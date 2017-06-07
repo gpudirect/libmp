@@ -5,6 +5,8 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
+[ ! -e "hostfile" ] 	&& { echo "ERROR: missing hostfile";  exit 1; }
+
 NP=$1
 
 export PATH=$PATH
