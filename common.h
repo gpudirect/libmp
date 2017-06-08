@@ -38,9 +38,33 @@
 #define OOB_PRIORITY_MPI 0
 #define OOB_PRIORITY_SOCKET 1
 
-#define VERBS_SUCCESS 0
-#define VERBS_FAILURE 1
+#define OOB_SUCCESS 0
+#define OOB_FAILURE	1
+
+#define MP_SUCCESS 0
+#define MP_FAILURE 1
 
 #define MAX_PEERS 50
+
+typedef enum {
+	MP_CHAR=0,
+	MP_BYTE,
+	MP_INT,
+	MP_LONG,
+	MP_FLOAT,
+	MP_DOUBLE
+} mp_data_type;
+
+#define mp_info_msg(FMT, ARGS...) do {                                  \
+        fprintf(stderr, "[%d] [%d] MP INFO %s() "                       \
+                FMT, getpid(), 0 /*mpi_comm_rank*/, __FUNCTION__ , ## ARGS);  \
+        fflush(stderr);                                                 \
+    } while(0)
+
+#define mp_err_msg(FMT, ARGS...)  do {                                  \
+        fprintf(stderr, "[%d] [%d] MP ERR  %s() "                       \
+                FMT, getpid(), 0 /*mpi_comm_rank*/, __FUNCTION__ , ## ARGS);  \
+        fflush(stderr);                                                 \
+    } while(0)
 
 #endif

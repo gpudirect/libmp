@@ -27,8 +27,7 @@ MVAPICH_params="$MVAPICH_params -genv MV2_CUDA_BLOCK_SIZE 16777216 -genv MV2_GPU
 #MVAPICH_params=""
 
 set -x
-$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params  \
- -np $NP -hostfile hostfile ./wrapper_mvapich.sh ./mpi_test
+$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile ./wrapper_mvapich.sh ./mpi_test
 
 #-verbose
 #nvprof -o nvprof-singlestream.%q{MV2_COMM_WORLD_LOCAL_RANK}.nvprof

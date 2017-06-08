@@ -197,4 +197,16 @@ struct mp_request {
    struct mp_request *prev;
 }; 
 
+struct mp_window {
+   void **base_ptr;
+   int size;
+   struct mp_reg *reg;
+   uint32_t lkey;
+   uint32_t *rkey;
+   uint64_t *rsize;
+};
 
+typedef struct mem_region {
+  void *region;
+  struct mem_region *next;
+} mem_region_t;

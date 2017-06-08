@@ -20,8 +20,25 @@ int main(int argc, char *argv[])
 #endif
 
 	tl_comm->setupOOB(oob_comm);
+	printf("OOB set\n");
 
 	tl_comm->setupNetworkDevices();
+	printf("setupNetworkDevices set\n");
+	
+	tl_comm->createEndpoints();
+	printf("createEndpoints set\n");
+	
+	tl_comm->exchangeEndpoints();
+	printf("exchangeEndpoints set\n");
+
+	tl_comm->updateEndpoints();
+	printf("updateEndpoints set\n");
+	
+	tl_comm->cleanupInit();
+	printf("cleanupInit set\n");
+	
+	tl_comm->finalize();
+	printf("finalize set\n");
 	
 	oob_comm->finalize();
 

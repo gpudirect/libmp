@@ -14,7 +14,7 @@ namespace OOB
 	        virtual int getMyId()=0;
    	        virtual void sync()=0;
 	        virtual int finalize()=0;
-	        virtual int bcast(void * sendBuf, size_t sendSize)=0;
+			virtual int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)=0;
     };
 
 }

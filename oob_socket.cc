@@ -37,7 +37,7 @@ namespace OOB
 				return 0;
 			}
 
-			int bcast(void * sendBuf, size_t sendSize) {
+			int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType) {
 				return 0;
 			}
 	};
