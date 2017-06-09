@@ -24,9 +24,14 @@ namespace TL
 	        virtual void cleanupInit()=0;
 	        virtual int finalize()=0;
 
+	        // ===== PREPARE COMMUNICATION
+			virtual int register_buffer(void * addr, size_t length, mp_key_t * mp_req)=0;
+			virtual mp_request_t * create_requests(int number)=0;
+			virtual mp_key_t * create_keys(int number)=0;
+
 	        // ===== COMMUNICATION
 	        virtual int send()=0;
-	        virtual int receive()=0;
+	        virtual int receive(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key)=0;
     };
 }
 

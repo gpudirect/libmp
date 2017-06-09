@@ -46,24 +46,86 @@
 
 #define MAX_PEERS 50
 
+//progress flow fix
+#define MP_MAX_PROGRESS_FLOW_TRY 100
+#define MP_PROGRESS_ERROR_CHECK_TMOUT_US ((us_t)60*1000*1000)
+
 typedef enum {
-	MP_CHAR=0,
-	MP_BYTE,
-	MP_INT,
-	MP_LONG,
-	MP_FLOAT,
-	MP_DOUBLE
+    MP_CHAR=0,
+    MP_BYTE,
+    MP_INT,
+    MP_LONG,
+    MP_FLOAT,
+    MP_DOUBLE
 } mp_data_type;
+
+typedef enum mp_state {
+    MP_UNDEF,
+    MP_PREPARED,       // req just prepared
+    MP_PENDING_NOWAIT, // req posted, but not wait-for-end pending yet
+    MP_PENDING,        // req posted and wait is pending
+    // MP_WAIT_POSTED,
+    MP_COMPLETE,
+    MP_N_STATES
+} mp_state_t ;
+
+typedef enum mp_req_type {
+    MP_NULL = 0,
+    MP_SEND,
+    MP_RECV,
+    MP_RDMA,
+    MP_N_TYPES
+} mp_req_type_t;
+
+typedef enum mp_flow {
+    TX_FLOW, // requests associated with tx_cq
+    RX_FLOW, // same for rx_cq
+    N_FLOWS
+} mp_flow_t;
+
+//to be continued.....
+//cast within tl functions to verbs_request_t
+typedef void * mp_request_t;
+typedef void * mp_key_t;
+
+#ifndef ACCESS_ONCE
+#define ACCESS_ONCE(V)                          \
+    (*(volatile typeof (V) *)&(V))
+#endif
+
+#ifndef MIN
+#define MIN(A,B) ((A)<(B)?(A):(B))
+#endif
+
+extern int oob_rank;
+
+#define mp_dbg_msg(FMT, ARGS...)  do {                                  \
+    if (mp_dbg_is_enabled)  {                                            \
+        fprintf(stderr, "[%d] [%d] MP DBG  %s() "                       \
+                FMT, getpid(),  oob_rank, __FUNCTION__ , ## ARGS); \
+        fflush(stderr);                                                 \
+    }                                                                   \
+} while(0)
+
+#define mp_warn_msg(FMT, ARGS...) do {                                  \
+        if (mp_warn_is_enabled) {                                        \
+            fprintf(stderr, "[%d] [%d] MP WARN %s() "                   \
+                    FMT, getpid(), oob_rank, __FUNCTION__ , ## ARGS); \
+            fflush(stderr);                                             \
+        }                                                               \
+    } while(0)
+
+
 
 #define mp_info_msg(FMT, ARGS...) do {                                  \
         fprintf(stderr, "[%d] [%d] MP INFO %s() "                       \
-                FMT, getpid(), 0 /*mpi_comm_rank*/, __FUNCTION__ , ## ARGS);  \
+                FMT, getpid(), oob_rank, __FUNCTION__ , ## ARGS);  \
         fflush(stderr);                                                 \
     } while(0)
 
 #define mp_err_msg(FMT, ARGS...)  do {                                  \
         fprintf(stderr, "[%d] [%d] MP ERR  %s() "                       \
-                FMT, getpid(), 0 /*mpi_comm_rank*/, __FUNCTION__ , ## ARGS);  \
+                FMT, getpid(), oob_rank, __FUNCTION__ , ## ARGS);  \
         fflush(stderr);                                                 \
     } while(0)
 
