@@ -182,7 +182,3 @@ struct verbs_reg {
     struct ibv_mr *mr;
 };
 typedef struct verbs_reg * verbs_reg_t;
-
-static inline const char *verbs_flow_to_str(mp_flow_t flow) {
-    return flow==TX_FLOW?"TX":"RX";
-}

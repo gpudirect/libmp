@@ -118,6 +118,11 @@ namespace TL
 			  return req;
 			}
 
+			static inline const char *verbs_flow_to_str(mp_flow_t flow) {
+			    return flow==TX_FLOW?"TX":"RX";
+			}
+
+
 			int verbs_get_request_id(client_t *client, mp_req_type_t type)
 			{
 			    assert(client->last_req_id < UINT_MAX);
@@ -157,7 +162,7 @@ namespace TL
 			    int cqe_count = 0;
 
 			    if (!wc) {
-			        wc = malloc(sizeof(struct ibv_wc)*cq_poll_count);
+			        wc = (struct ibv_wc*)calloc(cq_poll_count, sizeof(struct ibv_wc));
 			    }
 
 			    const char *flow_str = verbs_flow_to_str(flow);
@@ -934,7 +939,7 @@ namespace TL
 				return (mp_request_t *) req;
 			}
 
-			int receive(void * buf, size_t size, int peer, verbs_request_t * mp_req, mp_key_t * mp_mem_key) {
+			int receive(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
 				int ret = 0;
 				struct verbs_request *req = NULL;
 				verbs_reg_t reg = (verbs_reg_t) *mp_mem_key;
