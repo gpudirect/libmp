@@ -141,8 +141,11 @@ namespace TL
 			        return MP_FAILURE;
 			    do
 			    {
-
+#ifdef GDSYNC
+			    	ret = gds_post_recv(client->qp, &req->in.rr, &req->out.bad_rr);
+#else
 			    	ret = ibv_post_recv(client->qp->qp, &req->in.rr, &req->out.bad_rr);
+#endif
 			        if(ret == ENOMEM)
 			        {
 			            ret_progress = verbs_progress_single_flow(RX_FLOW);
@@ -156,6 +159,45 @@ namespace TL
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
 
+			    return ret;
+			}
+
+			int verbs_post_send(client_t *client, struct verbs_request *req)
+			{
+			    int progress_retry=0, ret=0, ret_progress=0;
+
+			    if(!client || !req)
+			        return MP_FAILURE;
+			    do
+			    {
+#ifdef GDSYNC
+					ret = gds_post_send (client->qp, &req->in.sr, &req->out.bad_sr);
+#else
+			    	ret = ibv_exp_post_send(client->qp->qp, &req->in.sr, &req->out.bad_sr);
+			        if (ret) {
+		                if (ret == ENOMEM) {
+	                        // out of space error can happen too often to report
+	                        //dgb
+	                        mp_dbg_msg("ENOMEM error %d in ibv_exp_post_send\n", ret);
+		                } else {
+		                    mp_err_msg("error %d in ibv_exp_post_send\n", ret);
+		                }
+		                goto out;
+			        }
+#endif
+			        if(ret == ENOMEM)
+			        {
+			            ret_progress = verbs_progress_single_flow(TX_FLOW);
+			            if(ret_progress != MP_SUCCESS)
+			            {
+			                mp_err_msg("mp_progress_single_flow failed. Error: %d\n", ret_progress);
+			                break;
+			            }
+			            mp_warn_msg("TX_FLOW was full. mp_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+			            progress_retry++;
+			        }
+			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
+			out:
 			    return ret;
 			}
 
@@ -868,10 +910,6 @@ namespace TL
 			}
 
 			// ===== COMMUNICATION
-			int send() {
-				return MP_SUCCESS;
-			}
-
 			int register_buffer(void * addr, size_t length, mp_key_t * mp_mem_key) {
 
 				int flags;
@@ -982,12 +1020,72 @@ namespace TL
 				//progress (remove) some request on the RX flow if is not possible to queue a recv request
 				ret = verbs_post_recv(client, req);
 				if (ret) {
-					mp_err_msg("posting recv failed ret: %d error: %s peer: %d index: %d \n", ret, strerror(errno), peer, client_index[peer]);
-					return MP_FAILURE;
+					mp_err_msg("posting recv failed: %s \n", strerror(errno));
+					goto out;
+				}
+#ifdef GDSYNC
+				ret = gds_prepare_wait_cq(client->recv_cq, &req->gds_wait_info, 0);
+					if (ret) {
+					mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+					goto out;
+				}
+#endif
+				*mp_req = req; 
+			out:
+				return ret;
+			}
+
+			int send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+				int ret = 0;
+				struct verbs_request *req = NULL;
+				verbs_reg_t reg = (verbs_reg_t) *mp_mem_key;
+				client_t *client = &clients[client_index[peer]];
+
+				assert(reg);
+				req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
+				assert(req);
+
+				printf("peer=%d req=%p buf=%p size=%zd req id=%d\n", peer, req, buf, size, req->id);
+				printf("reg=%p key=%x\n", reg, reg->key);
+
+//			    mp_dbg_msg("req=%p id=%d\n", req, req->id);
+
+
+				req->in.sr.next = NULL;
+				req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = 1;
+				req->in.sr.sg_list = &req->sg_entry;
+
+				if (verbs_enable_ud) {
+				    req->in.sr.wr.ud.ah = client->ah;
+				    req->in.sr.wr.ud.remote_qpn = client->qpn; 
+				    req->in.sr.wr.ud.remote_qkey = 0;
 				}
 
+				req->sg_entry.length = size;
+				req->sg_entry.lkey = reg->key;
+				req->sg_entry.addr = (uintptr_t)(buf);
+				// progress (remove) some request on the TX flow if is not possible to queue a send request
+				ret = verbs_post_send(client, req);
+				if (ret) {
+					mp_err_msg("posting send failed: %s \n", strerror(errno));
+					goto out;
+				}
+
+#ifdef GDSYNC
+				ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
+				if (ret) {
+				    mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+				    goto out;
+				}
+#endif		    
+
 				*mp_req = req; 
-				return MP_SUCCESS;
+
+			out:
+			    return ret;
 			}
 	};
 }

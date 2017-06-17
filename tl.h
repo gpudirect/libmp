@@ -30,7 +30,7 @@ namespace TL
 			virtual mp_key_t * create_keys(int number)=0;
 
 	        // ===== COMMUNICATION
-	        virtual int send()=0;
+	        virtual int send(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key)=0;
 	        virtual int receive(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key)=0;
     };
 }
