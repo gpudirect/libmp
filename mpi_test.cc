@@ -37,8 +37,11 @@ int main(int argc, char *argv[])
 	
 	size_t bufSize=10;
 	char * rBuf = (char *) calloc (bufSize, sizeof(char));
+	memset(sBuf, 0, bufSize);
+	
 	char * sBuf = (char *) calloc (bufSize, sizeof(char));
 	memset(sBuf, 'b', bufSize);
+
 	mp_key_t * mp_key;
 
 	mp_key = tl_comm->create_keys(2);
@@ -60,10 +63,15 @@ int main(int argc, char *argv[])
 	tl_comm->send(sBuf, bufSize, !myId, &reqs[1], &mp_key[1]);
 	printf("receive set\n");
 
-	//add a wait
-	oob_comm->sync();
+	//wait send
+	tl_comm->wait(&reqs[0]);
+	//wait recv
+	tl_comm->wait(&reqs[1]);
 
-	printf("received: %s\n", rBuf);
+	//oob_comm->sync();
+
+	printf("myRank: %d, received buffer: %s\n", myId, rBuf);
+
 	tl_comm->cleanupInit();
 	printf("cleanupInit set\n");
 	

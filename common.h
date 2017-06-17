@@ -129,4 +129,18 @@ extern int oob_rank;
         fflush(stderr);                                                 \
     } while(0)
 
+
+typedef uint64_t us_t;
+static inline us_t mp_get_cycles()
+{
+    struct timespec ts;
+    int ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+    if (ret) {
+        mp_err_msg("error in gettime %d/%s\n", errno, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    return (us_t)ts.tv_sec * 1000 * 1000 + (us_t)ts.tv_nsec / 1000;
+}
+
+
 #endif

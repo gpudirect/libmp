@@ -55,7 +55,6 @@ namespace TL
 
 			  assert (mp_request_free_list == NULL);
 
-			  printf("1\n");
 			  mem_region = (mem_region_t *) calloc (1, sizeof (mem_region_t));
 			  if (mem_region == NULL) {
 			    mp_err_msg("memory allocation for mem_region failed \n");
@@ -68,7 +67,6 @@ namespace TL
 			    mem_region->next = mem_region_list;
 			  }
 
-			  printf("2\n");
 			  mem_region->region = (struct verbs_request *) calloc (verbs_request_limit, sizeof(struct verbs_request));
 			  if (mem_region == NULL) {
 			    mp_err_msg("memory allocation for request_region failed \n");
@@ -76,9 +74,6 @@ namespace TL
 			  }
 
 			  mp_requests = (struct verbs_request *) mem_region->region;
-
-			  printf("3\n");
-
 			  mp_request_free_list = mp_requests;
 			  for (i=0; i<verbs_request_limit-1; i++) {
 			    mp_requests[i].next = mp_requests + i + 1;
@@ -122,10 +117,44 @@ namespace TL
 			  return req;
 			}
 
+			void release_verbs_request(verbs_request_t req)
+			{
+			  req->next = mp_request_free_list;
+			  req->prev = NULL;
+			  req->type = MP_NULL;
+
+			  mp_request_free_list = req;
+			}
+
+
 			static inline const char *verbs_flow_to_str(mp_flow_t flow) {
 			    return flow==TX_FLOW?"TX":"RX";
 			}
 
+			static inline int verbs_req_type_rx(mp_req_type_t type)
+			{
+			    assert(type > MP_NULL && type < MP_N_TYPES);
+			    return (type == MP_RECV);
+			}
+
+			static inline int verbs_req_type_tx(mp_req_type_t type)
+			{
+			    assert(type > MP_NULL && type < MP_N_TYPES);
+			    return (type == MP_SEND) || (type == MP_RDMA);
+			}
+
+			static inline int verbs_req_valid(struct verbs_request *req)
+			{
+			    return (req->type   > MP_NULL  && req->type   < MP_N_TYPES ) && 
+			           (req->status > MP_UNDEF && req->status < MP_N_STATES);
+			}
+
+			static inline int verbs_req_can_be_waited(struct verbs_request *req)
+			{
+			    assert(verbs_req_valid(req));
+			    return verbs_req_type_rx(req->type) || (
+			        verbs_req_type_tx(req->type) && !(req->flags & MP_PUT_NOWAIT));
+			}
 
 			int verbs_get_request_id(client_t *client, mp_req_type_t type)
 			{
@@ -141,7 +170,7 @@ namespace TL
 			        return MP_FAILURE;
 			    do
 			    {
-#ifdef GDSYNC
+#ifdef HAVE_GDSYNC
 			    	ret = gds_post_recv(client->qp, &req->in.rr, &req->out.bad_rr);
 #else
 			    	ret = ibv_post_recv(client->qp->qp, &req->in.rr, &req->out.bad_rr);
@@ -151,10 +180,10 @@ namespace TL
 			            ret_progress = verbs_progress_single_flow(RX_FLOW);
 			            if(ret_progress != MP_SUCCESS)
 			            {
-			                mp_err_msg("mp_progress_single_flow failed. Error: %d\n", ret_progress);
+			                mp_err_msg("verbs_progress_single_flow failed. Error: %d\n", ret_progress);
 			                break;
 			            }
-			            mp_warn_msg("RX_FLOW was full. mp_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+			            mp_warn_msg("RX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
 			            progress_retry++;
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
@@ -170,7 +199,7 @@ namespace TL
 			        return MP_FAILURE;
 			    do
 			    {
-#ifdef GDSYNC
+#ifdef HAVE_GDSYNC
 					ret = gds_post_send (client->qp, &req->in.sr, &req->out.bad_sr);
 #else
 			    	ret = ibv_exp_post_send(client->qp->qp, &req->in.sr, &req->out.bad_sr);
@@ -190,10 +219,10 @@ namespace TL
 			            ret_progress = verbs_progress_single_flow(TX_FLOW);
 			            if(ret_progress != MP_SUCCESS)
 			            {
-			                mp_err_msg("mp_progress_single_flow failed. Error: %d\n", ret_progress);
+			                mp_err_msg("verbs_progress_single_flow failed. Error: %d\n", ret_progress);
 			                break;
 			            }
-			            mp_warn_msg("TX_FLOW was full. mp_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+			            mp_warn_msg("TX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
 			            progress_retry++;
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
@@ -591,7 +620,7 @@ namespace TL
 					  ib_qp_init_attr.qp_type = IBV_QPT_RC;
 					  ib_qp_init_attr.cap.max_inline_data = ib_inline_size;
 					}
-#ifdef GDSYNC
+#ifdef HAVE_GDSYNC
 					gds_flags = GDS_CREATE_QP_DEFAULT;
 					if (use_wq_gpu)
 					  gds_flags |= GDS_CREATE_QP_WQ_ON_GPU;
@@ -860,7 +889,7 @@ namespace TL
 				/*destroy IB resources*/
 				for (i=0; i<peer_count; i++) {
 					printf("peer %d\n", i);
-#ifdef GDSYNC
+#ifdef HAVE_GDSYNC
 				  	gds_destroy_qp (clients[i].qp);
 #else
 			        assert(clients[i].qp);
@@ -892,14 +921,13 @@ namespace TL
 
 				ibv_dealloc_pd (ib_ctx->pd);
 				ibv_close_device (ib_ctx->context);
-/*
+
 				while (mem_region_list != NULL) {
 					mem_region = mem_region_list;
 					mem_region_list = mem_region_list->next;
 					free(mem_region->region);
 					free(mem_region);
 				}
-*/
 
 				/*free all buffers*/
 				free(ib_ctx);
@@ -1023,7 +1051,7 @@ namespace TL
 					mp_err_msg("posting recv failed: %s \n", strerror(errno));
 					goto out;
 				}
-#ifdef GDSYNC
+#ifdef HAVE_GDSYNC
 				ret = gds_prepare_wait_cq(client->recv_cq, &req->gds_wait_info, 0);
 					if (ret) {
 					mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
@@ -1048,7 +1076,7 @@ namespace TL
 				printf("peer=%d req=%p buf=%p size=%zd req id=%d\n", peer, req, buf, size, req->id);
 				printf("reg=%p key=%x\n", reg, reg->key);
 
-//			    mp_dbg_msg("req=%p id=%d\n", req, req->id);
+				//			    mp_dbg_msg("req=%p id=%d\n", req, req->id);
 
 
 				req->in.sr.next = NULL;
@@ -1074,7 +1102,7 @@ namespace TL
 					goto out;
 				}
 
-#ifdef GDSYNC
+#ifdef HAVE_GDSYNC
 				ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
 				if (ret) {
 				    mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
@@ -1086,6 +1114,144 @@ namespace TL
 
 			out:
 			    return ret;
+			}
+
+			int wait(mp_request_t *req)
+			{
+			  int ret = 0;
+
+			  ret = wait_all(1, req);
+
+			  return ret;
+			}
+
+			int wait_all (int count, mp_request_t *req_)
+			{
+			    int complete = 0, ret = 0;
+			    
+			    us_t start = mp_get_cycles();
+			    us_t tmout = MP_PROGRESS_ERROR_CHECK_TMOUT_US;
+			    
+			    /*poll until completion*/
+			    while (complete < count) {
+			        struct verbs_request *req = (verbs_request_t) req_[complete];
+					if (!verbs_req_can_be_waited(req))
+					{
+					    mp_dbg_msg("cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
+					    ret = EINVAL;
+					    goto out;
+					}
+					if (req->status == MP_PENDING_NOWAIT) {
+					    mp_dbg_msg("PENDING_NOWAIT->PENDING req:%p status:%d id=%d peer=%d type=%d\n", req, req->status, req->id, req->peer, req->type);
+#ifdef HAVE_GDSYNC
+					    client_t *client = &clients[client_index[req->peer]];
+					    mp_flow_t req_flow = mp_type_to_flow(req->type);
+					    struct gds_cq *cq = (req_flow == TX_FLOW) ? client->send_cq : client->recv_cq;
+						// user did not call post_wait_cq()
+						// if req->status == WAIT_PENDING && it is a stream request
+						//   manually ack the cqe info (NEW EXP verbs API)
+						//   req->status = MP_WAIT_POSTED
+					    ret = gds_post_wait_cq(cq, &req->gds_wait_info, 0);
+					    if (ret) {
+					      mp_err_msg("got %d while posting cq\n", ret);
+					      goto out;
+					    }
+					    req->stream = NULL;
+#endif
+					    req->status = MP_PENDING;
+					}
+
+			        complete++;
+			    }
+			    
+			    complete=0;
+
+			    while (complete < count) {
+			        struct verbs_request *req = (verbs_request_t) req_[complete];
+			        
+			        while (req->status != MP_COMPLETE) {
+			            ret = verbs_progress_single_flow (TX_FLOW);
+			            if (ret) {
+			                goto out;
+			            }
+			            ret = verbs_progress_single_flow (RX_FLOW);
+			            if (ret) {
+			                goto out;
+			            }
+#ifdef HAVE_GDSYNC
+			            us_t now = mp_get_cycles();
+			            if (((long)now-(long)start) > (long)tmout) {
+			                start = now;
+			                mp_warn_msg("checking for GPU errors\n");
+			                int retcode = mp_check_gpu_error();
+			                if (retcode) {
+			                    ret = MP_FAILURE;
+			                    goto out;
+			                }
+			                mp_warn_msg("enabling dbg tracing\n");
+			                mp_enable_dbg(1);
+			                mp_dbg_msg("complete=%d req:%p status:%d id=%d peer=%d type=%d\n", complete, req, req->status, req->id, req->peer, req->type);
+			            }
+#endif
+			        }
+			        
+			        complete++;
+			    }
+
+			    if(!ret)
+			    {
+			        complete=0;
+			        while (complete < count) {
+			        	struct verbs_request *req = (verbs_request_t) req_[complete];
+			            if (req->status == MP_COMPLETE)
+			                release_verbs_request((verbs_request_t) req);
+			            else
+			                ret = MP_FAILURE;
+
+			            complete++;
+			        }
+			    }
+
+			out:
+			    return ret;
+			}
+
+			int verbs_progress_requests (uint32_t count, mp_request_t *req_)
+			{
+			  int r = 0, ret = 0;
+			  int completed_reqs = 0;
+			  /*poll until completion*/
+			  while (r < count) {
+			    struct mp_request *req = req_[r];
+			    
+			    if (!verbs_req_valid(req)) {
+			        mp_err_msg("invalid req=%p req->id=%d\n", req, req->id);
+			    }
+
+			    ret = verbs_progress_single_flow(TX_FLOW);
+			    if (ret) {
+			        mp_dbg_msg("progress error %d\n", ret);
+			        goto out;
+			    }
+
+			    ret = verbs_progress_single_flow(RX_FLOW);
+			    if (ret) {
+			        mp_dbg_msg("progress error %d\n", ret);
+			        goto out;
+			    }
+
+			    if (req->status == MP_COMPLETE) {
+			        completed_reqs++;
+			    }
+
+			    r++;
+			  }
+			  if (completed_reqs)
+			      mp_dbg_msg("%d completed reqs, not being released!\n", completed_reqs);
+			  ret = completed_reqs;
+
+			 out:
+			  return ret;
 			}
 	};
 }

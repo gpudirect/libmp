@@ -32,6 +32,8 @@ namespace TL
 	        // ===== COMMUNICATION
 	        virtual int send(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key)=0;
 	        virtual int receive(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key)=0;
+	        virtual int wait(mp_request_t *req)=0;
+	        virtual int wait_all (int count, mp_request_t *req)=0;
     };
 }
 
