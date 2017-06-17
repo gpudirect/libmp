@@ -35,23 +35,35 @@ int main(int argc, char *argv[])
 	tl_comm->updateEndpoints();
 	printf("updateEndpoints set\n");
 	
-	size_t rsize=10;
-	char * rBuf = (char *) calloc (rsize, sizeof(char));
+	size_t bufSize=10;
+	char * rBuf = (char *) calloc (bufSize, sizeof(char));
+	char * sBuf = (char *) calloc (bufSize, sizeof(char));
+	memset(sBuf, 'b', bufSize);
 	mp_key_t * mp_key;
 
-	mp_key = tl_comm->create_keys(1);
+	mp_key = tl_comm->create_keys(2);
 	printf("create_requests set\n");
 
-	tl_comm->register_buffer(rBuf, rsize, &mp_key[0]);
-	printf("register_buffer set\n");
+	tl_comm->register_buffer(rBuf, bufSize, &mp_key[0]);
+	printf("register_buffer recv\n");
+
+	tl_comm->register_buffer(sBuf, bufSize, &mp_key[1]);
+	printf("register_buffer send\n");
 
 	mp_request_t * reqs;
-	reqs = tl_comm->create_requests(1);
+	reqs = tl_comm->create_requests(2);
 	printf("create_requests set\n");
 
-	tl_comm->receive(rBuf, rsize, !myId, reqs, &mp_key[0]);
+	tl_comm->receive(rBuf, bufSize, !myId, &reqs[0], &mp_key[0]);
 	printf("receive set\n");
 
+	tl_comm->send(sBuf, bufSize, !myId, &reqs[1], &mp_key[1]);
+	printf("receive set\n");
+
+	//add a wait
+	oob_comm->sync();
+
+	printf("received: %s\n", rBuf);
 	tl_comm->cleanupInit();
 	printf("cleanupInit set\n");
 	
