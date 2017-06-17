@@ -55,7 +55,8 @@ namespace TL
 
 			  assert (mp_request_free_list == NULL);
 
-			  mem_region = (mem_region_t *) malloc (sizeof (mem_region_t));
+			  printf("1\n");
+			  mem_region = (mem_region_t *) calloc (1, sizeof (mem_region_t));
 			  if (mem_region == NULL) {
 			    mp_err_msg("memory allocation for mem_region failed \n");
 			    exit(-1);
@@ -67,13 +68,16 @@ namespace TL
 			    mem_region->next = mem_region_list;
 			  }
 
-			  mem_region->region = malloc (sizeof(struct verbs_request)*verbs_request_limit);
+			  printf("2\n");
+			  mem_region->region = (struct verbs_request *) calloc (verbs_request_limit, sizeof(struct verbs_request));
 			  if (mem_region == NULL) {
 			    mp_err_msg("memory allocation for request_region failed \n");
 			    exit(-1);
 			  }
 
 			  mp_requests = (struct verbs_request *) mem_region->region;
+
+			  printf("3\n");
 
 			  mp_request_free_list = mp_requests;
 			  for (i=0; i<verbs_request_limit-1; i++) {
@@ -84,6 +88,8 @@ namespace TL
 
 			struct verbs_request *verbs_get_request()
 			{
+				printf("verbs_get_request init\n");
+
 			  struct verbs_request *req = NULL;
 
 			  if (mp_request_free_list == NULL) {
@@ -92,7 +98,9 @@ namespace TL
 			  }
 
 			  req = mp_request_free_list;
+			  printf("req = mp_request_free_list\n");
 			  mp_request_free_list = mp_request_free_list->next;
+			  printf("mp_request_free_list = mp_request_free_list->next\n");
 
 			  req->next = NULL;
 			  req->prev = NULL;
@@ -871,8 +879,8 @@ namespace TL
 			int register_buffer(void * addr, size_t length, mp_key_t * mp_mem_key) {
 
 				int flags;
-
-				struct verbs_reg * reg = (verbs_reg_t)calloc(1, sizeof(struct verbs_reg));
+				assert(mp_mem_key);
+				verbs_reg_t reg = (verbs_reg_t)calloc(1, sizeof(struct verbs_reg));
 				if (!reg) {
 				  mp_err_msg("malloc returned NULL while allocating struct mp_reg\n");
 				  return MP_FAILURE;
@@ -906,12 +914,14 @@ namespace TL
 
 			mp_key_t * create_keys(int number) {
 
+				verbs_reg_t * reg;
+
 				if(number <= 0) {
 					mp_err_msg("erroneuos requests number specified (%d)\n", number);
 					return NULL;
 				}
 
-				struct verbs_reg * reg = (verbs_reg_t)calloc(number, sizeof(struct verbs_reg));
+				reg = (verbs_reg_t *)calloc(number, sizeof(verbs_reg_t));
 				if (!reg) {
 				  mp_err_msg("malloc returned NULL while allocating struct mp_reg\n");
 				  return NULL;
@@ -945,14 +955,15 @@ namespace TL
 				verbs_reg_t reg = (verbs_reg_t) *mp_mem_key;
 				client_t *client = &clients[client_index[peer]];
 
+				assert(reg);
 				req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
 				assert(req);
 
-				printf("peer=%d req=%p buf=%p size=%zd id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
- 
+				printf("peer=%d req=%p buf=%p size=%zd req id=%d\n", peer, req, buf, size, req->id);
+				printf("reg=%p key=%x\n", reg, reg->key);
+
 				req->in.rr.next = NULL;
 				req->in.rr.wr_id = (uintptr_t) req;
-
 
 				if (verbs_enable_ud) { 
 				  struct verbs_reg *ud_reg = (struct verbs_reg *) ud_padding_reg;

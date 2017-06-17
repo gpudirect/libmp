@@ -42,15 +42,15 @@ int main(int argc, char *argv[])
 	mp_key = tl_comm->create_keys(1);
 	printf("create_requests set\n");
 
-	tl_comm->register_buffer(rBuf, rsize, mp_key);
+	tl_comm->register_buffer(rBuf, rsize, &mp_key[0]);
 	printf("register_buffer set\n");
 
 	mp_request_t * reqs;
 	reqs = tl_comm->create_requests(1);
 	printf("create_requests set\n");
 
-	tl_comm->receive(rBuf, rsize, !myId, mp_key, &reqs[0]);
-
+	tl_comm->receive(rBuf, rsize, !myId, reqs, &mp_key[0]);
+	printf("receive set\n");
 
 	tl_comm->cleanupInit();
 	printf("cleanupInit set\n");
