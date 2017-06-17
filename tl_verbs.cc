@@ -88,8 +88,6 @@ namespace TL
 
 			struct verbs_request *verbs_get_request()
 			{
-				printf("verbs_get_request init\n");
-
 			  struct verbs_request *req = NULL;
 
 			  if (mp_request_free_list == NULL) {
@@ -98,10 +96,8 @@ namespace TL
 			  }
 
 			  req = mp_request_free_list;
-			  printf("req = mp_request_free_list\n");
 			  mp_request_free_list = mp_request_free_list->next;
-			  printf("mp_request_free_list = mp_request_free_list->next\n");
-
+			  
 			  req->next = NULL;
 			  req->prev = NULL;
 
