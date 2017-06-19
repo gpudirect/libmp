@@ -21,70 +21,6 @@ struct verbs_qp {
 typedef struct ibv_qp_init_attr_ex verbs_qp_init_attr_t;
 typedef struct ibv_exp_send_wr verbs_send_wr;
 
-
-
-// batched submission APIs
-
-typedef enum gds_wait_cond_flag {
-        GDS_WAIT_COND_GEQ = 0, // must match verbs_exp enum
-        GDS_WAIT_COND_EQ,
-        GDS_WAIT_COND_AND,
-        GDS_WAIT_COND_NOR
-} gds_wait_cond_flag_t;
-
-typedef enum gds_memory_type {
-        GDS_MEMORY_GPU  = 1,
-        GDS_MEMORY_HOST = 2,
-        GDS_MEMORY_IO   = 4,
-	GDS_MEMORY_MASK = 0x7
-} gds_memory_type_t;
-
-typedef enum gds_wait_flags {
-	GDS_WAIT_POST_FLUSH = 1<<3,
-} gds_wait_flags_t;
-
-typedef enum gds_write_flags {
-	GDS_WRITE_PRE_BARRIER = 1<<4,
-} gds_write_flags_t;
-
-typedef enum gds_immcopy_flags {
-	GDS_IMMCOPY_POST_TAIL_FLUSH = 1<<4,
-} gds_immcopy_flags_t;
-
-typedef enum gds_membar_flags {
-	GDS_MEMBAR_FLUSH_REMOTE = 1<<4,
-	GDS_MEMBAR_DEFAULT      = 1<<5,
-	GDS_MEMBAR_SYS          = 1<<6,
-} gds_membar_flags_t;
-
-enum {
-        GDS_SEND_INFO_MAX_OPS = 32,
-        GDS_WAIT_INFO_MAX_OPS = 32
-};
-
-typedef struct gds_send_request {
-        struct ibv_exp_peer_commit commit;
-        struct peer_op_wr wr[GDS_SEND_INFO_MAX_OPS];
-} verbs_send_request_t;
-
-typedef struct gds_wait_request {
-        struct ibv_exp_peer_peek peek;
-        struct peer_op_wr wr[GDS_WAIT_INFO_MAX_OPS];
-} verbs_wait_request_t;
-
-typedef struct gds_wait_value32 { 
-        uint32_t  *ptr;
-        uint32_t   value;
-        gds_wait_cond_flag_t cond_flags;
-        int        flags; // takes gds_memory_type_t | gds_wait_flags_t
-} gds_wait_value32_t;
-
-typedef struct gds_write_value32 { 
-        uint32_t  *ptr;
-        uint32_t   value;
-        int        flags; // takes gds_memory_type_t | gds_write_flags_t
-} gds_write_value32_t;
-
 #define UD_ADDITION 40 
 
 /*exchange info*/
@@ -119,17 +55,19 @@ typedef struct {
    struct verbs_cq *send_cq;
    struct verbs_cq *recv_cq;
 #endif
+
    struct ibv_mr *region_mr;
    //UD info
    struct ibv_ah *ah;
    uint32_t qpn;
+
+#ifdef HAVE_IPC
    //ICP
    int is_local;
    int local_rank;
    int can_use_ipc;
 //   smp_channel_t smp;
 //   ipc_handle_cache_entry_t *ipc_handle_cache;
-#ifdef HAVE_IPC
    struct verbs_request *last_posted_ipc_rreq;
    struct verbs_request *posted_ipc_rreq;
    struct verbs_request *last_processed_ipc_rreq;
