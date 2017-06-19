@@ -879,7 +879,7 @@ namespace TL
 
 
 			int finalize() {
-				int i, ret, retcode=0;
+				int i, ret, retcode=MP_SUCCESS;
 				mem_region_t *mem_region = NULL;
 
 				printf("IBV finalize\n");
@@ -934,7 +934,7 @@ namespace TL
 				free(client_index);
 				free(clients);
 
-				return MP_SUCCESS;			
+				return retcode;			
 			}
 
 			// ===== COMMUNICATION
@@ -1128,10 +1128,11 @@ namespace TL
 			int wait_all (int count, mp_request_t *req_)
 			{
 			    int complete = 0, ret = 0;
-			    
+
+#ifdef HAVE_GDSYNC
 			    us_t start = mp_get_cycles();
 			    us_t tmout = MP_PROGRESS_ERROR_CHECK_TMOUT_US;
-			    
+#endif
 			    /*poll until completion*/
 			    while (complete < count) {
 			        struct verbs_request *req = (verbs_request_t) req_[complete];
@@ -1216,13 +1217,13 @@ namespace TL
 			    return ret;
 			}
 
-			int verbs_progress_requests (uint32_t count, mp_request_t *req_)
+			int verbs_progress_requests (int count, mp_request_t *req_)
 			{
 			  int r = 0, ret = 0;
 			  int completed_reqs = 0;
 			  /*poll until completion*/
 			  while (r < count) {
-			    struct mp_request *req = req_[r];
+			    verbs_request_t req = (verbs_request_t)req_[r];
 			    
 			    if (!verbs_req_valid(req)) {
 			        mp_err_msg("invalid req=%p req->id=%d\n", req, req->id);

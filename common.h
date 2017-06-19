@@ -24,6 +24,7 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <assert.h>
+#include <errno.h>
 
 //#include <cuda.h>
 //#include <cudaProfiler.h>
@@ -82,6 +83,12 @@ typedef enum mp_flow {
     RX_FLOW, // same for rx_cq
     N_FLOWS
 } mp_flow_t;
+
+enum mp_put_flags {
+    MP_PUT_INLINE  = 1<<0,
+    MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
+};
+
 
 //to be continued.....
 //cast within tl functions to verbs_request_t

@@ -144,35 +144,36 @@ typedef struct {
 } ib_context_t;
 
 struct verbs_request {
-   mp_req_type_t type;
-   int status;
-   int trigger;
-   uint32_t id;
-   int flags;
-   union
-   {
-      struct ibv_recv_wr rr;
+  int peer;
+  mp_req_type_t type;
+  int status;
+  int trigger;
+  int id;
+  //uint32_t id;
+  int flags;
+  union
+  {
+    struct ibv_recv_wr rr;
 #ifdef HAVE_GDSYNC
-      gds_send_wr sr;
+    gds_send_wr sr;
 #else
-      verbs_send_wr* bad_sr;
+    verbs_send_wr sr;
 #endif       
-   } in;
-   union
-   {
+  } in;
+  union
+  {
 #ifdef HAVE_GDSYNC
-      gds_send_wr* bad_sr;
+    gds_send_wr* bad_sr;
 #else
-      verbs_send_wr* bad_sr;
+    verbs_send_wr* bad_sr;
 #endif       
-      struct ibv_recv_wr* bad_rr;
-   } out;
-   struct ibv_sge sg_entry;
-   struct ibv_sge ud_sg_entry[2];
-   struct ibv_sge *sgv;
+    struct ibv_recv_wr* bad_rr;
+  } out;
+  struct ibv_sge sg_entry;
+  struct ibv_sge ud_sg_entry[2];
+  struct ibv_sge *sgv;
 
 #ifdef HAVE_GDSYNC
-  int peer;
   struct CUstream_st *stream;
   gds_send_request_t gds_send_info;
   gds_wait_request_t gds_wait_info;
