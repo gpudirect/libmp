@@ -15,6 +15,7 @@ namespace OOB
    	        virtual void sync()=0;
 	        virtual int finalize()=0;
 			virtual int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)=0;
+			virtual int allgather(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)=0;
     };
 
 }

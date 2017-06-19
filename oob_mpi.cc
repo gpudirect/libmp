@@ -88,21 +88,38 @@ namespace OOB
 				if(sBuf == NULL)
 				{
 					MPI_CHECK(MPI_Alltoall(
-						MPI_IN_PLACE, 0, 0, 
-						rBuf, rSize, mp_get_mpi_datatype(rType),
-						comm)
+							MPI_IN_PLACE, 0, 0, 
+							rBuf, rSize, mp_get_mpi_datatype(rType),
+							comm)
 					);
 				}
 				else
 				{
 					MPI_CHECK(MPI_Alltoall(
-						sBuf, sSize, mp_get_mpi_datatype(sType), 
-						rBuf, rSize, mp_get_mpi_datatype(rType),
-						comm)
+							sBuf, sSize, mp_get_mpi_datatype(sType), 
+							rBuf, rSize, mp_get_mpi_datatype(rType),
+							comm)
 					);
 				}
 
 				return OOB_SUCCESS;
+			}
+
+			int allgather(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType) {
+				if(sBuf == NULL)
+				{
+					MPI_CHECK(MPI_Allgather(
+							MPI_IN_PLACE, 0, 0, 
+							rBuf, rSize, mp_get_mpi_datatype(rType),
+							comm));
+				}
+				else
+				{
+					MPI_CHECK(MPI_Allgather(
+							sBuf, sSize, mp_get_mpi_datatype(sType), 
+							rBuf, rSize, mp_get_mpi_datatype(rType),
+							comm));
+				}
 			}
 	};
 }

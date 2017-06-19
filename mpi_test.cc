@@ -61,10 +61,10 @@ int main(int argc, char *argv[])
 	reqs = tl_comm->create_requests(2);
 	printf("create_requests set\n");
 
-	tl_comm->receive(rBuf, bufSize, !myId, &reqs[TEST_RECV_REQ], &mp_key[TEST_RECV_REQ]);
+	tl_comm->pt2pt_nb_receive(rBuf, bufSize, !myId, &reqs[TEST_RECV_REQ], &mp_key[TEST_RECV_REQ]);
 	printf("receive set\n");
 
-	tl_comm->send(sBuf, bufSize, !myId, &reqs[TEST_SEND_REQ], &mp_key[TEST_SEND_REQ]);
+	tl_comm->pt2pt_nb_send(sBuf, bufSize, !myId, &reqs[TEST_SEND_REQ], &mp_key[TEST_SEND_REQ]);
 	printf("receive set\n");
 
 	//wait recv

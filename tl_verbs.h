@@ -5,7 +5,16 @@
 #include <memory>
 #include <string>
 
-//GDS
+
+#ifdef HAVE_GDSYNC
+enum verbs_init_flags {
+    VERBS_INIT_DEFAULT = 0,
+    VERBS_INIT_WQ_ON_GPU,
+    VERBS_INIT_RX_CQ_ON_GPU,
+    VERBS_INIT_TX_CQ_ON_GPU,
+    VERBS_INIT_DBREC_ON_GPU
+};
+#endif
 
 struct verbs_cq {
         struct ibv_cq *cq;
@@ -122,6 +131,12 @@ struct verbs_request {
 };
 typedef struct verbs_request * verbs_request_t;
 
+struct verbs_reg {
+    uint32_t key;
+    struct ibv_mr *mr;
+};
+typedef struct verbs_reg * verbs_reg_t;
+
 struct verbs_window {
    void **base_ptr;
    int size;
@@ -137,9 +152,4 @@ typedef struct mem_region {
   struct mem_region *next;
 } mem_region_t;
 
-struct verbs_reg {
-    uint32_t key;
-    struct ibv_mr *mr;
-};
-typedef struct verbs_reg * verbs_reg_t;
 typedef uint64_t us_t;

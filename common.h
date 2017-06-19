@@ -89,11 +89,10 @@ enum mp_put_flags {
     MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
 };
 
-
-//to be continued.....
-//cast within tl functions to verbs_request_t
+//cast done inside tl layer
 typedef void * mp_request_t;
 typedef void * mp_key_t;
+typedef void * mp_window_t;
 
 #ifndef ACCESS_ONCE
 #define ACCESS_ONCE(V)                          \
@@ -149,5 +148,38 @@ static inline us_t mp_get_cycles()
     return (us_t)ts.tv_sec * 1000 * 1000 + (us_t)ts.tv_nsec / 1000;
 }
 
+#pragma once
+
+#if defined(__x86_64__) || defined (__i386__)
+
+#define mb()    asm volatile("mfence":::"memory")
+#define rmb()   asm volatile("lfence":::"memory")
+#define wmb()   asm volatile("sfence" ::: "memory")
+static inline void arch_cpu_relax(void)
+{
+        asm volatile("pause\n": : :"memory");
+}
+
+#elif defined(__powerpc__)
+
+static void arch_cpu_relax(void) __attribute__((unused)) ;
+static void arch_cpu_relax(void)
+{
+}
+
+static void wmb(void) __attribute__((unused)) ;
+static void wmb(void) 
+{
+    asm volatile("sync") ; 
+}
+static void rmb(void) __attribute__((unused)) ;
+static void rmb(void) 
+{
+    asm volatile("sync") ; 
+}
+
+#else
+#error "platform not supported"
+#endif
 
 #endif
