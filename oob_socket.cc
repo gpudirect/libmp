@@ -40,6 +40,11 @@ namespace OOB
 			int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType) {
 				return 0;
 			}
+
+			int allgather(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType) {
+				return 0;
+			}
+
 	};
 }
 

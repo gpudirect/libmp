@@ -1928,7 +1928,7 @@ int mp_iget (void *dst, int size, mp_reg_t *reg_t, int peer, size_t displ,
 
   assert(displ < window->rsize[client_id]);
 
-  req = new_request(clietn, MP_RDMA, MP_PENDING_NOWAIT);
+  req = new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
 
   req->in.sr.next = NULL;
   req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;

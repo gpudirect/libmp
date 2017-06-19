@@ -18,18 +18,18 @@ case ${HOSTNAME} in
 	# let's pick:
 	# GPU #0,2,4,6
 	# HCA #0,1,2,3
-	if (( $lrank > 8 )); then echo "too many ranks"; exit; fi
-	if (( $lrank == 0 )); then hlrank=0; dlrank=0; HCA=mlx5_0; fi
-	if (( $lrank == 1 )); then hlrank=1; dlrank=7; HCA=mlx5_3; fi 
-#	hlrank=1 #$(($lrank / 4)) # 0,1
-#	dlrank=$((($lrank * 2)+4)) # 0,2,4,6
-#	CUDA_VISIBLE_DEVICES=$dlrank
-	USE_GPU=${dlrank}
-	USE_CPU=${hlrank}
-	#MY_HCA=$(($dlrank/2))	
-	#HCA=mlx5_${MY_HCA}
-	MV2_IBA_HCA=${HCA}
-	VERBS_IB_HCA=${HCA}
+    if (( $lrank > 4 )); then echo "too many ranks"; exit; fi
+#       if (( $lrank == 0 )); then hlrank=0; dlrank=0; HCA=mlx5_0; fi
+#       if (( $lrank == 1 )); then hlrank=1; dlrank=7; HCA=mlx5_3; fi 
+    hlrank=$(($lrank / 2)) # 0,1
+    dlrank=$(($lrank * 2)) # 0,2,4,6
+#       CUDA_VISIBLE_DEVICES=$dlrank
+    USE_GPU=${dlrank}
+    USE_CPU=${hlrank}
+    #MY_HCA=$(($dlrank/2))  
+    HCA=mlx5_${lrank}
+    MV2_IBA_HCA=${HCA}
+    VERBS_IB_HCA=${HCA}
 	;;
 
     *ivy*)

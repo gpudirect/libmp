@@ -49,7 +49,7 @@ namespace TL
 #ifdef HAVE_GDSYNC
 			gds_send_request_t *gds_send_info_region = NULL;
 			gds_wait_request_t *gds_wait_info_region = NULL;
-			int use_event_sync, use_rx_cq_gpu, use_dbrec_gpu, use_rx_cq_gpu, use_tx_cq_gpu;
+			int use_event_sync, use_rx_cq_gpu, use_dbrec_gpu, use_wq_gpu, use_rx_cq_gpu, use_tx_cq_gpu;
 #endif
 
 #ifdef	HAVE_IPC
@@ -274,7 +274,7 @@ namespace TL
 			    if (!use_event_sync) 
 				return ret;
 
-			    for (i=0; i<client_count; i++) {
+			    for (i=0; i<peer_count; i++) {
 			        client_t *client = &clients[i];
 
 			        req = client->posted_stream_req[flow];
@@ -327,9 +327,9 @@ namespace TL
 			{
 			    int i, ne = 0, ret = 0;
 #ifdef HAVE_GDSYNC
-			    struct verbs_cq *cq = NULL; 
-#else
 			    struct gds_cq *cq = NULL;  
+#else
+			    struct verbs_cq *cq = NULL; 
 #endif
 			    int cqe_count = 0;
 
@@ -370,7 +370,7 @@ namespace TL
 			            int j;
 			            for (j=0; j<ne; j++) {
 			                struct ibv_wc *wc_curr = wc + j;
-			                printf("client:%d wc[%d]: status=%x(%s) opcode=%x byte_len=%d wr_id=%"PRIx64"\n",
+			                mp_dbg_msg("client:%d wc[%d]: status=%x(%s) opcode=%x byte_len=%d wr_id=%"PRIx64"\n",
 			                           client->oob_rank, j,
 			                           wc_curr->status, ibv_wc_status_str(wc_curr->status), 
 			                           wc_curr->opcode, wc_curr->byte_len, wc_curr->wr_id);
@@ -387,7 +387,7 @@ namespace TL
 			                }
 
 			                if (req) { 
-			                    printf("polled new CQE for req:%p flow:%s id=%d peer=%d type=%d\n", req, flow_str, req->id, req->peer, req->type);
+			                    mp_dbg_msg("polled new CQE for req:%p flow:%s id=%d peer=%d type=%d\n", req, flow_str, req->id, req->peer, req->type);
 
 			                    if (!(req->status == MP_PENDING_NOWAIT || req->status == MP_PENDING))
 			                        mp_err_msg("status not pending, value: %d \n", req->status);
@@ -401,7 +401,7 @@ namespace TL
 			                    ACCESS_ONCE(client->last_done_id) = req->id;
 			                    verbs_progress_request(req);
 			                } else {
-			                    printf("received completion with null wr_id \n");
+			                    mp_warn_msg("received completion with null wr_id \n");
 			                }
 			            }
 			        }
@@ -617,15 +617,12 @@ namespace TL
 				oob_size=oob_comm->getSize();
 				oob_rank=oob_comm->getMyId();
 
-				printf("Communicator says: %d peers\n", oob_size);
-
 				// init peers_list_list    
 				for (i=0, j=0; i<oob_size; ++i) {
 				        // self reference is forbidden
 				    if (i!=oob_rank) {
 				        peers_list[j] = i;
 				       // rank_to_peer[i] = j;
-				        printf("peers_list[%d]=rank %d\n", j, i);
 				        ++j;
 				    }
 				    /* else {
@@ -635,8 +632,6 @@ namespace TL
 				peer_count = j;
 				if(oob_size-1 != peer_count)
 					return MP_FAILURE;
-
-				printf("peer_count=%d\n", peer_count);
 
 	    		return MP_SUCCESS;
 	    	}
@@ -657,7 +652,7 @@ namespace TL
 					  select_dev = ibv_get_device_name(dev_list[i]);
 					  if (strstr(select_dev, ib_req_dev) != NULL) {
 					    ib_dev = dev_list[i];
-					    mp_err_msg("using IB device: %s \n", ib_req_dev);
+					    mp_dbg_msg("using IB device: %s \n", ib_req_dev);
 					    break;
 					  }
 					}
@@ -667,7 +662,7 @@ namespace TL
 					  printf("request device: %s not found, defaulting to %s \n", ib_req_dev, select_dev);
 					}
 				}
-				printf("HCA dev: %s\n", ibv_get_device_name(ib_dev));
+				mp_warn_msg("HCA dev: %s\n", ibv_get_device_name(ib_dev));
 
 				/*create context, pd, cq*/
 				ib_ctx = (ib_context_t *) calloc (1, sizeof (ib_context_t));
@@ -710,6 +705,17 @@ namespace TL
 
 			int createEndpoints() {
 				int ret, i;
+#ifdef HAVE_GDSYNC
+				int gds_flags;
+				gds_qp_init_attr_t ib_qp_init_attr;
+#else
+				int old_errno=0;
+				struct ibv_cq *send_cq = NULL;
+				struct ibv_cq *recv_cq = NULL;
+				struct ibv_exp_cq_init_attr cq_attr;
+				struct ibv_exp_qp_init_attr ib_qp_init_attr;
+#endif
+
 				/*establish connections*/
 				client_index = (int *)calloc(oob_size, sizeof(int));
 				if (client_index == NULL) {
@@ -738,7 +744,7 @@ namespace TL
 					peer = peers_list[i];
 					/*rank to peer id mapping */
 					client_index[peer] = i;
-					printf("Creating client %d, peer %d, client_index[peer]: %d\n", i, peer, client_index[peer]);
+					mp_dbg_msg("Creating client %d, peer %d, client_index[peer]: %d\n", i, peer, client_index[peer]);
 					/*peer id to rank mapping */
 					clients[i].oob_rank = peer;
 					clients[i].last_req_id = 0;
@@ -754,11 +760,6 @@ namespace TL
 					memset(clients[i].last_posted_stream_req, 0, sizeof(clients[0].last_posted_stream_req));
 					memset(clients[i].posted_stream_req,      0, sizeof(clients[0].posted_stream_req));
 
-#ifdef HAVE_GDSYNC
-			      gds_qp_init_attr_t ib_qp_init_attr;
-#else
-					struct ibv_exp_qp_init_attr ib_qp_init_attr;
-#endif
 					memset(&ib_qp_init_attr, 0, sizeof(ib_qp_init_attr));
 					ib_qp_init_attr.cap.max_send_wr  = ib_tx_depth;
 					ib_qp_init_attr.cap.max_recv_wr  = ib_rx_depth;
@@ -773,6 +774,7 @@ namespace TL
 					  ib_qp_init_attr.qp_type = IBV_QPT_RC;
 					  ib_qp_init_attr.cap.max_inline_data = ib_inline_size;
 					}
+
 #ifdef HAVE_GDSYNC
 					int gds_flags = GDS_CREATE_QP_DEFAULT;
 					if (use_wq_gpu)
@@ -787,138 +789,122 @@ namespace TL
 					//is the CUDA context already initialized?
 					clients[i].qp = gds_create_qp(ib_ctx->pd, ib_ctx->context, &ib_qp_init_attr, gpu_id, gds_flags);
 					if (clients[i].qp == NULL) {
-					  printf("qp creation failed \n");
+					  mp_err_msg("qp creation failed, errno %d\n", errno);
 					  return MP_FAILURE;
 					}
 #else
-					printf("Starting CQ creation\n");
-
 					// ================= CQs creation =================
-					int ret = 0;
-			        struct ibv_cq *send_cq = NULL;
-			        struct ibv_cq *recv_cq = NULL;
-					struct ibv_exp_cq_init_attr cq_attr;
 			        cq_attr.comp_mask = 0; //IBV_CREATE_CQ_ATTR_PEER_DIRECT;
-
 			        //CQE Compressing IBV_EXP_CQ_COMPRESSED_CQE? https://www.mail-archive.com/netdev@vger.kernel.org/msg110152.html
 			        cq_attr.flags = 0; // see ibv_exp_cq_create_flags
 			        cq_attr.res_domain = NULL;
 			        //Not Async case, no need of peer attrs
 			        cq_attr.peer_direct_attrs = NULL; //peer_attr;
 
-			        int old_errno = errno;
-
-   					printf("ibv_exp_create_cq send_cq\n");
+			        old_errno = errno;
 
 			        send_cq = ibv_exp_create_cq(ib_ctx->context, ib_qp_init_attr.cap.max_send_wr /*num cqe*/, NULL /* cq_context */, NULL /* channel */, 0 /*comp_vector*/, &cq_attr);
 			        if (!send_cq) {
-			                mp_err_msg("error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
+			            mp_err_msg("error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
+			            return MP_FAILURE;
 			        }
-   					printf("ibv_exp_create_cq recv_cq\n");
 
 			        recv_cq = ibv_exp_create_cq(ib_ctx->context, ib_qp_init_attr.cap.max_recv_wr /*num cqe*/, NULL /* cq_context */, NULL /* channel */, 0 /*comp_vector*/, &cq_attr);
 			        if (!recv_cq) {
-			                mp_err_msg("error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
+			            mp_err_msg("error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
+			            goto err_free_tx_cq;
 			        }
 
 					// ================= QP creation =================
-
 			        ib_qp_init_attr.send_cq = send_cq;
 			        ib_qp_init_attr.recv_cq = recv_cq;
-
 			        ib_qp_init_attr.pd = ib_ctx->pd;
 			        ib_qp_init_attr.comp_mask |= IBV_EXP_QP_INIT_ATTR_PD;
-
 			        //todo: No need of IBV_QP_INIT_ATTR_PEER_DIRECT (IBV_EXP_QP_INIT_ATTR_PEER_DIRECT)
 			        //ib_qp_init_attr.comp_mask |= IBV_QP_INIT_ATTR_PEER_DIRECT;
 			        ib_qp_init_attr.peer_direct_attrs = NULL; //peer_attr;
-
-   					printf("calloc client %d qp\n", i);
 
    					clients[i].qp = (struct verbs_qp*)calloc(1, sizeof(struct verbs_qp));
 			        if (!clients[i].qp) {
 			                mp_err_msg("cannot allocate memory\n");
 			                return MP_FAILURE;
 			        }
-			        printf("ibv_exp_create_qp qp\n");
 
 			        clients[i].qp->qp = ibv_exp_create_qp(ib_ctx->context, &ib_qp_init_attr);
 			        if (!clients[i].qp->qp)  {
 			                ret = EINVAL;
 			                mp_err_msg("error in ibv_exp_create_qp\n");
-			                goto err_free_cqs;
+			                goto err_free_rx_cq;
 					}
-
-   					printf("populate client %d qp\n", i);
-
 			        clients[i].qp->send_cq.cq = clients[i].qp->qp->send_cq;
 			        clients[i].qp->send_cq.curr_offset = 0;
 			        clients[i].qp->recv_cq.cq = clients[i].qp->qp->recv_cq;
 			        clients[i].qp->recv_cq.curr_offset = 0;
-
-			        printf("created client %d\n", i); //clients[i].qp);
-			        goto ok_qp;
-
-					//======== ERROR CASES ========
-			        err_free_qp:
-				        printf("destroying QP\n");
-				        ibv_destroy_qp(clients[i].qp->qp);
-
-					err_free_cqs:
-					    printf("destroying RX CQ\n");
-						ret = ibv_destroy_cq(send_cq);
-				        if (ret)
-				        	mp_err_msg("error %d destroying RX CQ\n", ret);
-
-					err_free_tx_cq:
-				        printf("destroying TX CQ\n");
-						ret = ibv_destroy_cq(recv_cq);
-				        if (ret)
-				        	mp_err_msg("error %d destroying TX CQ\n", ret);
-
-				    return ret;
-			   		//============================
-
 #endif
+
   					//======== QP CREATED
-			    	ok_qp:
-						clients[i].send_cq = &clients[i].qp->send_cq;
-						clients[i].recv_cq = &clients[i].qp->recv_cq;
+		    		clients[i].send_cq = &clients[i].qp->send_cq;
+					clients[i].recv_cq = &clients[i].qp->recv_cq;
 
-						assert(clients[i].qp);
-						assert(clients[i].send_cq);
-						assert(clients[i].recv_cq);
-						
-						struct ibv_qp_attr ib_qp_attr;
-						memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
-						ib_qp_attr.qp_state        = IBV_QPS_INIT;
-						ib_qp_attr.pkey_index      = 0;
-						ib_qp_attr.port_num        = ib_port;
-						int flags = 0;
-						if (verbs_enable_ud) { 
-						  ib_qp_attr.qkey            = 0;
-						  flags                      = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_QKEY;
-						} else {
-						  ib_qp_attr.qp_access_flags = IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE;
-						  flags                      = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS;
-						}
+					assert(clients[i].qp);
+					assert(clients[i].send_cq);
+					assert(clients[i].recv_cq);
+					
+					struct ibv_qp_attr ib_qp_attr;
+					memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
+					ib_qp_attr.qp_state        = IBV_QPS_INIT;
+					ib_qp_attr.pkey_index      = 0;
+					ib_qp_attr.port_num        = ib_port;
+					int flags = 0;
+					if (verbs_enable_ud) { 
+					  ib_qp_attr.qkey            = 0;
+					  flags                      = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_QKEY;
+					} else {
+					  ib_qp_attr.qp_access_flags = IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_LOCAL_WRITE;
+					  flags                      = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS;
+					}
 
-						ret = ibv_modify_qp (clients[i].qp->qp, &ib_qp_attr, flags);
-						if (ret != 0) {
-						  mp_err_msg("Failed to modify QP to INIT: %d, %s\n", ret, strerror(errno));
-						  exit(EXIT_FAILURE);
-						}
+					ret = ibv_modify_qp (clients[i].qp->qp, &ib_qp_attr, flags);
+					if (ret != 0) {
+					  mp_err_msg("Failed to modify QP to INIT: %d, %s\n", ret, strerror(errno));
+					  goto err_free_qps;
+					}
 
-						qpinfo_all[peer].lid = ib_port_attr.lid;
-						qpinfo_all[peer].qpn = clients[i].qp->qp->qp_num;
-						qpinfo_all[peer].psn = 0;
-						printf("QP lid:%04x qpn:%06x psn:%06x\n", 
-						         qpinfo_all[peer].lid,
-						         qpinfo_all[peer].qpn,
-						         qpinfo_all[peer].psn);
+					qpinfo_all[peer].lid = ib_port_attr.lid;
+					qpinfo_all[peer].qpn = clients[i].qp->qp->qp_num;
+					qpinfo_all[peer].psn = 0;
+					mp_dbg_msg("QP lid:%04x qpn:%06x psn:%06x\n", 
+					         qpinfo_all[peer].lid,
+					         qpinfo_all[peer].qpn,
+					         qpinfo_all[peer].psn);
 				}
 
 				return MP_SUCCESS;
+
+				//======== ERROR CASES ========
+				err_free_qps:
+					for (i=0; i<peer_count; i++)
+					{
+						mp_dbg_msg("destroying QP client %d\n", i);
+						ret = ibv_destroy_qp(clients[i].qp->qp);
+						if (ret)
+							mp_err_msg("error %d destroying QP client %d\n", ret, i);
+					}
+
+				err_free_rx_cq:
+					printf("destroying RX CQ\n");
+					ret = ibv_destroy_cq(recv_cq);
+					if (ret)
+						mp_err_msg("error %d destroying RX CQ\n", ret);
+
+				err_free_tx_cq:
+					mp_dbg_msg("destroying TX CQ\n");
+					ret = ibv_destroy_cq(send_cq);
+					if (ret)
+						mp_err_msg("error %d destroying TX CQ\n", ret);
+
+				return MP_FAILURE;
+				//============================
 			}
 
 			int exchangeEndpoints() {
@@ -1016,7 +1002,7 @@ namespace TL
 				}
 
 				if (verbs_enable_ud) {
-					int result = register_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
+					int result = register_key_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
 					assert(result == MP_SUCCESS);
 				}
 
@@ -1037,7 +1023,7 @@ namespace TL
 
 				CUDA_CHECK(cudaGetDevice(&node_info_all[oob_rank].gpu_id));
 
-				oob_comm->allgather(NULL, 0, 0, node_info_all, sizeof(struct node_info), MP_CHAR);
+				oob_comm->allgather(NULL, 0, MP_CHAR, node_info_all, sizeof(struct node_info), MP_CHAR);
 
 				int cidx, can_access_peer; 
 				for (i=0; i<oob_size; i++) {
@@ -1212,7 +1198,7 @@ namespace TL
 			}
 
 			// ===== COMMUNICATION
-			int register_buffer(void * addr, size_t length, mp_key_t * mp_mem_key) {
+			int register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem_key) {
 
 				int flags=1;
 				assert(mp_mem_key);
@@ -1235,14 +1221,14 @@ namespace TL
 				}
 #endif
 				if (verbs_enable_ud) {
-				  printf("UD enabled, registering buffer for LOCAL_WRITE\n");
+				  mp_warn_msg("UD enabled, registering buffer for LOCAL_WRITE\n");
 				  flags = IBV_ACCESS_LOCAL_WRITE;
 				} else { 
 				  flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
 				          IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC;
 				}
 
-				printf("ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
+				mp_dbg_msg("ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
 				// note: register addr, not base. no advantage in registering the whole buffer as we don't
 				// maintain a registration cache yet
 				reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
@@ -1254,20 +1240,22 @@ namespace TL
 				}
 
 				reg->key = reg->mr->lkey;
-				printf("reg=%p key=%x\n", reg, reg->key);
+				mp_dbg_msg("Registered key: key=%p value=%x buf=%p\n", reg, reg->key, addr);
 				*mp_mem_key = (mp_key_t)reg;
 
 				return MP_SUCCESS;
 			}
 
-			int unregister_buffer(mp_key_t *reg_)
+			int unregister_key(mp_key_t *reg_)
 			{
-				verbs_region_t reg = (verbs_region_t) *reg_; 
+				verbs_reg_t reg = (verbs_reg_t) *reg_; 
 
 				assert(reg);
 				assert(reg->mr);
 				ibv_dereg_mr(reg->mr);
 				free(reg);
+
+				return MP_SUCCESS;
 			}
 
 			mp_key_t * create_keys(int number) {
@@ -1292,7 +1280,6 @@ namespace TL
 			mp_request_t * create_requests(int number) {
 
 				verbs_request_t * req;
-
 				if(number <= 0) {
 					mp_err_msg("erroneuos requests number specified (%d)\n", number);
 					return NULL;
@@ -1303,7 +1290,7 @@ namespace TL
 					mp_err_msg("calloc returned NULL while allocating struct verbs_request_t\n");
 					return NULL;
 				}
-
+				
 				return (mp_request_t *) req;
 			}
 
@@ -1317,7 +1304,7 @@ namespace TL
 				req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
 				assert(req);
 
-				printf("peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
+				mp_dbg_msg("peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
 
 #ifdef HAVE_IPC
 				if (client->can_use_ipc)
@@ -1347,9 +1334,10 @@ namespace TL
 				//progress (remove) some request on the RX flow if is not possible to queue a recv request
 				ret = verbs_post_recv(client, req);
 				if (ret) {
-					mp_err_msg("posting recv failed: %s \n", strerror(errno));
+					mp_err_msg("Posting recv failed: %s \n", strerror(errno));
 					goto out;
 				}
+
 	#ifdef HAVE_GDSYNC
 				if (!use_event_sync) {
 					ret = gds_prepare_wait_cq(client->recv_cq, &req->gds_wait_info, 0);
@@ -1360,7 +1348,7 @@ namespace TL
 				}
 	#endif
 #endif
-				*mp_req = req; 
+				*mp_req = (mp_request_t) req; 
 			out:
 				return ret;
 			}
@@ -1375,7 +1363,7 @@ namespace TL
 				req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
 				assert(req);
 
-				printf("peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
+				mp_dbg_msg("peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
 
 #ifdef HAVE_IPC
 				if (client->can_use_ipc)
@@ -1448,7 +1436,7 @@ namespace TL
 				}
 	#endif		    
 #endif
-				*mp_req = req; 
+				*mp_req = (mp_request_t) req;
 
 			out:
 			    return ret;
@@ -1570,31 +1558,31 @@ namespace TL
 			  exchange_win_info *exchange_win = NULL; 
 			  int i, peer;
 
-			  window = malloc (sizeof(struct mp_window));
+			  window = (verbs_window_t) calloc(1, sizeof(struct verbs_window));
 			  assert(window != NULL); 
 
-			  window->base_ptr = malloc (client_count*sizeof(void *));
+			  window->base_ptr = (void ** ) calloc(peer_count, sizeof(void *));
 			  assert(window->base_ptr != NULL);
-			  window->rkey = malloc (client_count*sizeof(uint32_t));
+			  window->rkey = (uint32_t * ) calloc(peer_count, sizeof(uint32_t));
 			  assert(window->rkey != NULL);
-			  window->rsize = malloc (client_count*sizeof(uint64_t));
+			  window->rsize = (uint64_t * ) calloc(peer_count, sizeof(uint64_t));
 			  assert(window->rsize != NULL);
 
-			  exchange_win = malloc (oob_size*sizeof(exchange_win_info));
+			  exchange_win = (exchange_win_info * ) calloc(oob_size, sizeof(exchange_win_info));
 			  assert(exchange_win != NULL); 
 
-			  result = register_buffer(addr, size, &window->reg);  
+			  result = register_key_buffer(addr, size, (mp_key_t *) &window->reg);  
 			  assert(result == MP_SUCCESS); 
 			  
 			  exchange_win[oob_rank].base_addr = addr; 
 			  exchange_win[oob_rank].rkey = window->reg->mr->rkey; 
 			  exchange_win[oob_rank].size = size;
 
-			  oob_comm->allgather(NULL, 0, 0, exchange_win, sizeof(exchange_win_info), MP_CHAR);
+			  oob_comm->allgather(NULL, 0, MP_CHAR, exchange_win, sizeof(exchange_win_info), MP_CHAR);
 
 			  /*populate window address info*/
-			  for (i=0; i<client_count; i++) { 
-			      peer = clients[i].mpi_rank;
+			  for (i=0; i<peer_count; i++) { 
+			      peer = clients[i].oob_rank;
 			 
 			      window->base_ptr[i] = exchange_win[peer].base_addr;
 			      window->rkey[i] = exchange_win[peer].rkey;
@@ -1615,7 +1603,7 @@ namespace TL
 			  verbs_window_t window = (verbs_window_t) *window_t;
 			  int result = MP_SUCCESS;
 
-			  unregister_buffer(&window->reg);
+			  unregister_key((mp_key_t *) &window->reg);
 			  
 			  free(window->base_ptr);
 			  free(window->rkey);
@@ -1625,52 +1613,50 @@ namespace TL
 			  return result;
 			}
 
-			int onesided_nb_put (void *src, int size, mp_reg_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
+			int onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
 			{
-			  int ret = 0;
-			  verbs_request_t req;
-			  verbs_region_t reg = (verbs_regiont_t) *reg_t;
-			  verbs_window_t window = (verbs_window_t) *window_t;
+				int ret = 0;
+				verbs_request_t req;
+				verbs_reg_t reg = (verbs_reg_t) *reg_t;
+				verbs_window_t window = (verbs_window_t) *window_t;
+				int client_id = client_index[peer];
+				client_t *client = &clients[client_id];
 
-			  if (verbs_enable_ud) { 
-				mp_err_msg("put/get not supported with UD \n");
-				ret = MP_FAILURE;
-				goto out;
-			  }
+				if (verbs_enable_ud) { 
+					mp_err_msg("put/get not supported with UD \n");
+					ret = MP_FAILURE;
+					goto out;
+				}
+				assert(displ < window->rsize[client_id]);
 
-			  int client_id = client_index[peer];
-			  client_t *client = &clients[client_id];
+				req = verbs_new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
+				assert(req);
 
-			  assert(displ < window->rsize[client_id]);
+				req->flags = flags;
+				req->in.sr.next = NULL;
+				if (flags & MP_PUT_NOWAIT)
+				  req->in.sr.exp_send_flags = 0;
+				else
+				  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				if (flags & MP_PUT_INLINE)
+				  req->in.sr.exp_send_flags |= IBV_EXP_SEND_INLINE;
+				req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = 1;
+				req->in.sr.sg_list = &req->sg_entry;
 
-			  req = new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
-			  assert(req);
+				req->sg_entry.length = size;
+				req->sg_entry.lkey = reg->key;
+				req->sg_entry.addr = (uintptr_t)src;
 
-			  req->flags = flags;
-			  req->in.sr.next = NULL;
-			  if (flags & MP_PUT_NOWAIT)
-			      req->in.sr.exp_send_flags = 0;
-			  else
-			      req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-			  if (flags & MP_PUT_INLINE)
-			      req->in.sr.exp_send_flags |= IBV_EXP_SEND_INLINE;
-			  req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
-			  req->in.sr.wr_id = (uintptr_t) req;
-			  req->in.sr.num_sge = 1;
-			  req->in.sr.sg_list = &req->sg_entry;
+				req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
+				req->in.sr.wr.rdma.rkey = window->rkey[client_id];
 
-			  req->sg_entry.length = size;
-			  req->sg_entry.lkey = reg->key;
-			  req->sg_entry.addr = (uintptr_t)src;
-
-			  req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
-			  req->in.sr.wr.rdma.rkey = window->rkey[client_id];
-
-			  ret = verbs_post_send(client, req);
-			  if (ret) {
-			    mp_err_msg("posting send failed: %s \n", strerror(errno));
-			    goto out;
-			  }
+				ret = verbs_post_send(client, req);
+				if (ret) {
+					mp_err_msg("posting send failed: %s \n", strerror(errno));
+					goto out;
+				}
 
 #ifdef HAVE_GDSYNC
 
@@ -1688,29 +1674,28 @@ namespace TL
 			return ret;
 			}
 
-			int onesided_nb_get(void *dst, int size, mp_reg_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
+			int onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
 			{
 				int ret = 0;
 				verbs_request_t req;
-				verbs_region_t reg = (verbs_regiont_t) *reg_t;
+				verbs_reg_t reg = (verbs_reg_t) *reg_t;
 				verbs_window_t window = (verbs_window_t) *window_t;
-
-				if (verbs_enable_ud) { 
-				mp_err_msg("put/get not supported with UD \n");
-				ret = MP_FAILURE;
-				goto out;
-				}
-
 				int client_id = client_index[peer];
 				client_t *client = &clients[client_id];
 
+				if (verbs_enable_ud) { 
+					mp_err_msg("put/get not supported with UD \n");
+					ret = MP_FAILURE;
+					goto out;
+				}
+
 				assert(displ < window->rsize[client_id]);
 
-				req = new_request(clietn, MP_RDMA, MP_PENDING_NOWAIT);
+				req = verbs_new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
 
 				req->in.sr.next = NULL;
 				req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-				req->in.sr.exp_opcode = IBV_WR_RDMA_READ;
+				req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
 				req->in.sr.wr_id = (uintptr_t) req;
 				req->in.sr.num_sge = 1;
 				req->in.sr.sg_list = &req->sg_entry;
@@ -1752,9 +1737,9 @@ namespace TL
 			    int cnt = 0;
 			    while (1) {
 			        switch(flags) {
-			        case MP_WAIT_EQ:   cond = (ACCESS_ONCE(*ptr) >  value); break;
-			        case MP_WAIT_GEQ:  cond = (ACCESS_ONCE(*ptr) >= value); break;
-			        case MP_WAIT_AND:  cond = (ACCESS_ONCE(*ptr) &  value); break;
+			        case VERBS_WAIT_EQ:   cond = (ACCESS_ONCE(*ptr) >  value); break;
+			        case VERBS_WAIT_GEQ:  cond = (ACCESS_ONCE(*ptr) >= value); break;
+			        case VERBS_WAIT_AND:  cond = (ACCESS_ONCE(*ptr) &  value); break;
 			        default: ret = EINVAL; goto out; break;
 			        }
 			        if (cond) break;
@@ -1822,7 +1807,7 @@ static class update_tl_list {
 
 
 #if 0
-int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_reg_t *reg_t, mp_request_t *req_t)
+int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request_t *req_t)
 {
   int i, ret = 0;
   struct mp_request *req = NULL;
@@ -1876,7 +1861,7 @@ int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_reg_t *reg_t, mp_request
 }
 
 
-int mp_isendv (struct iovec *v, int nvecs, int peer, mp_reg_t *reg_t, mp_request_t *req_t)
+int mp_isendv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request_t *req_t)
 {
   int i, ret = 0;
   struct mp_request *req;

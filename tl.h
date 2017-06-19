@@ -25,8 +25,8 @@ namespace TL
 	        virtual int finalize()=0;
 
 	        // ===== PREPARE COMMUNICATION
-			virtual int register_buffer(void * addr, size_t length, mp_key_t * mp_req)=0;
-			virtual int unregister_buffer(mp_key_t *reg_)=0;
+			virtual int register_key_buffer(void * addr, size_t length, mp_key_t * mp_req)=0;
+			virtual int unregister_key(mp_key_t *reg_)=0;
 			virtual mp_request_t * create_requests(int number)=0;
 			virtual mp_key_t * create_keys(int number)=0;
 
@@ -37,8 +37,8 @@ namespace TL
 	        // ===== COMMUNICATION ONE-SIDED
 	        virtual int onesided_window_create(void *addr, size_t size, mp_window_t *window_t)=0;
 	        virtual int onesided_window_destroy(mp_window_t *window_t)=0;
-	        virtual int onesided_nb_put (void *src, int size, mp_reg_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags)=0;
-	        virtual int onesided_nb_get(void *dst, int size, mp_reg_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t)=0;
+	        virtual int onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags)=0;
+	        virtual int onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t)=0;
 
 	        // ===== COMMUNICATION COMMONS
    	        virtual int wait(mp_request_t *req)=0;

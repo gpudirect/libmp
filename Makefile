@@ -18,7 +18,7 @@ CUDADIR= /usr/local/cuda-8.0
 CUDAINCLUDEDIR= $(CUDADIR)/include
 CUDALDFLAGS=-L$(CUDADIR)/lib -lcudart
 
-OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o mpi_test.o
+OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o raw_pt2pt.o
 
 ifdef use_gdr
 	CPPFLAGS+=-DGPURDMA
@@ -26,14 +26,14 @@ endif
 
 .PHONY: all clean
 
-all: mpi_test
+all: raw_pt2pt
 
-mpi_test: $(OBJ)
-	$(LD) -o mpi_test $(OBJ) ${CFLAGS} ${CPPFLAGS} ${LDFLAGS}
+raw_pt2pt: $(OBJ)
+	$(LD) -o raw_pt2pt $(OBJ) ${CFLAGS} ${CPPFLAGS} ${LDFLAGS}
 
 .cc.o:
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 
 clean:
-	rm -rf *.o mpi_test
+	rm -rf *.o raw_pt2pt

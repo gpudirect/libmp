@@ -16,6 +16,13 @@ enum verbs_init_flags {
 };
 #endif
 
+
+enum verbs_wait_flags {
+    VERBS_WAIT_GEQ = 0,
+    VERBS_WAIT_EQ,
+    VERBS_WAIT_AND,
+};
+
 struct verbs_cq {
         struct ibv_cq *cq;
         uint32_t curr_offset;

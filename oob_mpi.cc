@@ -120,6 +120,8 @@ namespace OOB
 							rBuf, rSize, mp_get_mpi_datatype(rType),
 							comm));
 				}
+
+				return OOB_SUCCESS;
 			}
 	};
 }
