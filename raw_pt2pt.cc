@@ -2,9 +2,7 @@
 #include "oob.h"
 #include "tl.h"
 
-#define TEST_RECV_REQ 0
-#define TEST_SEND_REQ 1
-#define BUF_SIZE	20
+#define BUF_SIZE 20
 
 int main(int argc, char *argv[])
 {
@@ -157,16 +155,19 @@ int main(int argc, char *argv[])
 			{
 				cudaFree(rBuf[i]);
 				cudaFree(sBuf[i]);
+				free(hostBuf[i]);
 			}
 			else
 			{				
 				free(rBuf[i]);
 				free(sBuf[i]);
 			}
-
 		}
 	}
-
+	
+	if(use_gpu_buffers == 1)
+		free(hostBuf);
+	
 	free(rBuf);
 	free(sBuf);
 	free(mp_keys_recv);

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-if [ "$#" -ne 2 ]; then
-    echo "Illegal parameters number: <MPI proc num> <GPU Buffers=0:1>"
+if [ "$#" -ne 3 ]; then
+    echo "Illegal parameters number: <MPI proc num> <GPU Buffers=0:1> </path/test/name>"
     exit 1
 fi
 
@@ -9,6 +9,7 @@ fi
 
 NP=$1
 GPUBUF=$2
+TEST_NAME=$3
 
 export PATH=$PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
@@ -32,7 +33,7 @@ MVAPICH_params="$MVAPICH_params -genv MP_GPU_BUFFERS $GPUBUF "
 #MVAPICH_params=""
 
 set -x
-$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile ./wrapper_mvapich.sh ./raw_pt2pt
+$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile ./wrapper_mvapich.sh $TEST_NAME
 
 #-verbose
 #nvprof -o nvprof-singlestream.%q{MV2_COMM_WORLD_LOCAL_RANK}.nvprof
