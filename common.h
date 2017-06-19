@@ -26,10 +26,6 @@
 #include <assert.h>
 #include <errno.h>
 
-//#include <cuda.h>
-//#include <cudaProfiler.h>
-//#include <mpi.h>
-
 #define MAX_OOB 20
 #define MAX_TL 20
 
@@ -180,6 +176,38 @@ static void rmb(void)
 
 #else
 #error "platform not supported"
+#endif
+
+
+
+#ifdef HAVE_CUDA
+#include <cuda.h>
+#include <cuda_runtime.h>
+
+#define CUDA_CHECK(stmt)                                \
+do {                                                    \
+    cudaError_t result = (stmt);                        \
+    if (cudaSuccess != result) {                        \
+        fprintf(stderr, "[%s:%d] [%d] cuda failed with %s \n",   \
+         __FILE__, __LINE__, oob_rank, cudaGetErrorString(result));\
+        exit(-1);                                       \
+    }                                                   \
+    assert(cudaSuccess == result);                      \
+} while (0)
+
+
+#define CU_CHECK(stmt)                                  \
+do {                                                    \
+    CUresult result = (stmt);                           \
+    if (CUDA_SUCCESS != result) {                       \
+        fprintf(stderr, "[%s:%d] [%d] cu failed with %d \n",    \
+         __FILE__, __LINE__, oob_rank, result);    \
+        exit(-1);                                       \
+    }                                                   \
+    assert(CUDA_SUCCESS == result);                     \
+} while (0)
+
+//#include <cudaProfiler.h>
 #endif
 
 #endif

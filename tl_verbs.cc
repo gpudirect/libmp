@@ -1216,8 +1216,9 @@ namespace TL
 				CUresult curesult; 
 				curesult = cuPointerGetAttribute((void *)&type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)addr);
 				if ((curesult == CUDA_SUCCESS) && (type == CU_MEMORYTYPE_DEVICE)) { 
-				   CU_CHECK(cuMemGetAddressRange(&base, &size, (CUdeviceptr)addr));
-				   CU_CHECK(cuPointerSetAttribute(&flags, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, base)); 
+					CU_CHECK(cuMemGetAddressRange(&base, &size, (CUdeviceptr)addr));
+					CU_CHECK(cuPointerSetAttribute(&flags, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, base)); 
+	   				mp_dbg_msg("Addr:%p Memory type: CU_MEMORYTYPE_DEVICE\n", addr);
 				}
 #endif
 				if (verbs_enable_ud) {
