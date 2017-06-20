@@ -52,12 +52,11 @@ namespace OOB
 	};
 }
 
-
-static OOB::Communicator *create() { return new OOB::OOB_Socket(); }
+static OOB::Communicator *create_oob_socket() { return new OOB::OOB_Socket(); }
 
 static class update_oob_list {
 	public: 
 		update_oob_list() {
-			add_oob_creator(OOB_PRIORITY_SOCKET, create);
+			add_oob_creator(OOB_PRIORITY_SOCKET, create_oob_socket);
 		}
-} tmp;
+} list_oob_socket;

@@ -26,11 +26,7 @@ void mp_get_envars()
 		mp_warn_is_enabled = 0;
 }
 
-#ifdef HAVE_GDSYNC
-int mp_init(int argc, char *argv[], int gpu_id)
-#else
-int mp_init(int argc, char *argv[]) 
-#endif
+int mp_init(int argc, char *argv[], int par1)
 {
 	int ret=MP_SUCCESS;
 	mp_get_envars();
@@ -51,21 +47,24 @@ int mp_init(int argc, char *argv[])
 	oob_size = oob_comm->getSize();
 
 	// ====== TL INIT
-#ifdef HAVE_VERBS
-	#ifdef HAVE_GDSYNC
-		tl_comm = getTLObj(TL_INDEX_VERBS_GDS);
-		tl_type = TL_INDEX_VERBS_GDS;
-	#else
+#ifdef HAVE_GDSYNC
+	tl_comm = getTLObj(TL_INDEX_VERBS_GDS);
+	tl_type = TL_INDEX_VERBS_GDS;
+#else
+	#ifdef HAVE_VERBS
 		tl_comm = getTLObj(TL_INDEX_VERBS);
 		tl_type = TL_INDEX_VERBS;
+	#else
+		tl_comm = getTLObj(TL_INDEX_PSM);
+		tl_type = TL_INDEX_PSM;
 	#endif
-#else
-	tl_comm = getTLObj(TL_INDEX_PSM);
-	tl_type = TL_INDEX_PSM;
 #endif
 
 	MP_CHECK_COMM_OBJ();
 	MP_CHECK(tl_comm->setupOOB(oob_comm));
+#ifdef HAVE_GDSYNC
+		tl_comm->setup_sublayer(par1);
+#endif
 	MP_CHECK(tl_comm->setupNetworkDevices());
 	MP_CHECK(tl_comm->createEndpoints());
 	MP_CHECK(tl_comm->exchangeEndpoints());

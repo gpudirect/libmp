@@ -9,10 +9,17 @@ int main(int argc, char *argv[])
 	char *envVar = NULL;
 	char ** sBuf, ** rBuf;
 	char ** hostBuf;
-	
+	int gpu_id=0;
+
 	mp_key_t * mp_keys_recv, * mp_keys_send;
 	mp_request_t * mp_reqs_recv, * mp_reqs_send;
-	ret = mp_init(argc, argv);
+	
+	envVar = getenv("MP_USE_GPU");
+	if (envVar != NULL) {
+		gpu_id = atoi(envVar);
+	}
+
+	ret = mp_init(argc, argv, gpu_id);
 	if(ret)
 		exit(EXIT_FAILURE);
 

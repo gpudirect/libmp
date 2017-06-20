@@ -51,11 +51,7 @@ typedef enum mp_param {
 
 int mp_query_param(mp_param_t param, int *value);
 
-#ifdef HAVE_GDSYNC
-int mp_init(int argc, char *argv[], int gpu_id);
-#else
-int mp_init(int argc, char *argv[]);
-#endif
+int mp_init(int argc, char *argv[], int par1);
 void mp_finalize();
 void mp_get_envars();
 

@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 
+#ifdef HAVE_GDSYNC
+#include <gdsync.h>
+#endif
 
 #ifdef HAVE_GDSYNC
 enum verbs_init_flags {

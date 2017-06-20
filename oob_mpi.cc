@@ -131,11 +131,11 @@ namespace OOB
 }
 
 
-static OOB::Communicator *create() { return new OOB::OOB_MPI(); }
+static OOB::Communicator *create_oob_mpi() { return new OOB::OOB_MPI(); }
 
 static class update_oob_list {
 	public: 
 		update_oob_list() {
-			add_oob_creator(OOB_PRIORITY_MPI, create);
+			add_oob_creator(OOB_PRIORITY_MPI, create_oob_mpi);
 		}
-} tmp;
+} list_oob_mpi;

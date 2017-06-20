@@ -12,12 +12,18 @@ int main(int argc, char *argv[])
 	char * commBuf;
 	char * hostBuf;
 	int totSize=SIZE*WINDOW_SIZE;
+	int gpu_id=0;
 
 	mp_key_t * mp_keys_put;
 	mp_request_t * mp_reqs_put;
 	mp_window_t mp_win;
 
-	ret = mp_init(argc, argv);
+	envVar = getenv("MP_USE_GPU");
+	if (envVar != NULL) {
+		gpu_id = atoi(envVar);
+	}
+
+	ret = mp_init(argc, argv, gpu_id);
 	if(ret)
 		exit(EXIT_FAILURE);
 
