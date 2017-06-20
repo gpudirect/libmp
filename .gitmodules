@@ -1,0 +1,3 @@
+[submodule "libgdsync"]
+	path = libgdsync
+	url = https://github.com/gpudirect/libgdsync.git
