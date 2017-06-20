@@ -65,8 +65,6 @@ int mp_init(int argc, char *argv[])
 #endif
 
 	MP_CHECK_COMM_OBJ();
-	if(!oob_rank) printf("\nLibMP Init Transport Layer Obj\n");
-
 	MP_CHECK(tl_comm->setupOOB(oob_comm));
 	MP_CHECK(tl_comm->setupNetworkDevices());
 	MP_CHECK(tl_comm->createEndpoints());
