@@ -3,7 +3,7 @@
 namespace TL
 {
 	class Verbs : public Communicator {
-		private:
+		protected:
 			OOB::Communicator * oob_comm;
 
 			struct ibv_device **dev_list;
@@ -45,7 +45,7 @@ namespace TL
 
 			int oob_size, oob_rank;
 			int mp_warn_is_enabled, mp_dbg_is_enabled;
-			int qp_query=0;
+			int qp_query;
 #ifdef HAVE_GDSYNC
 			int gpu_id;
 			gds_send_request_t *gds_send_info_region = NULL;
@@ -232,9 +232,9 @@ namespace TL
 			}
 
 #ifdef HAVE_GDSYNC
-			int verbs_query_print_qp(struct gds_qp *qp, struct mp_request *req, int async)
+			int verbs_query_print_qp(struct gds_qp *qp, verbs_request_t req, int async)
 #else
-			int verbs_query_print_qp(struct verbs_qp *qp, struct mp_request *req, int async)
+			int verbs_query_print_qp(struct verbs_qp *qp, verbs_request_t req, int async)
 #endif
 			{
 			    assert(qp);
@@ -275,6 +275,7 @@ namespace TL
 			#endif
 			    return MP_SUCCESS;
 			}
+
 			int verbs_post_send(client_t *client, struct verbs_request *req)
 			{
 			    int progress_retry=0, ret=0, ret_progress=0;
@@ -566,7 +567,7 @@ namespace TL
 				client_index=NULL;
 				mp_request_free_list = NULL;
 				mem_region_list = NULL;
-
+				qp_query=0;
 #ifdef HAVE_GDSYNC
 				use_event_sync=0;
 				use_dbrec_gpu=0;
@@ -1882,6 +1883,10 @@ namespace TL
 				cudaFree(0);
 #endif
 				return MP_SUCCESS;
+			}
+
+			int funzione_casuale() {
+				return 0;
 			}
 
 	};

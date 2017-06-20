@@ -4,19 +4,17 @@ namespace TL
 {
 	class Verbs_GDS : public Verbs {
 		private:
-			int qp_query=0;
-
-			uint32_t *verbs_gds_client_last_tracked_id_ptr(client_t *client, struct mp_request *req)
+			uint32_t *verbs_gds_client_last_tracked_id_ptr(client_t *client, verbs_request_t req)
 			{
-			    return &client->last_tracked_id[verbs_type_to_flow(req)]; //mp_req_to_flow
+			    return &client->last_tracked_id[verbs_type_to_flow((mp_req_type_t)req->type)]; //mp_req_to_flow
 			}
 
-			void verbs_gds_client_track_posted_stream_req(client_t *client, struct mp_request *req, mp_flow_t flow)
+			void verbs_gds_client_track_posted_stream_req(client_t *client, verbs_request_t req, mp_flow_t flow)
 			{    
-			    mp_dbg_msg(oob_rank,"[%d] queuing request: %d req: %p \n", mpi_comm_rank, req->id, req);
+			    mp_dbg_msg(oob_rank,"[%d] queuing request: %d req: %p \n", oob_rank, req->id, req);
 			    if (!client->posted_stream_req[flow]) {
 			        mp_dbg_msg(oob_rank,"setting client[%d]->posted_stream_req[%s]=req=%p req->id=%d\n", 
-			                   client->mpi_rank, flow==TX_FLOW?"TX":"RX", req, req->id);
+			                   client->oob_rank, flow==TX_FLOW?"TX":"RX", req, req->id);
 			        assert(client->last_posted_stream_req[flow] == NULL);
 			        client->posted_stream_req[flow] = client->last_posted_stream_req[flow] = req;
 			    } else {
@@ -30,14 +28,14 @@ namespace TL
 			    }
 			}
 
-			void verbs_gds_client_track_waited_stream_req(client_t *client, struct mp_request *req, mp_flow_t flow)
+			void verbs_gds_client_track_waited_stream_req(client_t *client, verbs_request_t req, mp_flow_t flow)
 			{
 			    const char *flow_str = flow==TX_FLOW?"TX":"RX";
 			    // init 1st pending req
-			    mp_dbg_msg(oob_rank,"client[%d] req=%p req->id=%d flow=%s\n", client->mpi_rank, req, req->id, flow_str);
+			    mp_dbg_msg(oob_rank,"client[%d] req=%p req->id=%d flow=%s\n", client->oob_rank, req, req->id, flow_str);
 			    if (!client->waited_stream_req[flow]) {
 			        mp_dbg_msg(oob_rank,"setting client[%d]->waited_stream_req[%s]=req=%p req->id=%d\n", 
-			                   client->mpi_rank, flow_str, req, req->id);
+			                   client->oob_rank, flow_str, req, req->id);
 			        assert(client->last_waited_stream_req[flow] == NULL);
 			        client->waited_stream_req[flow] = client->last_waited_stream_req[flow] = req;
 			    } else {
@@ -53,7 +51,7 @@ namespace TL
 
 			//Progress TX_FLOW fix:
 			//progress (remove) some requests on the TX flow if is not possible to queue a send request
-			int verbs_post_send_on_stream(cudaStream_t stream, client_t *client, struct mp_request *req)
+			int verbs_post_send_on_stream(cudaStream_t stream, client_t *client, verbs_request_t req)
 			{
 			    int progress_retry=0;
 			    int ret = MP_SUCCESS;
@@ -62,7 +60,7 @@ namespace TL
 			    if(!client || !req)
 			        return MP_FAILURE;
 
-			    us_t start = verbs_get_cycles();
+			    us_t start = mp_get_cycles();
 			    us_t tmout = MP_PROGRESS_ERROR_CHECK_TMOUT_US;
 
 			    do
@@ -115,7 +113,7 @@ namespace TL
 		public:
 
 			int funzione_casuale() {
-				return 0;
+				return 1;
 			}
 
 
@@ -133,7 +131,7 @@ static class update_tl_list_gds {
 } list_tl_gds;
 
 #if 0
-static int mp_prepare_send(client_t *client, struct mp_request *req)
+static int mp_prepare_send(client_t *client, verbs_request_t req)
 {
     int progress_retry=0;
     int ret = MP_SUCCESS;
@@ -188,7 +186,7 @@ int mp_send_on_stream (void *buf, int size, int peer, mp_reg_t *reg_t,
 		mp_request_t *req_t, cudaStream_t stream)
 {
     int ret = 0;
-    struct mp_request *req = NULL;
+    verbs_request_t req = NULL;
     struct mp_reg *reg = (struct mp_reg *)*reg_t;
     client_t *client = &clients[client_index[peer]];
 
@@ -287,3 +285,4 @@ out:
     return ret; 
 }
 
+#endif

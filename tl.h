@@ -46,6 +46,8 @@ namespace TL
    	        virtual int wait(mp_request_t *req)=0;
 	        virtual int wait_all (int count, mp_request_t *req)=0;
 	        virtual int wait_word(uint32_t *ptr, uint32_t value, int flags)=0;
+
+	        virtual int funzione_casuale()=0;
 	    };
 }
 
