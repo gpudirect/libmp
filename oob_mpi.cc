@@ -9,30 +9,11 @@ do {                                                                \
         char string[MPI_MAX_ERROR_STRING];                          \
         int resultlen = 0;                                          \
         MPI_Error_string(result, string, &resultlen);               \
-        mp_err_msg(" (%s:%d) MPI check failed with %d (%*s)\n",     \
+        fprintf(stderr, " (%s:%d) MPI check failed with %d (%*s)\n",     \
                    __FILE__, __LINE__, result, resultlen, string);  \
         exit(-1);                                                   \
     }                                                               \
 } while(0)
-
-MPI_Datatype mp_get_mpi_datatype(mp_data_type type) {
-	switch(type) {			
-		case MP_CHAR:		
-			return MPI_CHAR;
-		case MP_BYTE:		
-			return MPI_BYTE;
-		case MP_INT:		
-			return MPI_INT;	
-		case MP_LONG:		
-			return MPI_LONG;
-		case MP_FLOAT:		
-			return MPI_FLOAT;
-		case MP_DOUBLE:		
-			return MPI_DOUBLE;
-		default:			
-			return MPI_BYTE;
-	}						
-}
 
 namespace OOB
 {
@@ -42,6 +23,25 @@ namespace OOB
 			int initialized;
 			int numRanks;
 			int myRank;
+
+			MPI_Datatype get_mpi_datatype(mp_data_type type) {
+				switch(type) {			
+					case MP_CHAR:		
+						return MPI_CHAR;
+					case MP_BYTE:		
+						return MPI_BYTE;
+					case MP_INT:		
+						return MPI_INT;	
+					case MP_LONG:		
+						return MPI_LONG;
+					case MP_FLOAT:		
+						return MPI_FLOAT;
+					case MP_DOUBLE:		
+						return MPI_DOUBLE;
+					default:			
+						return MPI_BYTE;
+				}						
+			}
 
 		public:
 			OOB_MPI(void){
@@ -93,15 +93,15 @@ namespace OOB
 				{
 					MPI_CHECK(MPI_Alltoall(
 							MPI_IN_PLACE, 0, 0, 
-							rBuf, rSize, mp_get_mpi_datatype(rType),
+							rBuf, rSize, get_mpi_datatype(rType),
 							comm)
 					);
 				}
 				else
 				{
 					MPI_CHECK(MPI_Alltoall(
-							sBuf, sSize, mp_get_mpi_datatype(sType), 
-							rBuf, rSize, mp_get_mpi_datatype(rType),
+							sBuf, sSize, get_mpi_datatype(sType), 
+							rBuf, rSize, get_mpi_datatype(rType),
 							comm)
 					);
 				}
@@ -114,14 +114,14 @@ namespace OOB
 				{
 					MPI_CHECK(MPI_Allgather(
 							MPI_IN_PLACE, 0, 0, 
-							rBuf, rSize, mp_get_mpi_datatype(rType),
+							rBuf, rSize, get_mpi_datatype(rType),
 							comm));
 				}
 				else
 				{
 					MPI_CHECK(MPI_Allgather(
-							sBuf, sSize, mp_get_mpi_datatype(sType), 
-							rBuf, rSize, mp_get_mpi_datatype(rType),
+							sBuf, sSize, get_mpi_datatype(sType), 
+							rBuf, rSize, get_mpi_datatype(rType),
 							comm));
 				}
 

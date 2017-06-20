@@ -38,11 +38,12 @@ namespace TL
 	        virtual int onesided_window_create(void *addr, size_t size, mp_window_t *window_t)=0;
 	        virtual int onesided_window_destroy(mp_window_t *window_t)=0;
 	        virtual int onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags)=0;
-	        virtual int onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t)=0;
+			virtual int onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t)=0;
 
-	        // ===== COMMUNICATION COMMONS
+	        // ===== COMMUNICATION WAIT
    	        virtual int wait(mp_request_t *req)=0;
 	        virtual int wait_all (int count, mp_request_t *req)=0;
+	        virtual int wait_word(uint32_t *ptr, uint32_t value, int flags)=0;
     };
 }
 

@@ -29,11 +29,20 @@ CUDALDFLAGS=
 endif
 #===========================
 
-OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o 
+OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o mp.o
 
 .PHONY: all clean
 
-all: raw_pt2pt raw_onesided
+all: raw_pt2pt raw_onesided mp_pt2pt mp_onesided
+
+#mp: $(OBJ) mp.o
+#	$(LD) -o mp $(OBJ) mp.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDALDFLAGS}
+
+mp_pt2pt: $(OBJ) mp_pt2pt.o
+	$(LD) -o mp_pt2pt $(OBJ) mp_pt2pt.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDALDFLAGS}
+
+mp_onesided: $(OBJ) mp_onesided.o
+	$(LD) -o mp_onesided $(OBJ) mp_onesided.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDALDFLAGS}
 
 raw_pt2pt: $(OBJ) raw_pt2pt.o
 	$(LD) -o raw_pt2pt $(OBJ) raw_pt2pt.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDALDFLAGS}
@@ -46,4 +55,4 @@ raw_onesided: $(OBJ) raw_onesided.o
 
 
 clean:
-	rm -rf *.o raw_pt2pt raw_onesided
+	rm -rf *.o raw_pt2pt raw_onesided mp_pt2pt mp_onesided 

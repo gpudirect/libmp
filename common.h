@@ -31,6 +31,7 @@
 
 #define TL_INDEX_VERBS 0
 #define TL_INDEX_PSM 1
+#define TL_INDEX_VERBS_GDS 2
 
 #define OOB_PRIORITY_MPI 0
 #define OOB_PRIORITY_SOCKET 1
@@ -99,35 +100,33 @@ typedef void * mp_window_t;
 #define MIN(A,B) ((A)<(B)?(A):(B))
 #endif
 
-extern int oob_rank;
-
-#define mp_dbg_msg(FMT, ARGS...)  do {                                  \
+#define mp_dbg_msg(RANK, FMT, ARGS...)  do {                                  \
     if (mp_dbg_is_enabled)  {                                            \
         fprintf(stderr, "[%d] [%d] MP DBG  %s() "                       \
-                FMT, getpid(),  oob_rank, __FUNCTION__ , ## ARGS); \
+                FMT, getpid(),  RANK, __FUNCTION__ , ## ARGS); \
         fflush(stderr);                                                 \
     }                                                                   \
 } while(0)
 
-#define mp_warn_msg(FMT, ARGS...) do {                                  \
+#define mp_warn_msg(RANK, FMT, ARGS...) do {                                  \
         if (mp_warn_is_enabled) {                                        \
             fprintf(stderr, "[%d] [%d] MP WARN %s() "                   \
-                    FMT, getpid(), oob_rank, __FUNCTION__ , ## ARGS); \
+                    FMT, getpid(), RANK, __FUNCTION__ , ## ARGS); \
             fflush(stderr);                                             \
         }                                                               \
     } while(0)
 
 
 
-#define mp_info_msg(FMT, ARGS...) do {                                  \
+#define mp_info_msg(RANK, FMT, ARGS...) do {                                  \
         fprintf(stderr, "[%d] [%d] MP INFO %s() "                       \
-                FMT, getpid(), oob_rank, __FUNCTION__ , ## ARGS);  \
+                FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
         fflush(stderr);                                                 \
     } while(0)
 
-#define mp_err_msg(FMT, ARGS...)  do {                                  \
+#define mp_err_msg(RANK, FMT, ARGS...)  do {                                  \
         fprintf(stderr, "[%d] [%d] MP ERR  %s() "                       \
-                FMT, getpid(), oob_rank, __FUNCTION__ , ## ARGS);  \
+                FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
         fflush(stderr);                                                 \
     } while(0)
 
@@ -138,7 +137,7 @@ static inline us_t mp_get_cycles()
     struct timespec ts;
     int ret = clock_gettime(CLOCK_MONOTONIC, &ts);
     if (ret) {
-        mp_err_msg("error in gettime %d/%s\n", errno, strerror(errno));
+        mp_err_msg(0, "error in gettime %d/%s\n", errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
     return (us_t)ts.tv_sec * 1000 * 1000 + (us_t)ts.tv_nsec / 1000;
@@ -188,8 +187,8 @@ static void rmb(void)
 do {                                                    \
     cudaError_t result = (stmt);                        \
     if (cudaSuccess != result) {                        \
-        fprintf(stderr, "[%s:%d] [%d] cuda failed with %s \n",   \
-         __FILE__, __LINE__, oob_rank, cudaGetErrorString(result));\
+        fprintf(stderr, "[%s] [%d] cuda failed with %s \n",   \
+         __FILE__, __LINE__, cudaGetErrorString(result));\
         exit(-1);                                       \
     }                                                   \
     assert(cudaSuccess == result);                      \
@@ -200,8 +199,8 @@ do {                                                    \
 do {                                                    \
     CUresult result = (stmt);                           \
     if (CUDA_SUCCESS != result) {                       \
-        fprintf(stderr, "[%s:%d] [%d] cu failed with %d \n",    \
-         __FILE__, __LINE__, oob_rank, result);    \
+        fprintf(stderr, "[%s] [%d] cu failed with %d \n",    \
+         __FILE__, __LINE__, result);    \
         exit(-1);                                       \
     }                                                   \
     assert(CUDA_SUCCESS == result);                     \

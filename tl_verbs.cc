@@ -1,7 +1,7 @@
 #include "tl_verbs.h"
 
-int oob_size, oob_rank;
-int mp_dbg_is_enabled, mp_warn_is_enabled;
+static int oob_size, oob_rank;
+static int mp_warn_is_enabled=0, mp_dbg_is_enabled=0;
 
 namespace TL
 {
@@ -69,12 +69,12 @@ namespace TL
 				int version, ret;
 				ret = gds_query_param(GDS_PARAM_VERSION, &version);
 				if (ret) {
-					mp_err_msg("error querying libgdsync version\n");
+					mp_err_msg(oob_rank, "error querying libgdsync version\n");
 					return MP_FAILURE;
 				}
-				mp_dbg_msg("libgdsync queried version 0x%08x\n", version);
+				mp_dbg_msg(oob_rank, "libgdsync queried version 0x%08x\n", version);
 				if (!GDS_API_VERSION_COMPATIBLE(version)) {
-					mp_err_msg("incompatible libgdsync version 0x%08x\n", version);
+					mp_err_msg(oob_rank, "incompatible libgdsync version 0x%08x\n", version);
 					return MP_FAILURE;
 				}
 				
@@ -92,7 +92,7 @@ namespace TL
 
 			  mem_region = (mem_region_t *) calloc (1, sizeof (mem_region_t));
 			  if (mem_region == NULL) {
-			    mp_err_msg("memory allocation for mem_region failed \n");
+			    mp_err_msg(oob_rank, "memory allocation for mem_region failed \n");
 			    exit(-1);
 			  }
 			  if (mem_region_list == NULL) {
@@ -104,7 +104,7 @@ namespace TL
 
 			  mem_region->region = (struct verbs_request *) calloc (verbs_request_limit, sizeof(struct verbs_request));
 			  if (mem_region == NULL) {
-			    mp_err_msg("memory allocation for request_region failed \n");
+			    mp_err_msg(oob_rank, "memory allocation for request_region failed \n");
 			    exit(-1);
 			  }
 
@@ -137,7 +137,7 @@ namespace TL
 			struct verbs_request *verbs_new_request(client_t *client, mp_req_type_t type, mp_state_t state) //, struct CUstream_st *stream)
 			{
 			  struct verbs_request *req = verbs_get_request();
-			  //mp_dbg_msg("new req=%p\n", req);
+			  //mp_dbg_msg(oob_rank, "new req=%p\n", req);
 			  if (req) {
 			      req->peer = client->oob_rank;
 			      req->sgv = NULL;
@@ -215,10 +215,10 @@ namespace TL
 			            ret_progress = verbs_progress_single_flow(RX_FLOW);
 			            if(ret_progress != MP_SUCCESS)
 			            {
-			                mp_err_msg("verbs_progress_single_flow failed. Error: %d\n", ret_progress);
+			                mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
 			                break;
 			            }
-			            mp_warn_msg("RX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+			            mp_warn_msg(oob_rank, "RX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
 			            progress_retry++;
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
@@ -242,9 +242,9 @@ namespace TL
 		                if (ret == ENOMEM) {
 	                        // out of space error can happen too often to report
 	                        //dgb
-	                        mp_dbg_msg("ENOMEM error %d in ibv_exp_post_send\n", ret);
+	                        mp_dbg_msg(oob_rank, "ENOMEM error %d in ibv_exp_post_send\n", ret);
 		                } else {
-		                    mp_err_msg("error %d in ibv_exp_post_send\n", ret);
+		                    mp_err_msg(oob_rank, "error %d in ibv_exp_post_send\n", ret);
 		                }
 		                goto out;
 			        }
@@ -254,10 +254,10 @@ namespace TL
 			            ret_progress = verbs_progress_single_flow(TX_FLOW);
 			            if(ret_progress != MP_SUCCESS)
 			            {
-			                mp_err_msg("verbs_progress_single_flow failed. Error: %d\n", ret_progress);
+			                mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
 			                break;
 			            }
-			            mp_warn_msg("TX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+			            mp_warn_msg(oob_rank, "TX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
 			            progress_retry++;
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
@@ -285,7 +285,7 @@ namespace TL
 			            assert(req->status == MP_PREPARED);
 			            assert(req->type == MP_SEND || req->type == MP_RDMA);
 
-			            mp_dbg_msg("posting req id %d from posted_stream_req list trigger id :%d \n", req->id, client->last_trigger_id[flow]);
+			            mp_dbg_msg(oob_rank, "posting req id %d from posted_stream_req list trigger id :%d \n", req->id, client->last_trigger_id[flow]);
 
 			            ret = gds_post_send(client->qp, &req->in.sr, &req->out.bad_sr);
 			            if (ret) {
@@ -296,7 +296,7 @@ namespace TL
 			            req->status = MP_PENDING;
 
 			            // remove request from waited list
-			            mp_dbg_msg("removing req %p from posted_stream_req list\n", req);
+			            mp_dbg_msg(oob_rank, "removing req %p from posted_stream_req list\n", req);
 
 				    //delink the request
 			            if (req->next != NULL) {
@@ -363,14 +363,14 @@ namespace TL
 			            //if (errno) printf("client[%d] flow=%s errno=%s\n", client->oob_rank, flow_str, strerror(errno));
 			        }
 			        else if (ne < 0) {
-			            mp_err_msg("error %d(%d) in ibv_poll_cq\n", ne, errno);
+			            mp_err_msg(oob_rank, "error %d(%d) in ibv_poll_cq\n", ne, errno);
 			            ret = MP_FAILURE;
 			            goto out;
 			        } else if (ne) {
 			            int j;
 			            for (j=0; j<ne; j++) {
 			                struct ibv_wc *wc_curr = wc + j;
-			                mp_dbg_msg("client:%d wc[%d]: status=%x(%s) opcode=%x byte_len=%d wr_id=%"PRIx64"\n",
+			                mp_dbg_msg(oob_rank, "client:%d wc[%d]: status=%x(%s) opcode=%x byte_len=%d wr_id=%"PRIx64"\n",
 			                           client->oob_rank, j,
 			                           wc_curr->status, ibv_wc_status_str(wc_curr->status), 
 			                           wc_curr->opcode, wc_curr->byte_len, wc_curr->wr_id);
@@ -378,7 +378,7 @@ namespace TL
 			                struct verbs_request *req = (struct verbs_request *) wc_curr->wr_id;
 
 			                if (wc_curr->status != IBV_WC_SUCCESS) {
-			                    mp_err_msg("ERROR!!! completion error, status:'%s' client:%d rank:%d req:%p flow:%s\n",
+			                    mp_err_msg(oob_rank, "ERROR!!! completion error, status:'%s' client:%d rank:%d req:%p flow:%s\n",
 			                               ibv_wc_status_str(wc_curr->status),
 			                               i, client->oob_rank,
 			                               req, flow_str);
@@ -387,21 +387,21 @@ namespace TL
 			                }
 
 			                if (req) { 
-			                    mp_dbg_msg("polled new CQE for req:%p flow:%s id=%d peer=%d type=%d\n", req, flow_str, req->id, req->peer, req->type);
+			                    mp_dbg_msg(oob_rank, "polled new CQE for req:%p flow:%s id=%d peer=%d type=%d\n", req, flow_str, req->id, req->peer, req->type);
 
 			                    if (!(req->status == MP_PENDING_NOWAIT || req->status == MP_PENDING))
-			                        mp_err_msg("status not pending, value: %d \n", req->status);
+			                        mp_err_msg(oob_rank, "status not pending, value: %d \n", req->status);
 
 			                    if (req->status == MP_PENDING_NOWAIT) {
 			                    } else if (req->status != MP_PENDING) {
-			                        mp_err_msg("status not pending, value: %d \n", req->status);
+			                        mp_err_msg(oob_rank, "status not pending, value: %d \n", req->status);
 			                        exit(-1);
 			                    }
 
 			                    ACCESS_ONCE(client->last_done_id) = req->id;
 			                    verbs_progress_request(req);
 			                } else {
-			                    mp_warn_msg("received completion with null wr_id \n");
+			                    mp_warn_msg(oob_rank, "received completion with null wr_id \n");
 			                }
 			            }
 			        }
@@ -425,11 +425,11 @@ namespace TL
 			        // re-reading each time as it might have been updated
 			        int threshold_id = ACCESS_ONCE(client->last_tracked_id[flow]);
 			        if (threshold_id < pending_req->id) {
-			            mp_dbg_msg("client[%d] stalling progress flow=%s threshold_id=%d req->id=%d\n", 
+			            mp_dbg_msg(oob_rank, "client[%d] stalling progress flow=%s threshold_id=%d req->id=%d\n", 
 			                       client->oob_rank, verbs_flow_to_str(flow), threshold_id, pending_req->id);
 			            break;
 			        } else {
-			            mp_dbg_msg("client[%d] flow=%s threshold_id=%d req->id=%d\n", 
+			            mp_dbg_msg(oob_rank, "client[%d] flow=%s threshold_id=%d req->id=%d\n", 
 			                       client->oob_rank, verbs_flow_to_str(flow), threshold_id, pending_req->id);
 				    ret++;
 				    pending_req = pending_req->next;
@@ -440,7 +440,7 @@ namespace TL
 			        ret = cq_poll_count;
 			    }
 
-			    mp_dbg_msg("pending_req=%p ret=%d\n", pending_req, ret);
+			    mp_dbg_msg(oob_rank, "pending_req=%p ret=%d\n", pending_req, ret);
 			    return ret;
 			}
 
@@ -449,20 +449,20 @@ namespace TL
 			{
 				switch(req->status) {
 					case MP_PREPARED:
-					    mp_dbg_msg("req=%p id=%d PREPARED\n", req, req->id);
+					    mp_dbg_msg(oob_rank, "req=%p id=%d PREPARED\n", req, req->id);
 					    break;
 					case MP_PENDING_NOWAIT:
-					    mp_dbg_msg("req=%p id=%d NOWAIT\n", req, req->id);
+					    mp_dbg_msg(oob_rank, "req=%p id=%d NOWAIT\n", req, req->id);
 					case MP_PENDING:
-					    mp_dbg_msg("req=%p id=%d PENDING->COMPLETE\n", req, req->id);
+					    mp_dbg_msg(oob_rank, "req=%p id=%d PENDING->COMPLETE\n", req, req->id);
 					    req->status = MP_COMPLETE;
 					    cleanup_request(req);
 					    break;
 					case MP_COMPLETE:
-					    mp_warn_msg("attempt at progressing a complete req:%p \n", req);
+					    mp_warn_msg(oob_rank, "attempt at progressing a complete req:%p \n", req);
 					    break;
 					default:
-					    mp_err_msg("invalid status %d for req:%p \n", req->status, req);
+					    mp_err_msg(oob_rank, "invalid status %d for req:%p \n", req->status, req);
 					    break;
 				}
 				return 0;
@@ -560,7 +560,7 @@ namespace TL
 				value = getenv("VERBS_IB_CQ_DEPTH");
 				if (value != NULL) {
 					num_cqes = atoi(value);
-					mp_dbg_msg("setting num_cqes=%d\n", num_cqes);
+					mp_dbg_msg(oob_rank, "setting num_cqes=%d\n", num_cqes);
 				}
 
 				value = getenv ("VERBS_IB_MAX_SGL"); 
@@ -579,30 +579,30 @@ namespace TL
 				if (value != NULL) {
 					use_event_sync = atoi(value);
 				}
-				if (use_event_sync) mp_warn_msg("EVENT_ASYNC enabled\n");
+				if (use_event_sync) mp_warn_msg(oob_rank, "EVENT_ASYNC enabled\n");
 				
 				if (init_flags & VERBS_INIT_RX_CQ_ON_GPU) use_rx_cq_gpu = 1;
 				value = getenv("VERBS_RX_CQ_ON_GPU");
 				if (value != NULL) {
 					use_rx_cq_gpu = atoi(value);
 				}
-				if (use_rx_cq_gpu) mp_warn_msg("RX CQ on GPU memory enabled\n");
+				if (use_rx_cq_gpu) mp_warn_msg(oob_rank, "RX CQ on GPU memory enabled\n");
 			
 				if (init_flags & VERBS_INIT_TX_CQ_ON_GPU) use_tx_cq_gpu = 1;
 				value = getenv("VERBS_TX_CQ_ON_GPU");
 				if (value != NULL) {
 					use_tx_cq_gpu = atoi(value);
 				}
-				if (use_tx_cq_gpu) mp_warn_msg("TX CQ on GPU memory enabled\n");
+				if (use_tx_cq_gpu) mp_warn_msg(oob_rank, "TX CQ on GPU memory enabled\n");
 
 				if (init_flags & VERBS_INIT_DBREC_ON_GPU) use_dbrec_gpu = 1;
 				value = getenv("VERBS_DBREC_ON_GPU");
 				if (value != NULL) {
 					use_dbrec_gpu = atoi(value);
 				}
-				if (use_dbrec_gpu) mp_warn_msg("WQ DBREC on GPU memory enabled\n");
+				if (use_dbrec_gpu) mp_warn_msg(oob_rank, "WQ DBREC on GPU memory enabled\n");
 
-				mp_dbg_msg("libgdsync build version 0x%08x, major=%d minor=%d\n", GDS_API_VERSION, GDS_API_MAJOR_VERSION, GDS_API_MINOR_VERSION);
+				mp_dbg_msg(oob_rank, "libgdsync build version 0x%08x, major=%d minor=%d\n", GDS_API_VERSION, GDS_API_MAJOR_VERSION, GDS_API_MINOR_VERSION);
 #endif
 	    	}
 
@@ -642,7 +642,7 @@ namespace TL
 				/*pick the right device*/
 				dev_list = ibv_get_device_list (&num_devices);
 				if (dev_list == NULL) {
-					mp_err_msg("ibv_get_device_list returned NULL \n");
+					mp_err_msg(oob_rank, "ibv_get_device_list returned NULL \n");
 					return MP_FAILURE;
 				}
 
@@ -652,7 +652,7 @@ namespace TL
 					  select_dev = ibv_get_device_name(dev_list[i]);
 					  if (strstr(select_dev, ib_req_dev) != NULL) {
 					    ib_dev = dev_list[i];
-					    mp_dbg_msg("using IB device: %s \n", ib_req_dev);
+					    mp_dbg_msg(oob_rank, "using IB device: %s \n", ib_req_dev);
 					    break;
 					  }
 					}
@@ -662,29 +662,29 @@ namespace TL
 					  printf("request device: %s not found, defaulting to %s \n", ib_req_dev, select_dev);
 					}
 				}
-				mp_warn_msg("HCA dev: %s\n", ibv_get_device_name(ib_dev));
+				mp_warn_msg(oob_rank, "HCA dev: %s\n", ibv_get_device_name(ib_dev));
 
 				/*create context, pd, cq*/
 				ib_ctx = (ib_context_t *) calloc (1, sizeof (ib_context_t));
 				if (ib_ctx == NULL) {
-					mp_err_msg("ib_ctx allocation failed \n");
+					mp_err_msg(oob_rank, "ib_ctx allocation failed \n");
 					return MP_FAILURE;
 				}
 
 				ib_ctx->context = ibv_open_device(ib_dev);
 				if (ib_ctx->context == NULL) {
-					mp_err_msg("ibv_open_device failed \n");
+					mp_err_msg(oob_rank, "ibv_open_device failed \n");
 					return MP_FAILURE;
 				}
 
 				/*get device attributes and check relevant leimits*/
 				if (ibv_query_device(ib_ctx->context, &dev_attr)) {
-					mp_err_msg("query_device failed \n"); 	 
+					mp_err_msg(oob_rank, "query_device failed \n"); 	 
 					return MP_FAILURE;	
 				}
 
 				if (ib_max_sge > dev_attr.max_sge) {
-					mp_err_msg("warning!! requested sgl length longer than supported by the adapter, reverting to max, requested: %d max: %d \n", ib_max_sge, dev_attr.max_sge);
+					mp_err_msg(oob_rank, "warning!! requested sgl length longer than supported by the adapter, reverting to max, requested: %d max: %d \n", ib_max_sge, dev_attr.max_sge);
 					ib_max_sge = dev_attr.max_sge;
 				}
 
@@ -719,21 +719,21 @@ namespace TL
 				/*establish connections*/
 				client_index = (int *)calloc(oob_size, sizeof(int));
 				if (client_index == NULL) {
-					mp_err_msg("allocation failed \n");
+					mp_err_msg(oob_rank, "allocation failed \n");
 					return MP_FAILURE;
 				}
 				memset(client_index, -1, sizeof(int)*oob_size);
 
 				clients = (client_t *)calloc(peer_count, sizeof(client_t));
 				if (clients == NULL) {
-					mp_err_msg("allocation failed \n");
+					mp_err_msg(oob_rank, "allocation failed \n");
 					return MP_FAILURE;
 				}
 				memset(clients, 0, sizeof(client_t)*peer_count);
 
 				qpinfo_all =(qpinfo_t *)calloc(oob_size, sizeof(qpinfo_t));
 				if (qpinfo_all == NULL) {
-					mp_err_msg("qpinfo allocation failed \n");
+					mp_err_msg(oob_rank, "qpinfo allocation failed \n");
 					return MP_FAILURE;
 				}
 				//client_count = peer_count
@@ -744,7 +744,7 @@ namespace TL
 					peer = peers_list[i];
 					/*rank to peer id mapping */
 					client_index[peer] = i;
-					mp_dbg_msg("Creating client %d, peer %d, client_index[peer]: %d\n", i, peer, client_index[peer]);
+					mp_dbg_msg(oob_rank, "Creating client %d, peer %d, client_index[peer]: %d\n", i, peer, client_index[peer]);
 					/*peer id to rank mapping */
 					clients[i].oob_rank = peer;
 					clients[i].last_req_id = 0;
@@ -789,7 +789,7 @@ namespace TL
 					//is the CUDA context already initialized?
 					clients[i].qp = gds_create_qp(ib_ctx->pd, ib_ctx->context, &ib_qp_init_attr, gpu_id, gds_flags);
 					if (clients[i].qp == NULL) {
-					  mp_err_msg("qp creation failed, errno %d\n", errno);
+					  mp_err_msg(oob_rank, "qp creation failed, errno %d\n", errno);
 					  return MP_FAILURE;
 					}
 #else
@@ -805,13 +805,13 @@ namespace TL
 
 			        send_cq = ibv_exp_create_cq(ib_ctx->context, ib_qp_init_attr.cap.max_send_wr /*num cqe*/, NULL /* cq_context */, NULL /* channel */, 0 /*comp_vector*/, &cq_attr);
 			        if (!send_cq) {
-			            mp_err_msg("error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
+			            mp_err_msg(oob_rank, "error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
 			            return MP_FAILURE;
 			        }
 
 			        recv_cq = ibv_exp_create_cq(ib_ctx->context, ib_qp_init_attr.cap.max_recv_wr /*num cqe*/, NULL /* cq_context */, NULL /* channel */, 0 /*comp_vector*/, &cq_attr);
 			        if (!recv_cq) {
-			            mp_err_msg("error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
+			            mp_err_msg(oob_rank, "error %d in ibv_exp_create_cq, old errno %d\n", errno, old_errno);
 			            goto err_free_tx_cq;
 			        }
 
@@ -826,14 +826,14 @@ namespace TL
 
    					clients[i].qp = (struct verbs_qp*)calloc(1, sizeof(struct verbs_qp));
 			        if (!clients[i].qp) {
-			                mp_err_msg("cannot allocate memory\n");
+			                mp_err_msg(oob_rank, "cannot allocate memory\n");
 			                return MP_FAILURE;
 			        }
 
 			        clients[i].qp->qp = ibv_exp_create_qp(ib_ctx->context, &ib_qp_init_attr);
 			        if (!clients[i].qp->qp)  {
 			                ret = EINVAL;
-			                mp_err_msg("error in ibv_exp_create_qp\n");
+			                mp_err_msg(oob_rank, "error in ibv_exp_create_qp\n");
 			                goto err_free_rx_cq;
 					}
 			        clients[i].qp->send_cq.cq = clients[i].qp->qp->send_cq;
@@ -866,14 +866,14 @@ namespace TL
 
 					ret = ibv_modify_qp (clients[i].qp->qp, &ib_qp_attr, flags);
 					if (ret != 0) {
-					  mp_err_msg("Failed to modify QP to INIT: %d, %s\n", ret, strerror(errno));
+					  mp_err_msg(oob_rank, "Failed to modify QP to INIT: %d, %s\n", ret, strerror(errno));
 					  goto err_free_qps;
 					}
 
 					qpinfo_all[peer].lid = ib_port_attr.lid;
 					qpinfo_all[peer].qpn = clients[i].qp->qp->qp_num;
 					qpinfo_all[peer].psn = 0;
-					mp_dbg_msg("QP lid:%04x qpn:%06x psn:%06x\n", 
+					mp_dbg_msg(oob_rank, "QP lid:%04x qpn:%06x psn:%06x\n", 
 					         qpinfo_all[peer].lid,
 					         qpinfo_all[peer].qpn,
 					         qpinfo_all[peer].psn);
@@ -885,23 +885,23 @@ namespace TL
 				err_free_qps:
 					for (i=0; i<peer_count; i++)
 					{
-						mp_dbg_msg("destroying QP client %d\n", i);
+						mp_dbg_msg(oob_rank, "destroying QP client %d\n", i);
 						ret = ibv_destroy_qp(clients[i].qp->qp);
 						if (ret)
-							mp_err_msg("error %d destroying QP client %d\n", ret, i);
+							mp_err_msg(oob_rank, "error %d destroying QP client %d\n", ret, i);
 					}
 
 				err_free_rx_cq:
 					printf("destroying RX CQ\n");
 					ret = ibv_destroy_cq(recv_cq);
 					if (ret)
-						mp_err_msg("error %d destroying RX CQ\n", ret);
+						mp_err_msg(oob_rank, "error %d destroying RX CQ\n", ret);
 
 				err_free_tx_cq:
-					mp_dbg_msg("destroying TX CQ\n");
+					mp_dbg_msg(oob_rank, "destroying TX CQ\n");
 					ret = ibv_destroy_cq(send_cq);
 					if (ret)
-						mp_err_msg("error %d destroying TX CQ\n", ret);
+						mp_err_msg(oob_rank, "error %d destroying TX CQ\n", ret);
 
 				return MP_FAILURE;
 				//============================
@@ -1012,12 +1012,12 @@ namespace TL
 				//ipc connection setup
 				node_info_all = malloc(sizeof(struct node_info)*oob_size);
 				if (!node_info_all) {
-				  mp_err_msg("Failed to allocate node info array \n");
+				  mp_err_msg(oob_rank, "Failed to allocate node info array \n");
 				return MP_FAILURE;
 				}
 
 				if(!gethostname(node_info_all[oob_rank].hname, 20)) {
-				  mp_err_msg("gethostname returned error \n");
+				  mp_err_msg(oob_rank, "gethostname returned error \n");
 				return MP_FAILURE;
 				}
 
@@ -1061,23 +1061,23 @@ namespace TL
 
 				//setup shared memory buffers 
 				sprintf(shm_filename, "/dev/shm/libmp_shmem-%s-%d.tmp", node_info_all[oob_rank].hname, getuid());
-				mp_dbg_msg("shemfile %s\n", shm_filename);
+				mp_dbg_msg(oob_rank, "shemfile %s\n", shm_filename);
 
 				shm_fd = open(shm_filename, O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
 				  if (shm_fd < 0) {
-				      mp_err_msg("opening shm file failed \n");
+				      mp_err_msg(oob_rank, "opening shm file failed \n");
 				      return MP_FAILURE;
 				}
 
 				if (smp_leader == oob_rank) {
 				  if (ftruncate(shm_fd, 0)) {
-				      mp_err_msg("clearning up shm file failed \n");
+				      mp_err_msg(oob_rank, "clearning up shm file failed \n");
 				          /* to clean up tmp shared file */
 				      return MP_FAILURE;
 				      }
 
 				      if (ftruncate(shm_fd, shm_filesize)) {
-				          mp_err_msg("setting up shm file failed \n");
+				          mp_err_msg(oob_rank, "setting up shm file failed \n");
 				          /* to clean up tmp shared file */
 				          return MP_FAILURE;
 					      }
@@ -1092,7 +1092,7 @@ namespace TL
 					/* synchronization between local processes */
 					do {
 						if (fstat(shm_fd, &file_status) != 0) {
-							mp_err_msg("fstat on shm file failed \n");
+							mp_err_msg(oob_rank, "fstat on shm file failed \n");
 							/* to clean up tmp shared file */
 							return MP_FAILURE;
 						}
@@ -1102,7 +1102,7 @@ namespace TL
 					/* mmap of the shared memory file */
 					shm_mapptr = mmap(0, shm_filesize, (PROT_READ | PROT_WRITE), (MAP_SHARED), shm_fd, 0);
 					if (shm_mapptr == (void *) -1) {
-						mp_err_msg("mmap on shm file failed \n");
+						mp_err_msg(oob_rank, "mmap on shm file failed \n");
 						/* to clean up tmp shared file */
 						return MP_FAILURE;
 					}
@@ -1157,21 +1157,21 @@ namespace TL
 			        assert(clients[i].qp->qp);
 			        ret = ibv_destroy_qp(clients[i].qp->qp);
 			        if (ret) {
-		                mp_err_msg("error %d in destroy_qp\n", ret);
+		                mp_err_msg(oob_rank, "error %d in destroy_qp\n", ret);
 		                retcode = ret;
 			        }
 
 			        assert(clients[i].qp->send_cq.cq);
 			        ret = ibv_destroy_cq(clients[i].qp->send_cq.cq);
 			        if (ret) {
-		                mp_err_msg("error %d in destroy_cq send_cq\n", ret);
+		                mp_err_msg(oob_rank, "error %d in destroy_cq send_cq\n", ret);
 		                retcode = ret;
 			        }
 
 			        assert(clients[i].qp->recv_cq.cq);
 			        ret = ibv_destroy_cq(clients[i].qp->recv_cq.cq);
 			        if (ret) {
-		                mp_err_msg("error %d in destroy_cq recv_cq\n", ret);
+		                mp_err_msg(oob_rank, "error %d in destroy_cq recv_cq\n", ret);
 		                retcode = ret;
 			        }
 
@@ -1204,7 +1204,7 @@ namespace TL
 				assert(mp_mem_key);
 				verbs_reg_t reg = (verbs_reg_t)calloc(1, sizeof(struct verbs_reg));
 				if (!reg) {
-				  mp_err_msg("malloc returned NULL while allocating struct mp_reg\n");
+				  mp_err_msg(oob_rank, "malloc returned NULL while allocating struct mp_reg\n");
 				  return MP_FAILURE;
 				}
 
@@ -1218,30 +1218,30 @@ namespace TL
 				if ((curesult == CUDA_SUCCESS) && (type == CU_MEMORYTYPE_DEVICE)) { 
 					CU_CHECK(cuMemGetAddressRange(&base, &size, (CUdeviceptr)addr));
 					CU_CHECK(cuPointerSetAttribute(&flags, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, base)); 
-	   				mp_dbg_msg("Addr:%p Memory type: CU_MEMORYTYPE_DEVICE\n", addr);
+	   				mp_dbg_msg(oob_rank, "Addr:%p Memory type: CU_MEMORYTYPE_DEVICE\n", addr);
 				}
 #endif
 				if (verbs_enable_ud) {
-				  mp_warn_msg("UD enabled, registering buffer for LOCAL_WRITE\n");
+				  mp_warn_msg(oob_rank, "UD enabled, registering buffer for LOCAL_WRITE\n");
 				  flags = IBV_ACCESS_LOCAL_WRITE;
 				} else { 
 				  flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
 				          IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC;
 				}
 
-				mp_dbg_msg("ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
+				mp_dbg_msg(oob_rank, "ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
 				// note: register addr, not base. no advantage in registering the whole buffer as we don't
 				// maintain a registration cache yet
 				reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
 				if (!reg->mr) {
-					mp_err_msg("ibv_reg_mr returned NULL for addr:%p size:%zu errno=%d(%s)\n", 
+					mp_err_msg(oob_rank, "ibv_reg_mr returned NULL for addr:%p size:%zu errno=%d(%s)\n", 
 				            		addr, length, errno, strerror(errno));
 
 					return MP_FAILURE;
 				}
 
 				reg->key = reg->mr->lkey;
-				mp_dbg_msg("Registered key: key=%p value=%x buf=%p\n", reg, reg->key, addr);
+				mp_dbg_msg(oob_rank, "Registered key: key=%p value=%x buf=%p\n", reg, reg->key, addr);
 				*mp_mem_key = (mp_key_t)reg;
 
 				return MP_SUCCESS;
@@ -1264,13 +1264,13 @@ namespace TL
 				verbs_reg_t * reg;
 
 				if(number <= 0) {
-					mp_err_msg("erroneuos requests number specified (%d)\n", number);
+					mp_err_msg(oob_rank, "erroneuos requests number specified (%d)\n", number);
 					return NULL;
 				}
 
 				reg = (verbs_reg_t *)calloc(number, sizeof(verbs_reg_t));
 				if (!reg) {
-				  mp_err_msg("malloc returned NULL while allocating struct mp_reg\n");
+				  mp_err_msg(oob_rank, "malloc returned NULL while allocating struct mp_reg\n");
 				  return NULL;
 				}
 
@@ -1282,13 +1282,13 @@ namespace TL
 
 				verbs_request_t * req;
 				if(number <= 0) {
-					mp_err_msg("erroneuos requests number specified (%d)\n", number);
+					mp_err_msg(oob_rank, "erroneuos requests number specified (%d)\n", number);
 					return NULL;
 				}
 
 				req = (verbs_request_t *) calloc(number, sizeof(verbs_request_t));
 				if(!req) {
-					mp_err_msg("calloc returned NULL while allocating struct verbs_request_t\n");
+					mp_err_msg(oob_rank, "calloc returned NULL while allocating struct verbs_request_t\n");
 					return NULL;
 				}
 				
@@ -1305,7 +1305,7 @@ namespace TL
 				req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
 				assert(req);
 
-				mp_dbg_msg("peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
+				mp_dbg_msg(oob_rank, "peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
 
 #ifdef HAVE_IPC
 				if (client->can_use_ipc)
@@ -1335,7 +1335,7 @@ namespace TL
 				//progress (remove) some request on the RX flow if is not possible to queue a recv request
 				ret = verbs_post_recv(client, req);
 				if (ret) {
-					mp_err_msg("Posting recv failed: %s \n", strerror(errno));
+					mp_err_msg(oob_rank, "Posting recv failed: %s \n", strerror(errno));
 					goto out;
 				}
 
@@ -1343,7 +1343,7 @@ namespace TL
 				if (!use_event_sync) {
 					ret = gds_prepare_wait_cq(client->recv_cq, &req->gds_wait_info, 0);
 						if (ret) {
-						mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+						mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
 						goto out;
 					}
 				}
@@ -1364,7 +1364,7 @@ namespace TL
 				req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
 				assert(req);
 
-				mp_dbg_msg("peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
+				mp_dbg_msg(oob_rank, "peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
 
 #ifdef HAVE_IPC
 				if (client->can_use_ipc)
@@ -1377,7 +1377,7 @@ namespace TL
 					if (!entry) { 
 						entry = malloc(sizeof(ipc_handle_cache_entry_t));
 						if (!entry) { 
-							mp_err_msg("cache entry allocation failed \n");	
+							mp_err_msg(oob_rank, "cache entry allocation failed \n");	
 							ret = MP_FAILURE;
 							goto out;
 						}
@@ -1423,7 +1423,7 @@ namespace TL
 				// progress (remove) some request on the TX flow if is not possible to queue a send request
 				ret = verbs_post_send(client, req);
 				if (ret) {
-					mp_err_msg("posting send failed: %s \n", strerror(errno));
+					mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
 					goto out;
 				}
 
@@ -1431,7 +1431,7 @@ namespace TL
 				if (!use_event_sync) {
 					ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
 					if (ret) {
-					    mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+					    mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
 					    goto out;
 					}
 				}
@@ -1465,12 +1465,12 @@ namespace TL
 			        struct verbs_request *req = (verbs_request_t) req_[complete];
 					if (!verbs_req_can_be_waited(req))
 					{
-					    mp_dbg_msg("cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
+					    mp_dbg_msg(oob_rank, "cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
 					    ret = EINVAL;
 					    goto out;
 					}
 					if (req->status == MP_PENDING_NOWAIT) {
-					    mp_dbg_msg("PENDING_NOWAIT->PENDING req:%p status:%d id=%d peer=%d type=%d\n", req, req->status, req->id, req->peer, req->type);
+					    mp_dbg_msg(oob_rank, "PENDING_NOWAIT->PENDING req:%p status:%d id=%d peer=%d type=%d\n", req, req->status, req->id, req->peer, req->type);
 #ifdef HAVE_GDSYNC
 					    client_t *client = &clients[client_index[req->peer]];
 					    mp_flow_t req_flow = mp_type_to_flow(req->type);
@@ -1481,7 +1481,7 @@ namespace TL
 						//   req->status = MP_WAIT_POSTED
 					    ret = gds_post_wait_cq(cq, &req->gds_wait_info, 0);
 					    if (ret) {
-					      mp_err_msg("got %d while posting cq\n", ret);
+					      mp_err_msg(oob_rank, "got %d while posting cq\n", ret);
 					      goto out;
 					    }
 					    req->stream = NULL;
@@ -1510,15 +1510,15 @@ namespace TL
 			            us_t now = mp_get_cycles();
 			            if (((long)now-(long)start) > (long)tmout) {
 			                start = now;
-			                mp_warn_msg("checking for GPU errors\n");
+			                mp_warn_msg(oob_rank, "checking for GPU errors\n");
 			                int retcode = mp_check_gpu_error();
 			                if (retcode) {
 			                    ret = MP_FAILURE;
 			                    goto out;
 			                }
-			                mp_warn_msg("enabling dbg tracing\n");
+			                mp_warn_msg(oob_rank, "enabling dbg tracing\n");
 			                mp_enable_dbg(1);
-			                mp_dbg_msg("complete=%d req:%p status:%d id=%d peer=%d type=%d\n", complete, req, req->status, req->id, req->peer, req->type);
+			                mp_dbg_msg(oob_rank, "complete=%d req:%p status:%d id=%d peer=%d type=%d\n", complete, req, req->status, req->id, req->peer, req->type);
 			            }
 #endif
 			        }
@@ -1624,7 +1624,7 @@ namespace TL
 				client_t *client = &clients[client_id];
 
 				if (verbs_enable_ud) { 
-					mp_err_msg("put/get not supported with UD \n");
+					mp_err_msg(oob_rank, "put/get not supported with UD \n");
 					ret = MP_FAILURE;
 					goto out;
 				}
@@ -1655,7 +1655,7 @@ namespace TL
 
 				ret = verbs_post_send(client, req);
 				if (ret) {
-					mp_err_msg("posting send failed: %s \n", strerror(errno));
+					mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
 					goto out;
 				}
 
@@ -1664,7 +1664,7 @@ namespace TL
 			if (!(flags & MP_PUT_NOWAIT)) {
 				ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
 				if (ret) {
-					mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+					mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
 					goto out;
 				}
 			}
@@ -1685,7 +1685,7 @@ namespace TL
 				client_t *client = &clients[client_id];
 
 				if (verbs_enable_ud) { 
-					mp_err_msg("put/get not supported with UD \n");
+					mp_err_msg(oob_rank, "put/get not supported with UD \n");
 					ret = MP_FAILURE;
 					goto out;
 				}
@@ -1710,7 +1710,7 @@ namespace TL
 
 				ret = verbs_post_send(client, req);
 				if (ret) {
-					mp_err_msg("posting send failed: %s \n", strerror(errno));
+					mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
 					goto out;
 				}
 
@@ -1719,7 +1719,7 @@ namespace TL
 //				if (!(flags & MP_PUT_NOWAIT)) {
 					ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
 					if (ret) {
-						mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+						mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
 						goto out;
 					}
 //				}
@@ -1731,7 +1731,7 @@ namespace TL
 				return ret;
 			}
 
-			int onesided_wait_word(uint32_t *ptr, uint32_t value, int flags)
+			int wait_word(uint32_t *ptr, uint32_t value, int flags)
 			{
 			    int ret = MP_SUCCESS;
 			    int cond = 0;
@@ -1767,18 +1767,18 @@ namespace TL
 			    verbs_request_t req = (verbs_request_t)req_[r];
 			    
 			    if (!verbs_req_valid(req)) {
-			        mp_err_msg("invalid req=%p req->id=%d\n", req, req->id);
+			        mp_err_msg(oob_rank, "invalid req=%p req->id=%d\n", req, req->id);
 			    }
 
 			    ret = verbs_progress_single_flow(TX_FLOW);
 			    if (ret) {
-			        mp_dbg_msg("progress error %d\n", ret);
+			        mp_dbg_msg(oob_rank, "progress error %d\n", ret);
 			        goto out;
 			    }
 
 			    ret = verbs_progress_single_flow(RX_FLOW);
 			    if (ret) {
-			        mp_dbg_msg("progress error %d\n", ret);
+			        mp_dbg_msg(oob_rank, "progress error %d\n", ret);
 			        goto out;
 			    }
 
@@ -1789,7 +1789,7 @@ namespace TL
 			    r++;
 			  }
 			  if (completed_reqs)
-			      mp_dbg_msg("%d completed reqs, not being released!\n", completed_reqs);
+			      mp_dbg_msg(oob_rank, "%d completed reqs, not being released!\n", completed_reqs);
 			  ret = completed_reqs;
 
 			 out:
@@ -1817,7 +1817,7 @@ int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request
   struct mp_reg *reg = (struct mp_reg *) *reg_t;
 
   if (nvecs > ib_max_sge) {
-      mp_err_msg("exceeding max supported vector size: %d \n", ib_max_sge);
+      mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
       ret = MP_FAILURE;
       goto out;
   }
@@ -1829,7 +1829,7 @@ int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request
   req->sgv = malloc(sizeof(struct ibv_sge)*nvecs);
   assert(req->sgv);
 
-  mp_dbg_msg("req=%p id=%d\n", req, req->id);
+  mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
 
   for (i=0; i < nvecs; ++i) {
     req->sgv[i].length = v[i].iov_len;
@@ -1844,7 +1844,7 @@ int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request
 
   ret = gds_post_recv(client->qp, &req->in.rr, &req->out.bad_rr);
   if (ret) {
-    mp_err_msg("posting recvv failed ret: %d error: %s peer: %d index: %d \n", ret, strerror(errno), peer, client_index[peer]);
+    mp_err_msg(oob_rank, "posting recvv failed ret: %d error: %s peer: %d index: %d \n", ret, strerror(errno), peer, client_index[peer]);
     goto out;
   }
 
@@ -1852,7 +1852,7 @@ int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request
   if (!use_event_sync) {
       ret = gds_prepare_wait_cq(client->recv_cq, &req->gds_wait_info, 0);
       if (ret) {
-        mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+        mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
         goto out;
       }
   }
@@ -1871,7 +1871,7 @@ int mp_isendv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request
   struct mp_reg *reg = (struct mp_reg *) *reg_t;
 
   if (nvecs > ib_max_sge) {
-      mp_err_msg("exceeding max supported vector size: %d \n", ib_max_sge);
+      mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
       ret = MP_FAILURE;
       goto out;
   }
@@ -1883,7 +1883,7 @@ int mp_isendv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request
   req->sgv = malloc(sizeof(struct ibv_sge)*nvecs);
   assert(req->sgv);
 
-  mp_dbg_msg("req=%p id=%d\n", req, req->id);
+  mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
 
   for (i=0; i < nvecs; ++i) {
     req->sgv[i].length = v[i].iov_len;
@@ -1906,14 +1906,14 @@ int mp_isendv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request
 
   ret = gds_post_send(client->qp, &req->in.sr, &req->out.bad_sr);
   if (ret) {
-    mp_err_msg("posting send failed: %s \n", strerror(errno));
+    mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
     goto out;
   }
 
   if (!use_event_sync) {
       ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
       if (ret) {
-        mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(errno));
+        mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
         goto out;
       }
   }
