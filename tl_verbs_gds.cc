@@ -112,8 +112,95 @@ namespace TL
 
 		public:
 
-			int funzione_casuale() {
-				return 1;
+			Verbs_GDS() : Verbs() {
+#ifndef HAVE_GDSYNC
+				fprintf(stderr, "Verbs GDS extension cannot work without LibGDSync library\n");
+				exit(EXIT_FAILURE);
+#endif
+			}
+			int mp_isend_on_stream (void *buf, int size, int peer, mp_reg_t *reg_t,  mp_request_t *req_t, cudaStream_t stream)
+			{
+			    int ret = 0;
+			    struct mp_request *req = NULL;
+			    struct mp_reg *reg = (struct mp_reg *)*reg_t;
+			    client_t *client = &clients[client_index[peer]];
+
+			    if (use_event_sync) {
+			        req = new_stream_request(client, MP_SEND, MP_PREPARED, stream);
+			        assert(req);
+
+			        req->in.sr.next = NULL;
+			        req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+			        req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
+			        req->in.sr.wr_id = (uintptr_t) req;
+			        req->in.sr.num_sge = 1;
+			        req->in.sr.sg_list = &req->sg_entry;
+
+			        if (mp_enable_ud) {
+			            req->in.sr.wr.ud.ah = client->ah;
+			            req->in.sr.wr.ud.remote_qpn = client->qpn;
+			            req->in.sr.wr.ud.remote_qkey = 0;
+			        }
+
+			        req->sg_entry.length = size;
+			        req->sg_entry.lkey = reg->key;
+			        req->sg_entry.addr = (uintptr_t)(buf);
+
+			        client->last_posted_trigger_id[mp_type_to_flow(req->type)] = req->id;
+
+			        ret = gds_stream_post_poke_dword(stream, 
+					&client->last_trigger_id[mp_type_to_flow(req->type)], 
+					req->id, 
+					GDS_MEMORY_HOST);
+			        if (ret) {
+			            mp_err_msg("gds_stream_queue_send failed: %s \n", strerror(ret));
+			            // BUG: leaking req ??
+			            goto out;
+			        }
+
+			        client_track_posted_stream_req(client, req, TX_FLOW);
+			    } else {
+			        req = new_stream_request(client, MP_SEND, MP_PENDING_NOWAIT, stream);
+			        assert(req);
+
+			        mp_dbg_msg("req=%p id=%d\n", req, req->id);
+
+			        req->in.sr.next = NULL;
+			        req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+			        req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
+			        req->in.sr.wr_id = (uintptr_t) req;
+			        req->in.sr.num_sge = 1;
+			        req->in.sr.sg_list = &(req->sg_entry);
+
+			        if (mp_enable_ud) {
+			            req->in.sr.wr.ud.ah = client->ah;
+			            req->in.sr.wr.ud.remote_qpn = client->qpn;
+			            req->in.sr.wr.ud.remote_qkey = 0;
+			        }
+
+			        req->sg_entry.length = size;
+			        req->sg_entry.lkey = reg->key;
+			        req->sg_entry.addr = (uintptr_t)(buf);
+
+			        ret = mp_post_send_on_stream(stream, client, req);
+			        if (ret) {
+			            mp_err_msg("mp_post_send_on_stream failed: %s \n", strerror(ret));
+			            // BUG: leaking req ??
+			            goto out;
+			        }
+
+			        ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
+			        if (ret) {
+			            mp_err_msg("gds_prepare_wait_cq failed: %s \n", strerror(ret));
+			            // BUG: leaking req ??
+			            goto out;
+			        }
+			    }
+
+			    *req_t = req;
+
+			out:
+			    return ret;
 			}
 
 
