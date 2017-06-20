@@ -75,7 +75,7 @@ namespace OOB
 				return myRank;
 			} 
 
-			void sync() {
+			void barrier() {
 				MPI_Barrier(comm);
 			} 
 

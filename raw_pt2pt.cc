@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 	}
 	
 	//Ensure all recvs have been posted
-	oob_comm->sync();
+	oob_comm->barrier();
 
 	if(!myId)
 		printf("\n==== Send Msg ====\n");
@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
-	
+
 	if(use_gpu_buffers == 1)
 		free(hostBuf);
 	

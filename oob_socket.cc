@@ -30,7 +30,7 @@ namespace OOB
 				return 0;
 			} 
 
-			void sync() {
+			void barrier() {
 			} 
 
 			int finalize() {

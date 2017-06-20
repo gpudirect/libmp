@@ -949,7 +949,7 @@ namespace TL
 				}
 
 				//Barrier with oob object
-				oob_comm->sync();
+				oob_comm->barrier();
 
 				for (i=0; i<peer_count; i++) {
 					int flags = 0;
@@ -1006,7 +1006,7 @@ namespace TL
 					assert(result == MP_SUCCESS);
 				}
 
-				oob_comm->sync();
+				oob_comm->barrier();
 
 #ifdef HAVE_IPC
 				//ipc connection setup
@@ -1084,7 +1084,7 @@ namespace TL
 				}
 				}
 
-				oob_comm->sync();
+				oob_comm->barrier();
 
 				if (smp_num_procs > 1) {
 					struct stat file_status;
@@ -1146,7 +1146,7 @@ namespace TL
 				int i, ret, retcode=MP_SUCCESS;
 				mem_region_t *mem_region = NULL;
 
-				oob_comm->sync();
+				oob_comm->barrier();
 
 				/*destroy IB resources*/
 				for (i=0; i<peer_count; i++) {
@@ -1452,7 +1452,7 @@ namespace TL
 			  return ret;
 			}
 
-			int wait_all (int count, mp_request_t *req_)
+			int wait_all(int count, mp_request_t *req_)
 			{
 			    int complete = 0, ret = 0;
 
@@ -1594,7 +1594,7 @@ namespace TL
 
 			  free(exchange_win);
 
-			  oob_comm->sync();
+			  oob_comm->barrier();
 
 			  return result;
 			}
@@ -1736,6 +1736,8 @@ namespace TL
 			    int ret = MP_SUCCESS;
 			    int cond = 0;
 			    int cnt = 0;
+			    assert(ptr);
+			    
 			    while (1) {
 			        switch(flags) {
 			        case VERBS_WAIT_EQ:   cond = (ACCESS_ONCE(*ptr) >  value); break;

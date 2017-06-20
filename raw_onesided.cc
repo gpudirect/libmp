@@ -101,10 +101,10 @@ int main(int argc, char *argv[])
 				tl_comm->wait(&mp_reqs_put[j]); 
 			}			  
 
-			oob_comm->sync();
-			oob_comm->sync();
+			oob_comm->barrier();
+			oob_comm->barrier();
 		} else {  
-			oob_comm->sync();
+			oob_comm->barrier();
 			//validate
 			if(use_gpu_buffers == 1)
 				CUDA_CHECK(cudaMemcpy(hostBuf, commBuf, totSize, cudaMemcpyDeviceToHost));
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 				}
 			} 
 			
-			oob_comm->sync();
+			oob_comm->barrier();
 		}
 	}
 
