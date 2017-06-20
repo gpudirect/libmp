@@ -75,12 +75,16 @@ namespace OOB
 				return myRank;
 			} 
 
+			int finalize() {
+				return MPI_Finalize();
+			}
+
 			void barrier() {
 				MPI_Barrier(comm);
 			} 
 
-			int finalize() {
-				return MPI_Finalize();
+			int abort(int errCode) {
+				return MPI_Abort(comm, errCode);
 			}
 
 			int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType) {

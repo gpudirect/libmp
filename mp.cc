@@ -1,20 +1,17 @@
-#include "common.h"
-#include "oob.h"
-#include "tl.h"
+#include "mp.h"
 
-int oob_size, oob_rank;
+static int oob_size=0;
+static int oob_rank=0;
+static OOB::Communicator * oob_comm;
+static TL::Communicator * tl_comm;
 
 int mp_init() {
 
 	// ====== OOB INIT
-	OOB::Communicator * oob_comm;
 	oob_comm = getBestOOB();
-	ret = oob_comm->init(argc, argv);
-	if(ret)
-	{
-		fprintf(stderr, "OOB Init error %d\n", ret);
-		return MP_ERROR;
-	}
+	assert(oob_comm);
+
+	MP_CHECK(oob_comm->init(argc, argv));
 
 	oob_rank = oob_comm->getMyId();
 	oob_size = oob_comm->getSize();
@@ -22,18 +19,19 @@ int mp_init() {
 
 	// ====== TL INIT
 #ifdef HAVE_VERBS
-	TL::Communicator * tl_comm = getTLObj(TL_INDEX_VERBS);
+	tl_comm = getTLObj(TL_INDEX_VERBS);
 #else
-	TL::Communicator * tl_comm = getTLObj(TL_INDEX_PSM);
+	tl_comm = getTLObj(TL_INDEX_PSM);
 #endif
 
 	if(!oob_rank) printf("\nLibMP Init Transport Layer Obj\n");
-	tl_comm->setupOOB(oob_comm);
-	tl_comm->setupNetworkDevices();
-	tl_comm->createEndpoints();
-	tl_comm->exchangeEndpoints();
-	tl_comm->updateEndpoints();
-	tl_comm->cleanupInit();
+
+	MP_CHECK(tl_comm->setupOOB(oob_comm));
+	MP_CHECK(tl_comm->setupNetworkDevices());
+	MP_CHECK(tl_comm->createEndpoints());
+	MP_CHECK(tl_comm->exchangeEndpoints());
+	MP_CHECK(tl_comm->updateEndpoints());
+	MP_CHECK(tl_comm->cleanupInit());
 
 #ifndef HAVE_CUDA
 	fprintf(stderr, "WARNING: GPUDirect RDMA requires HAVE_CUDA configure flag\n", );
@@ -164,4 +162,14 @@ int mp_wait_all(int number, mp_request_t * mp_reqs) {
 //===== OTHERS
 int mp_barrier(){
 	oob_comm->barrier();
+}
+
+//===== FINALIZE
+int mp_finalize() {
+	int ret;
+
+	MP_CHECK(tl_comm->finalize());
+	MP_CHECK(oob_comm->finalize());
+
+	return ret;
 }

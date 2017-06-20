@@ -30,10 +30,14 @@ namespace OOB
 				return 0;
 			} 
 
+			int finalize() {
+				return 0;
+			}
+
 			void barrier() {
 			} 
 
-			int finalize() {
+			int abort(int errCode) {
 				return 0;
 			}
 
