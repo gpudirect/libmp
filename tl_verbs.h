@@ -7,6 +7,7 @@
 
 #ifdef HAVE_GDSYNC
 #include <gdsync.h>
+#include <gdsync/tools.h>
 #endif
 
 #ifdef HAVE_GDSYNC

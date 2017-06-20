@@ -7,6 +7,7 @@ static TL::Communicator * tl_comm=NULL;
 static int oob_type=-1;
 static int tl_type=-1;
 
+//=============== INIT ===============
 void mp_get_envars()
 {
 	char * value = getenv("MP_ENABLE_DEBUG");
@@ -62,15 +63,16 @@ int mp_init(int argc, char *argv[], int par1)
 
 	MP_CHECK_COMM_OBJ();
 	MP_CHECK(tl_comm->setupOOB(oob_comm));
-#ifdef HAVE_GDSYNC
-		tl_comm->setup_sublayer(par1);
-#endif
+	//GDSync in case of Verbs 
+	MP_CHECK(tl_comm->setup_sublayer(par1));
 	MP_CHECK(tl_comm->setupNetworkDevices());
 	MP_CHECK(tl_comm->createEndpoints());
 	MP_CHECK(tl_comm->exchangeEndpoints());
 	MP_CHECK(tl_comm->updateEndpoints());
 	tl_comm->cleanupInit();
 
+	tl_comm->funzione_casuale();
+	
 #ifndef HAVE_CUDA
 	fprintf(stderr, "WARNING: GPUDirect RDMA requires HAVE_CUDA configure flag\n");
 #endif
@@ -78,7 +80,7 @@ int mp_init(int argc, char *argv[], int par1)
 	return MP_SUCCESS;
 }
 
-//===== FINALIZE
+//=============== FINALIZE ===============
 void mp_finalize() {
 	MP_CHECK_COMM_OBJ();
 
@@ -86,7 +88,7 @@ void mp_finalize() {
 	MP_CHECK(oob_comm->finalize());
 }
 
-//===== MEMORY OPs
+//=============== MEMORY OPs ===============
 mp_request_t * mp_create_request(int number) {
 	MP_CHECK_TL_OBJ();
 	return tl_comm->create_requests(number);
@@ -125,7 +127,7 @@ int mp_register_key_buffer(void * addr, size_t length, mp_key_t * mp_key) {
 	return tl_comm->register_key_buffer(addr, length, mp_key);
 }
 
-//===== PT2PT
+//=============== PT2PT ===============
 int mp_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
 	MP_CHECK_COMM_OBJ();
 
@@ -157,7 +159,7 @@ int mp_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_
 }
 
 
-//===== ONE-SIDED
+//=============== ONE-SIDED ===============
 int mp_nb_put(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags) {
 	MP_CHECK_COMM_OBJ();
 
@@ -218,7 +220,7 @@ int mp_window_destroy(mp_window_t *window_t) {
 	return tl_comm->onesided_window_destroy(window_t);
 }
 
-//===== WAIT
+//=============== WAIT ===============
 int mp_wait_word(uint32_t *ptr, uint32_t value, int flags) {
 	if(!ptr)
 	{
@@ -257,8 +259,7 @@ int mp_wait_all(int number, mp_request_t * mp_reqs) {
 	return tl_comm->wait_all(number, mp_reqs);
 }
 
-
-//===== OTHERS
+//=============== OTHERS ===============
 void mp_barrier() {
 	MP_CHECK_COMM_OBJ();
 
@@ -270,7 +271,7 @@ void mp_abort() {
 
 	oob_comm->abort(-1);
 }
-//===== INFO
+//=============== INFO ===============
 int mp_query_param(mp_param_t param, int *value)
 {
 	int ret = 0;

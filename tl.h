@@ -15,6 +15,7 @@ namespace TL
   		    virtual int setupOOB(OOB::Communicator * input_comm)=0;
   		    virtual void getEnvVars()=0;
 	        virtual int setupNetworkDevices()=0;
+			virtual int setup_sublayer(int par1)=0;
 
 	        // ===== CONNECTION
 	        virtual int createEndpoints()=0;
@@ -45,9 +46,7 @@ namespace TL
    	        virtual int wait(mp_request_t *req)=0;
 	        virtual int wait_all (int count, mp_request_t *req)=0;
 	        virtual int wait_word(uint32_t *ptr, uint32_t value, int flags)=0;
-	        //GDSync
-			virtual int setup_sublayer(int par1)=0;
-    };
+	    };
 }
 
 TL::Communicator * getTLObj(int tl_index);

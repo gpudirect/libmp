@@ -45,7 +45,7 @@ namespace TL
 
 			int oob_size, oob_rank;
 			int mp_warn_is_enabled, mp_dbg_is_enabled;
-
+			int qp_query=0;
 #ifdef HAVE_GDSYNC
 			int gpu_id;
 			gds_send_request_t *gds_send_info_region = NULL;
@@ -210,6 +210,12 @@ namespace TL
 #endif
 			        if(ret == ENOMEM)
 			        {
+			        	if(qp_query == 0)
+			            {
+			                verbs_query_print_qp(client->qp, req, 1);
+			                qp_query=1;
+			            }
+
 			            ret_progress = verbs_progress_single_flow(RX_FLOW);
 			            if(ret_progress != MP_SUCCESS)
 			            {
@@ -221,9 +227,54 @@ namespace TL
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
 
+		        qp_query=0;
 			    return ret;
 			}
 
+#ifdef HAVE_GDSYNC
+			int verbs_query_print_qp(struct gds_qp *qp, struct mp_request *req, int async)
+#else
+			int verbs_query_print_qp(struct verbs_qp *qp, struct mp_request *req, int async)
+#endif
+			{
+			    assert(qp);
+			    struct ibv_qp_attr qp_attr;
+			    struct ibv_qp_init_attr qp_init_attr;
+
+			    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
+			    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
+
+			    if (ibv_query_qp(qp->qp, &qp_attr, IBV_QP_STATE | IBV_QP_PATH_MTU | IBV_QP_CAP, &qp_init_attr))
+			    {
+			        mp_err_msg(oob_rank, "client query qp attr fail\n");
+			        return MP_FAILURE;
+			    }
+			   
+			    mp_warn_msg(oob_rank, "Init QP attr: max_send_wr=%d, max_recv_wr=%d, max_inline_data=%d, qp_type=%d\nCurrent QP attr: QP State=%d QP Cur State=%d Access Flags=%d max_send_wr=%d, max_recv_wr=%d, max_inline_data=%d\n",
+			                    qp_init_attr.cap.max_send_wr,
+			                    qp_init_attr.cap.max_recv_wr,
+			                    qp_init_attr.cap.max_inline_data,
+			                    qp_init_attr.qp_type,
+			                    qp_attr.qp_state,
+			                    qp_attr.cur_qp_state,
+			                    qp_attr.qp_access_flags,
+			                    qp_attr.cap.max_send_wr,
+			                    qp_attr.cap.max_recv_wr,
+			                    qp_attr.cap.max_inline_data
+			    );
+
+			#if 0
+			    if(req != NULL)
+			    {
+			        if(req->in.sr.exp_opcode == IBV_EXP_WR_SEND)
+			            mp_warn_msg("This is an IBV_EXP_WR_SEND\n");
+			            
+			        if(req->in.sr.exp_opcode == IBV_EXP_WR_RDMA_WRITE)
+			            mp_warn_msg("This is an IBV_EXP_WR_RDMA_WRITE\n");
+			    }
+			#endif
+			    return MP_SUCCESS;
+			}
 			int verbs_post_send(client_t *client, struct verbs_request *req)
 			{
 			    int progress_retry=0, ret=0, ret_progress=0;
@@ -249,6 +300,12 @@ namespace TL
 #endif
 			        if(ret == ENOMEM)
 			        {
+			        	if(qp_query == 0)
+			            {
+			                verbs_query_print_qp(client->qp, req, 0);
+			                qp_query=1;
+			            }
+
 			            ret_progress = verbs_progress_single_flow(TX_FLOW);
 			            if(ret_progress != MP_SUCCESS)
 			            {
@@ -260,6 +317,7 @@ namespace TL
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
 			out:
+		        qp_query=0;
 			    return ret;
 			}
 
