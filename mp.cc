@@ -71,8 +71,6 @@ int mp_init(int argc, char *argv[], int par1)
 	MP_CHECK(tl_comm->updateEndpoints());
 	tl_comm->cleanupInit();
 
-	printf("Return casuale: %d\n", tl_comm->funzione_casuale());
-
 #ifndef HAVE_CUDA
 	fprintf(stderr, "WARNING: GPUDirect RDMA requires HAVE_CUDA configure flag\n");
 #endif

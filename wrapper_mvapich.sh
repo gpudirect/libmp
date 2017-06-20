@@ -19,15 +19,14 @@ case ${HOSTNAME} in
 	# GPU #0,2,4,6
 	# HCA #0,1,2,3
     if (( $lrank > 4 )); then echo "too many ranks"; exit; fi
-#       if (( $lrank == 0 )); then hlrank=0; dlrank=0; HCA=mlx5_0; fi
-#       if (( $lrank == 1 )); then hlrank=1; dlrank=7; HCA=mlx5_3; fi 
-    hlrank=$(($lrank / 2)) # 0,1
-    dlrank=$(($lrank * 2)) # 0,2,4,6
+     if (( $lrank == 0 )); then hlrank=1; dlrank=4; HCA=mlx5_2; fi
+     if (( $lrank == 1 )); then hlrank=1; dlrank=6; HCA=mlx5_3; fi 
+#    hlrank=$(($lrank / 2)) # 0,1
+#    dlrank=$(($lrank * 2)) # 0,2,4,6
+#    HCA=mlx5_${lrank}
 #       CUDA_VISIBLE_DEVICES=$dlrank
     MP_USE_GPU=${dlrank}
     USE_CPU=${hlrank}
-    #MY_HCA=$(($dlrank/2))  
-    HCA=mlx5_${lrank}
     MV2_IBA_HCA=${HCA}
     VERBS_IB_HCA=${HCA}
     OMPI_MCA_btl_openib_if_include=${HCA}

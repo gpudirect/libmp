@@ -1266,7 +1266,7 @@ namespace TL
 
 				int flags=1;
 				assert(mp_mem_key);
-				verbs_reg_t reg = (verbs_reg_t)calloc(1, sizeof(struct verbs_reg));
+				verbs_region_t reg = (verbs_region_t)calloc(1, sizeof(struct verbs_reg));
 				if (!reg) {
 				  mp_err_msg(oob_rank, "malloc returned NULL while allocating struct mp_reg\n");
 				  return MP_FAILURE;
@@ -1313,7 +1313,7 @@ namespace TL
 
 			int unregister_key(mp_key_t *reg_)
 			{
-				verbs_reg_t reg = (verbs_reg_t) *reg_; 
+				verbs_region_t reg = (verbs_region_t) *reg_; 
 
 				assert(reg);
 				assert(reg->mr);
@@ -1325,14 +1325,14 @@ namespace TL
 
 			mp_key_t * create_keys(int number) {
 
-				verbs_reg_t * reg;
+				verbs_region_t * reg;
 
 				if(number <= 0) {
 					mp_err_msg(oob_rank, "erroneuos requests number specified (%d)\n", number);
 					return NULL;
 				}
 
-				reg = (verbs_reg_t *)calloc(number, sizeof(verbs_reg_t));
+				reg = (verbs_region_t *)calloc(number, sizeof(verbs_region_t));
 				if (!reg) {
 				  mp_err_msg(oob_rank, "malloc returned NULL while allocating struct mp_reg\n");
 				  return NULL;
@@ -1361,8 +1361,8 @@ namespace TL
 
 			int pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
 				int ret = 0;
-				struct verbs_request *req = NULL;
-				verbs_reg_t reg = (verbs_reg_t) *mp_mem_key;
+				verbs_request_t req = NULL;
+				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
 				client_t *client = &clients[client_index[peer]];
 
 				assert(reg);
@@ -1379,7 +1379,7 @@ namespace TL
 				req->in.rr.wr_id = (uintptr_t) req;
 
 				if (verbs_enable_ud) { 
-				  struct verbs_reg *ud_reg = (struct verbs_reg *) ud_padding_reg;
+				  verbs_region_t ud_reg = (verbs_region_t ) ud_padding_reg;
 
 				  req->in.rr.num_sge = 2;
 				  req->in.rr.sg_list = req->ud_sg_entry;
@@ -1421,7 +1421,7 @@ namespace TL
 			int pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
 				int ret = 0;
 				struct verbs_request *req = NULL;
-				verbs_reg_t reg = (verbs_reg_t) *mp_mem_key;
+				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
 				client_t *client = &clients[client_index[peer]];
 
 				assert(reg);
@@ -1682,7 +1682,7 @@ namespace TL
 			{
 				int ret = 0;
 				verbs_request_t req;
-				verbs_reg_t reg = (verbs_reg_t) *reg_t;
+				verbs_region_t reg = (verbs_region_t) *reg_t;
 				verbs_window_t window = (verbs_window_t) *window_t;
 				int client_id = client_index[peer];
 				client_t *client = &clients[client_id];
@@ -1743,7 +1743,7 @@ namespace TL
 			{
 				int ret = 0;
 				verbs_request_t req;
-				verbs_reg_t reg = (verbs_reg_t) *reg_t;
+				verbs_region_t reg = (verbs_region_t) *reg_t;
 				verbs_window_t window = (verbs_window_t) *window_t;
 				int client_id = client_index[peer];
 				client_t *client = &clients[client_id];
@@ -1885,10 +1885,17 @@ namespace TL
 				return MP_SUCCESS;
 			}
 
-			int funzione_casuale() {
-				return 0;
-			}
-
+			//============== GPUDirect Async - Verbs_GDS class ==============
+	        int pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream) { return 0; }
+	        int pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream) { return 0; }
+	        int pt2pt_send_prepare(void *buf, int size, int peer, mp_reg_t *reg_t, mp_request_t *req_t) { return 0; }
+			int pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream) { return 0; }
+			int pt2pt_b_send_post_all_async(uint32_t count, mp_request_t *req_t, asyncStream stream) { return 0; }
+			int pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream) { return 0; }
+			int pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { return 0; }
+			int wait_async (mp_request_t *req_t, asyncStream stream) { return 0; }
+	        int wait_all_async(int count, mp_request_t *req_t, asyncStream stream) { return 0; }
+			//================================================================
 	};
 }
 

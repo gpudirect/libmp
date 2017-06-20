@@ -4,7 +4,6 @@
 #include "common.h"
 #include "oob.h"
 
-
 namespace TL
 {
     class Communicator {
@@ -35,6 +34,14 @@ namespace TL
 	        // ===== COMMUNICATION PT2PT
 	        virtual int pt2pt_nb_send(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key)=0;
 	        virtual int pt2pt_nb_receive(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key)=0;
+	     	// ----- GPUDirect Async support
+	        virtual int pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream)=0;
+	        virtual int pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream)=0;
+	        virtual	int pt2pt_send_prepare(void *buf, int size, int peer, mp_reg_t *reg_t, mp_request_t *req_t)=0;
+			virtual int pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream)=0;
+			virtual int pt2pt_b_send_post_all_async(uint32_t count, mp_request_t *req_t, asyncStream stream)=0;
+			virtual int pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream)=0;
+			virtual int pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream)=0;
 
 	        // ===== COMMUNICATION ONE-SIDED
 	        virtual int onesided_window_create(void *addr, size_t size, mp_window_t *window_t)=0;
@@ -46,8 +53,10 @@ namespace TL
    	        virtual int wait(mp_request_t *req)=0;
 	        virtual int wait_all (int count, mp_request_t *req)=0;
 	        virtual int wait_word(uint32_t *ptr, uint32_t value, int flags)=0;
+	     	// ----- GPUDirect Async support
+	        virtual int wait_async (mp_request_t *req_t, asyncStream stream)=0;
+	        virtual int wait_all_async(int count, mp_request_t *req_t, asyncStream stream)=0;
 
-	        virtual int funzione_casuale()=0;
 	    };
 }
 

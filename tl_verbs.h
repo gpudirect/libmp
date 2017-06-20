@@ -146,7 +146,7 @@ struct verbs_reg {
     uint32_t key;
     struct ibv_mr *mr;
 };
-typedef struct verbs_reg * verbs_reg_t;
+typedef struct verbs_region * verbs_region_t;
 
 struct verbs_window {
    void **base_ptr;
