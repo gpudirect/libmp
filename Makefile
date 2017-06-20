@@ -29,18 +29,21 @@ CUDALDFLAGS=
 endif
 #===========================
 
-OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o raw_pt2pt.o
+OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o 
 
 .PHONY: all clean
 
-all: raw_pt2pt
+all: raw_pt2pt raw_onesided
 
-raw_pt2pt: $(OBJ)
-	$(LD) -o raw_pt2pt $(OBJ) ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDALDFLAGS}
+raw_pt2pt: $(OBJ) raw_pt2pt.o
+	$(LD) -o raw_pt2pt $(OBJ) raw_pt2pt.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDALDFLAGS}
+
+raw_onesided: $(OBJ) raw_onesided.o
+	$(LD) -o raw_onesided $(OBJ) raw_onesided.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDALDFLAGS}
 
 .cc.o:
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $(CONFIGURE_FLAGS) $(CUDAINCLUDEDIR) $< -o $@
 
 
 clean:
-	rm -rf *.o raw_pt2pt
+	rm -rf *.o raw_pt2pt raw_onesided
