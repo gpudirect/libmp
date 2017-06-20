@@ -1,3 +1,6 @@
 [submodule "libgdsync"]
 	path = libgdsync
 	url = https://github.com/gpudirect/libgdsync.git
+[submodule "gdrcopy"]
+	path = gdrcopy
+	url = https://github.com/NVIDIA/gdrcopy.git
