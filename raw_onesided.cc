@@ -72,7 +72,6 @@ int main(int argc, char *argv[])
 	{
 		CUDA_CHECK(cudaMalloc((void **)&commBuf, totSize));
 		CUDA_CHECK(cudaMemset(commBuf, 0, totSize)); 
-
 	}
 	else
 	{
