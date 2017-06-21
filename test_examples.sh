@@ -18,8 +18,8 @@ OMPI_params="$OMPI_params --mca btl openib,self"
 OMPI_params="$OMPI_params --mca btl_openib_want_cuda_gdr 1"
 OMPI_params="$OMPI_params --mca btl_openib_warn_default_gid_prefix 0"
 OMPI_params="$OMPI_params --mca btl_openib_cuda_rdma_limit 16777216"
-OMPI_params="$OMPI_params  --map-by node"
-OMPI_params="-x LD_LIBRARY_PATH -x PATH -x CUDA_PASCAL_FORCE_40_BIT=1 -x NCHUNK_X_BETHE=16 -x NGPU_X_BETHE=1 -x NCCL_SHM_DISABLE=1 -x NCCL_DEBUG=INFO"
+OMPI_params="$OMPI_params --map-by node"
+OMPI_params="$OMPI_params -x LD_LIBRARY_PATH -x PATH -x CUDA_PASCAL_FORCE_40_BIT=1 -x NCHUNK_X_BETHE=16 -x NGPU_X_BETHE=1 -x NCCL_SHM_DISABLE=1 -x NCCL_DEBUG=INFO"
 OMPI_params="$OMPI_params -x MP_ENABLE_WARN=1 -x MP_ENABLE_DEBUG=0 "
 OMPI_params="$OMPI_params -x MP_GPU_BUFFERS $GPUBUF "
 OMPI_params=""
@@ -33,7 +33,7 @@ MVAPICH_params="$MVAPICH_params -genv MP_GPU_BUFFERS $GPUBUF "
 #MVAPICH_params=""
 
 set -x
-$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile ./wrapper_mvapich.sh $TEST_NAME
+$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile ./wrapper.sh $TEST_NAME
 
 #-verbose
 #nvprof -o nvprof-singlestream.%q{MV2_COMM_WORLD_LOCAL_RANK}.nvprof

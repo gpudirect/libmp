@@ -4,6 +4,7 @@ namespace TL
 {
 	class Verbs_GDS : public Verbs {
 		private:
+			
 			uint32_t *verbs_gds_client_last_tracked_id_ptr(client_t *client, verbs_request_t req)
 			{
 			    return &client->last_tracked_id[verbs_type_to_flow((mp_req_type_t)req->type)]; //mp_req_to_flow
