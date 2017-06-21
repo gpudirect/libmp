@@ -1,11 +1,11 @@
 #include "mp.h"
 
-static int oob_size=0, oob_rank=0;
-static int mp_warn_is_enabled=0, mp_dbg_is_enabled=0;
-static OOB::Communicator * oob_comm=NULL;
-static TL::Communicator * tl_comm=NULL;
-static int oob_type=-1;
-static int tl_type=-1;
+int oob_size=0, oob_rank=0;
+int mp_warn_is_enabled=0, mp_dbg_is_enabled=0;
+OOB::Communicator * oob_comm=NULL;
+TL::Communicator * tl_comm=NULL;
+int oob_type=-1;
+int tl_type=-1;
 
 //=============== INIT ===============
 void mp_get_envars()
@@ -86,7 +86,7 @@ void mp_finalize() {
 	MP_CHECK(oob_comm->finalize());
 }
 
-//=============== MEMORY OPs ===============
+//=============== MEMORY ===============
 mp_request_t * mp_create_request(int number) {
 	MP_CHECK_TL_OBJ();
 	return tl_comm->create_requests(number);
@@ -125,76 +125,6 @@ int mp_register_key_buffer(void * addr, size_t length, mp_key_t * mp_key) {
 	return tl_comm->register_key_buffer(addr, length, mp_key);
 }
 
-//=============== PT2PT ===============
-int mp_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
-	MP_CHECK_COMM_OBJ();
-
-	if(!mp_req || !mp_key)
-		return MP_FAILURE;
-
-	if(peer > oob_size)
-	{
-		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
-		return MP_FAILURE;
-	}
-
-	return tl_comm->pt2pt_nb_receive(buf, size, peer, mp_req, mp_key);
-}
-
-int mp_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
-	MP_CHECK_COMM_OBJ();
-
-	if(!mp_req || !mp_key)
-		return MP_FAILURE;
-
-	if(peer > oob_size)
-	{
-		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
-		return MP_FAILURE;
-	}
-
-	return tl_comm->pt2pt_nb_send(buf, size, peer, mp_req, mp_key);
-}
-
-
-//=============== ONE-SIDED ===============
-int mp_nb_put(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags) {
-	MP_CHECK_COMM_OBJ();
-
-	if(!mp_req || !mp_key)
-		return MP_FAILURE;
-
-	if(peer > oob_size)
-	{
-		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
-		return MP_FAILURE;
-	}
-
-	if(flags != 0 && !(flags & MP_PUT_NOWAIT) && !(flags & MP_PUT_INLINE))
-	{
-		mp_err_msg(oob_rank, "Wrong input flags %x\n", flags);
-		return MP_FAILURE;
-	}
-
-	return tl_comm->onesided_nb_put(buf, size, mp_key, peer, displ, mp_win, mp_req, flags); 
-}
-
-
-int mp_nb_get(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req) {
-	MP_CHECK_COMM_OBJ();
-
-	if(!mp_req || !mp_key)
-		return MP_FAILURE;
-
-	if(peer > oob_size)
-	{
-		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
-		return MP_FAILURE;
-	}
-
-	return tl_comm->onesided_nb_get(buf, size, mp_key, peer, displ, mp_win, mp_req); 
-}
-
 int mp_window_create(void *addr, size_t size, mp_window_t *window_t) {
 	MP_CHECK_COMM_OBJ();
 
@@ -218,45 +148,6 @@ int mp_window_destroy(mp_window_t *window_t) {
 	return tl_comm->onesided_window_destroy(window_t);
 }
 
-//=============== WAIT ===============
-int mp_wait_word(uint32_t *ptr, uint32_t value, int flags) {
-	if(!ptr)
-	{
-		mp_err_msg(oob_rank, "Input ptr NULL\n");
-		return MP_FAILURE;
-	}
-
-	return tl_comm->wait_word(ptr, value, flags);
-}
-
-int mp_wait(mp_request_t * mp_req) {
-	if(!mp_req)
-	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
-		return MP_FAILURE;
-	}
-
-	return mp_wait_all(1, mp_req);
-}
-
-int mp_wait_all(int number, mp_request_t * mp_reqs) {
-	MP_CHECK_COMM_OBJ();
-
-	if(!mp_reqs)
-	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
-		return MP_FAILURE;
-	}
-
-	if(number <= 0)
-	{
-		mp_err_msg(oob_rank, "Erroneous number of requests (%d)\n", number);
-		return MP_FAILURE;
-	}	
-	
-	return tl_comm->wait_all(number, mp_reqs);
-}
-
 //=============== OTHERS ===============
 void mp_barrier() {
 	MP_CHECK_COMM_OBJ();
@@ -269,6 +160,7 @@ void mp_abort() {
 
 	oob_comm->abort(-1);
 }
+
 //=============== INFO ===============
 int mp_query_param(mp_param_t param, int *value)
 {

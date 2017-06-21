@@ -23,7 +23,6 @@ int main(int argc, char *argv[])
 	if(ret)
 		exit(EXIT_FAILURE);
 
-
 	mp_query_param(MP_PARAM_VERSION, &libmp_version);
 	mp_query_param(MP_OOB_TYPE, &oob_type);
 	mp_query_param(MP_TL_TYPE, &tl_type);
@@ -50,7 +49,8 @@ int main(int argc, char *argv[])
 	mp_reqs_recv 	= mp_create_request(peersNum);
 	mp_reqs_send 	= mp_create_request(peersNum);
 
-	for(i=0; i<peersNum; i++) {
+	for(i=0; i<peersNum; i++)
+	{
 		if(i != myId)
 		{
 			if(use_gpu_buffers == 1)

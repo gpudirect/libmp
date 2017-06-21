@@ -2,6 +2,13 @@
 #include "oob.h"
 #include "tl.h"
 
+extern int oob_size, oob_rank;
+extern int mp_warn_is_enabled, mp_dbg_is_enabled;
+extern OOB::Communicator * oob_comm;
+extern TL::Communicator * tl_comm;
+extern int oob_type;
+extern int tl_type;
+
 #define MP_CHECK(stmt)                                  \
 do {                                                    \
     int result = (stmt);                                \
@@ -49,33 +56,46 @@ typedef enum mp_param {
     MP_MY_RANK
 } mp_param_t;
 
-int mp_query_param(mp_param_t param, int *value);
 
+//===== mp.cc
+int mp_query_param(mp_param_t param, int *value);
 int mp_init(int argc, char *argv[], int par1);
 void mp_finalize();
 void mp_get_envars();
-
-//===== MEMORY OPs
 mp_request_t * mp_create_request(int number);
 mp_key_t * mp_create_keys(int number);
 int mp_unregister_keys(int number, mp_key_t * mp_keys);
 int mp_register_key_buffer(void * addr, size_t length, mp_key_t * mp_key);
-
-//===== PT2PT
-int mp_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
-int mp_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
-
-//===== ONE-SIDED
-int mp_nb_put(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags);
-int mp_nb_get(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req);
 int mp_window_create(void *addr, size_t size, mp_window_t *window_t);
 int mp_window_destroy(mp_window_t *window_t);
+void mp_barrier();
+void mp_abort();
 
-//===== WAIT
+//===== mp_comm.cc
+int mp_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
+int mp_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
+int mp_nb_put(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags);
+int mp_nb_get(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req);
+
 int mp_wait_word(uint32_t *ptr, uint32_t value, int flags);
 int mp_wait(mp_request_t * mp_req);
 int mp_wait_all(int number, mp_request_t * mp_reqs);
 
-//===== SYNC
-void mp_barrier();
-void mp_abort();
+#ifdef HAVE_GDSYNC
+//===== mp_comm_async.cc
+int mp_send_prepare(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
+int mp_nb_send_post_async(mp_request_t * mp_req, cudaStream_t stream);
+int mp_nb_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
+int mp_nb_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream);
+int mp_b_send_post_async(mp_request_t * mp_req, cudaStream_t stream);
+int mp_b_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
+int mp_b_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream);
+int mp_put_prepare(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags);
+int mp_nb_put_post_async(mp_request_t * mp_req, cudaStream_t stream);
+int mp_nb_put_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
+int mp_nb_put_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags, cudaStream_t stream);
+int mp_nb_get_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, cudaStream_t stream);
+int mp_wait_word_async(uint32_t *ptr, uint32_t value, int flags, cudaStream_t stream);
+int mp_wait_async(mp_request_t * mp_req, cudaStream_t stream);
+int mp_wait_all_async(int number, mp_request_t * mp_reqs, cudaStream_t stream);
+#endif

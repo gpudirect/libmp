@@ -4,7 +4,7 @@ namespace TL
 {
 	class Verbs_GDS : public Verbs {
 		private:
-			
+
 			uint32_t *verbs_gds_client_last_tracked_id_ptr(client_t *client, verbs_request_t req)
 			{
 			    return &client->last_tracked_id[verbs_type_to_flow((mp_req_type_t)req->type)]; //mp_req_to_flow
@@ -393,71 +393,7 @@ namespace TL
 			//mp_send_post_on_stream
 			int pt2pt_b_send_post_async(mp_request_t *mp_req, asyncStream stream)
 			{
-			    int ret = 0; 
-			    verbs_request_t req = (verbs_request_t) *mp_req;
-
-			    assert(req->status == MP_PREPARED);
-			    client_t *client = &clients[client_index[req->peer]];
-				req->stream = stream;
-
-				if (use_event_sync) {
-
-				    if (req->id <= (int)client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
-				         mp_err_msg(oob_rank, "postd order is different from prepared order, last posted: %d being posted: %d \n",
-				                    client->last_posted_trigger_id[verbs_type_to_flow(req->type)], req->id);
-				         ret = MP_FAILURE;
-				         goto out;
-				    }
-				    client->last_posted_trigger_id[verbs_type_to_flow(req->type)] = req->id;
-
-					/*delay posting until stream has reached this id*/
-				    ret = gds_stream_post_poke_dword(stream,
-				            &client->last_trigger_id[verbs_type_to_flow(req->type)],
-				            req->id,
-				            GDS_MEMORY_HOST);
-				    if (ret) {
-				        mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
-				        // BUG: leaking req ??
-				        goto out;
-				    }
-				    
-				    verbs_gds_client_track_posted_stream_req(client, req, TX_FLOW);
-
-					/*block stream on completion of this req*/
-				    if ((int)client->last_posted_tracked_id[TX_FLOW] < req->id) {
-				        req->trigger = 1;
-
-				        client->last_posted_tracked_id[TX_FLOW] = req->id;
-
-				        ret = gds_stream_post_poll_dword(stream,
-				            &client->last_tracked_id[verbs_type_to_flow(req->type)],
-				            req->id,
-				            GDS_WAIT_COND_GEQ,
-				            GDS_MEMORY_HOST);
-				        if (ret) {
-				            mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
-				            goto out;
-				        }
-				    }
-				} else { 	
-				    req->status = MP_PENDING;
-
-				    ret = gds_stream_post_send(stream, &req->gds_send_info);
-				    if (ret) {
-				        mp_err_msg(oob_rank, "gds_stream_post_send failed: %s \n", strerror(ret));
-				        // BUG: leaking req ??
-				        goto out;
-				    }
-
-				    ret = gds_stream_post_wait_cq(stream, &req->gds_wait_info);
-				    if (ret) {
-				        mp_err_msg(oob_rank, "gds_stream_post_wait failed: %s \n", strerror(ret));
-				        // bug: leaking req ??
-				        goto out;
-				    }
-				}
-			out:
-			    return ret;
+				return pt2pt_b_send_post_all_async(1, mp_req, stream);
 			}
 
 			//mp_send_post_all_on_stream
@@ -561,54 +497,7 @@ namespace TL
 			//mp_isend_post_on_stream
 			int pt2pt_nb_send_post_async(mp_request_t *mp_req, asyncStream stream)
 			{
-			    int retcode;
-			    int ret = 0; 
-			    verbs_request_t req = (verbs_request_t) *mp_req;
-
-			    assert(req->status == MP_PREPARED);
-
-			    req->stream = stream;
-
-				if (use_event_sync) {
-					client_t *client = &clients[client_index[(int)req->peer]];
-
-					if (req->id <= (int)client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
-					     mp_err_msg(oob_rank, "postd order is different from prepared order, last posted: %d being posted: %d \n",
-					                client->last_posted_trigger_id[verbs_type_to_flow(req->type)], req->id);
-					     ret = MP_FAILURE;
-					     goto out;
-					}
-					client->last_posted_trigger_id[verbs_type_to_flow(req->type)] = req->id;
-
-					/*delay posting until stream has reached this id*/
-					retcode = gds_stream_post_poke_dword(stream,
-					                                     &client->last_trigger_id[verbs_type_to_flow(req->type)],
-					                                     req->id,
-					                                     GDS_MEMORY_HOST);
-					if (retcode) {
-					    mp_err_msg(oob_rank, "error %s\n", strerror(retcode));
-					    ret = MP_FAILURE;
-					    // BUG: leaking req ??
-					    goto out;
-					}
-
-					verbs_gds_client_track_posted_stream_req(client, req, TX_FLOW);
-			    } else {
-			        req->status = MP_PENDING_NOWAIT;
-
-			        mp_dbg_msg(oob_rank, " Entering \n");
-
-			        ret = gds_stream_post_send(stream, &req->gds_send_info);
-			        if (ret) {
-			            mp_err_msg(oob_rank, "gds_stream_post_send failed: %s \n", strerror(ret));
-			            goto out;
-			        }
-			    }
-
-			    mp_dbg_msg(oob_rank, " Leaving \n");
-
-			out:
-			    return ret;
+				return pt2pt_nb_send_post_all_async(1, mp_req, stream);
 			}
 
 			//mp_isend_post_all_on_stream
@@ -686,6 +575,27 @@ namespace TL
 			    return ret;
 			}
 
+			int wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream)
+			{
+			    int ret = MP_SUCCESS;
+			    gds_wait_cond_flag_t cond_flags = GDS_WAIT_COND_GEQ;
+
+			    mp_dbg_msg(oob_rank, "ptr=%p value=%d\n", ptr, value);
+
+			    switch(flags) {
+			    case VERBS_WAIT_EQ:  cond_flags = GDS_WAIT_COND_GEQ; break;
+			    case VERBS_WAIT_GEQ: cond_flags = GDS_WAIT_COND_GEQ; break;
+			    case VERBS_WAIT_AND: cond_flags = GDS_WAIT_COND_GEQ; break;
+			    default: ret = EINVAL; goto out; break;
+			    }
+
+			    ret = gds_stream_post_poll_dword(stream, ptr, value, cond_flags, GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
+			    if (ret) {
+			        mp_err_msg(oob_rank, "error %d while posting poll on ptr=%p value=%08x flags=%08x\n", ret, ptr, value, flags);
+			    }
+			out:
+			    return ret;
+			}
 
 			int wait_async(mp_request_t *mp_req, asyncStream stream)
 			{
@@ -1044,27 +954,6 @@ namespace TL
 			    return ret;
 			}
 
-			int wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream)
-			{
-			    int ret = MP_SUCCESS;
-			    gds_wait_cond_flag_t cond_flags = GDS_WAIT_COND_GEQ;
-
-			    mp_dbg_msg(oob_rank, "ptr=%p value=%d\n", ptr, value);
-
-			    switch(flags) {
-			    case VERBS_WAIT_EQ:  cond_flags = GDS_WAIT_COND_GEQ; break;
-			    case VERBS_WAIT_GEQ: cond_flags = GDS_WAIT_COND_GEQ; break;
-			    case VERBS_WAIT_AND: cond_flags = GDS_WAIT_COND_GEQ; break;
-			    default: ret = EINVAL; goto out; break;
-			    }
-
-			    ret = gds_stream_post_poll_dword(stream, ptr, value, cond_flags, GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
-			    if (ret) {
-			        mp_err_msg(oob_rank, "error %d while posting poll on ptr=%p value=%08x flags=%08x\n", ret, ptr, value, flags);
-			    }
-			out:
-			    return ret;
-			}
 	};
 }
 
