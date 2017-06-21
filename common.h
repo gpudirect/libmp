@@ -207,9 +207,9 @@ do {                                                    \
 } while (0)
 
 //#include <cudaProfiler.h>
-typedef cudaStream_t asyncStream
+typedef cudaStream_t asyncStream;
 #else
-typedef int asyncStream
+typedef int asyncStream;
 #endif
 
 #endif

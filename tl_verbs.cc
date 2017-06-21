@@ -337,7 +337,7 @@ namespace TL
 			        req = client->posted_stream_req[flow];
 
 			        while (req != NULL) { 
-				    if (req->id > client->last_trigger_id[flow]) break;
+				    if (req->id > (int)client->last_trigger_id[flow]) break;
 
 			            assert(req->status == MP_PREPARED);
 			            assert(req->type == MP_SEND || req->type == MP_RDMA);
@@ -1266,7 +1266,7 @@ namespace TL
 
 				int flags=1;
 				assert(mp_mem_key);
-				verbs_region_t reg = (verbs_region_t)calloc(1, sizeof(struct verbs_reg));
+				verbs_region_t reg = (verbs_region_t)calloc(1, sizeof(struct verbs_region));
 				if (!reg) {
 				  mp_err_msg(oob_rank, "malloc returned NULL while allocating struct mp_reg\n");
 				  return MP_FAILURE;
@@ -1888,13 +1888,19 @@ namespace TL
 			//============== GPUDirect Async - Verbs_GDS class ==============
 	        int pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream) { return 0; }
 	        int pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream) { return 0; }
-	        int pt2pt_send_prepare(void *buf, int size, int peer, mp_reg_t *reg_t, mp_request_t *req_t) { return 0; }
+	        int pt2pt_send_prepare(void *buf, int size, int peer, mp_key_t *reg_t, mp_request_t *req_t) { return 0; }
 			int pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream) { return 0; }
-			int pt2pt_b_send_post_all_async(uint32_t count, mp_request_t *req_t, asyncStream stream) { return 0; }
+			int pt2pt_b_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { return 0; }
 			int pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream) { return 0; }
 			int pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { return 0; }
 			int wait_async (mp_request_t *req_t, asyncStream stream) { return 0; }
 	        int wait_all_async(int count, mp_request_t *req_t, asyncStream stream) { return 0; }
+	        int wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream) { return 0; }
+			int onesided_nb_put_async(void *src, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream) { return 0; }
+			int onesided_nb_get_async(void *dst, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream) { return 0; }
+			int onesided_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) { return 0; }
+			int onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream) { return 0; }
+			int onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream) { return 0; }
 			//================================================================
 	};
 }
@@ -1911,114 +1917,5 @@ static class update_tl_list_verbs {
 
 #if 0
 int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request_t *req_t)
-{
-  int i, ret = 0;
-  struct mp_request *req = NULL;
-  struct mp_reg *reg = (struct mp_reg *) *reg_t;
-
-  if (nvecs > ib_max_sge) {
-      mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
-      ret = MP_FAILURE;
-      goto out;
-  }
-
-  client_t *client = &clients[client_index[peer]];
-
-  req = new_request(client, MP_RECV, MP_PENDING_NOWAIT);
-  assert(req);
-  req->sgv = malloc(sizeof(struct ibv_sge)*nvecs);
-  assert(req->sgv);
-
-  mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
-
-  for (i=0; i < nvecs; ++i) {
-    req->sgv[i].length = v[i].iov_len;
-    req->sgv[i].lkey = reg->key;
-    req->sgv[i].addr = (uint64_t)(v[i].iov_base);
-  }
-
-  req->in.rr.next = NULL;
-  req->in.rr.wr_id = (uintptr_t) req;
-  req->in.rr.num_sge = nvecs;
-  req->in.rr.sg_list = req->sgv;
-
-  ret = gds_post_recv(client->qp, &req->in.rr, &req->out.bad_rr);
-  if (ret) {
-    mp_err_msg(oob_rank, "posting recvv failed ret: %d error: %s peer: %d index: %d \n", ret, strerror(errno), peer, client_index[peer]);
-    goto out;
-  }
-
-  /*we are interested only in the last receive, retrieve repeatedly*/
-  if (!use_event_sync) {
-      ret = gds_prepare_wait_cq(client->recv_cq, &req->gds_wait_info, 0);
-      if (ret) {
-        mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
-        goto out;
-      }
-  }
-
-  *req_t = req;
-
- out:
-  return ret;
-}
-
-
 int mp_isendv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request_t *req_t)
-{
-  int i, ret = 0;
-  struct mp_request *req;
-  struct mp_reg *reg = (struct mp_reg *) *reg_t;
-
-  if (nvecs > ib_max_sge) {
-      mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
-      ret = MP_FAILURE;
-      goto out;
-  }
-
-  client_t *client = &clients[client_index[peer]];
-
-  req = new_request(client, MP_SEND, MP_PENDING_NOWAIT);
-  assert(req);
-  req->sgv = malloc(sizeof(struct ibv_sge)*nvecs);
-  assert(req->sgv);
-
-  mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
-
-  for (i=0; i < nvecs; ++i) {
-    req->sgv[i].length = v[i].iov_len;
-    req->sgv[i].lkey = reg->key;
-    req->sgv[i].addr = (uint64_t)(v[i].iov_base);
-  }
-
-  if (verbs_enable_ud) {
-      req->in.sr.wr.ud.ah = client->ah;
-      req->in.sr.wr.ud.remote_qpn = client->qpn;
-      req->in.sr.wr.ud.remote_qkey = 0;
-  }
-
-  req->in.sr.next = NULL;
-  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-  req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
-  req->in.sr.wr_id = (uintptr_t) req;
-  req->in.sr.num_sge = nvecs;
-  req->in.sr.sg_list = req->sgv;
-
-  ret = gds_post_send(client->qp, &req->in.sr, &req->out.bad_sr);
-  if (ret) {
-    mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
-    goto out;
-  }
-
-  if (!use_event_sync) {
-      ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
-      if (ret) {
-        mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
-        goto out;
-      }
-  }
-
- out:
-  return ret;
-}
 #endif

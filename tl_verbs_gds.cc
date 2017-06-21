@@ -136,15 +136,15 @@ namespace TL
 #endif
 			}
 			
-			int pt2pt_nb_send_async(void * rBuf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream stream)
+			int pt2pt_nb_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, asyncStream stream)
 			{
 			    int ret = 0;
 				verbs_request_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_region_t reg = (verbs_region_t) *mp_key;
 			    client_t *client = &clients[client_index[peer]];
 			    
 			    if (use_event_sync) {
-			        req = verbs_new_request_async(client, MP_SEND, MP_PREPARED, stream);
+			        req = verbs_new_request_async(client, MP_SEND, MP_PREPARED); //, stream);
 			        assert(req);
 
 			        req->in.sr.next = NULL;
@@ -154,7 +154,7 @@ namespace TL
 			        req->in.sr.num_sge = 1;
 			        req->in.sr.sg_list = &req->sg_entry;
 
-			        if (mp_enable_ud) {
+			        if (verbs_enable_ud) {
 			            req->in.sr.wr.ud.ah = client->ah;
 			            req->in.sr.wr.ud.remote_qpn = client->qpn;
 			            req->in.sr.wr.ud.remote_qkey = 0;
@@ -175,7 +175,7 @@ namespace TL
 
 			        verbs_gds_client_track_posted_stream_req(client, req, TX_FLOW);
 			    } else {
-			        req = verbs_new_request_async(client, MP_SEND, MP_PENDING_NOWAIT, stream);
+			        req = verbs_new_request_async(client, MP_SEND, MP_PENDING_NOWAIT); //, stream);
 			        assert(req);
 
 			        mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
@@ -187,7 +187,7 @@ namespace TL
 			        req->in.sr.num_sge = 1;
 			        req->in.sr.sg_list = &(req->sg_entry);
 
-			        if (mp_enable_ud) {
+			        if (verbs_enable_ud) {
 			            req->in.sr.wr.ud.ah = client->ah;
 			            req->in.sr.wr.ud.remote_qpn = client->qpn;
 			            req->in.sr.wr.ud.remote_qkey = 0;
@@ -219,15 +219,15 @@ namespace TL
 			}
 
 			//mp_send_on_stream
-			int pt2pt_b_send_async(void *buf, int size, int peer, mp_reg_t *reg_t,  mp_request_t *req_t,  stream)
+			int pt2pt_b_send_async(void *buf, int size, int peer, mp_key_t *mp_key,  mp_request_t *mp_req, asyncStream stream)
 			{
 			    int ret = 0;
 				verbs_request_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_region_t reg = (verbs_region_t) *mp_key;
 				client_t *client = &clients[client_index[peer]];
 
 			    if (use_event_sync) {
-			        req = verbs_new_request_async(client, MP_SEND, MP_PREPARED, stream);
+			        req = verbs_new_request_async(client, MP_SEND, MP_PREPARED); //, stream);
 			        assert(req);
 
 			        req->in.sr.next = NULL;
@@ -237,7 +237,7 @@ namespace TL
 			        req->in.sr.num_sge = 1;
 			        req->in.sr.sg_list = &req->sg_entry;
 
-			        if (mp_enable_ud) {
+			        if (verbs_enable_ud) {
 			            req->in.sr.wr.ud.ah = client->ah;
 			            req->in.sr.wr.ud.remote_qpn = client->qpn;
 			            req->in.sr.wr.ud.remote_qkey = 0;
@@ -262,7 +262,7 @@ namespace TL
 			        verbs_gds_client_track_posted_stream_req(client, req, TX_FLOW);
 
 					/*block stream on completion of this req*/
-			        if (client->last_posted_tracked_id[TX_FLOW] < req->id) {
+			        if ((int)client->last_posted_tracked_id[TX_FLOW] < req->id) {
 			            req->trigger = 1;
 			            client->last_posted_tracked_id[TX_FLOW] = req->id;
 			            ret = gds_stream_post_poll_dword(stream,
@@ -276,7 +276,7 @@ namespace TL
 			            }
 			        }
 			    } else {
-			        req = verbs_new_request_async(client, MP_SEND, MP_PENDING, stream);
+			        req = verbs_new_request_async(client, MP_SEND, MP_PENDING); //, stream);
 
 			        assert(req);
 			        req->in.sr.next = NULL;
@@ -286,7 +286,7 @@ namespace TL
 			        req->in.sr.num_sge = 1;
 			        req->in.sr.sg_list = &(req->sg_entry);
 
-			        if (mp_enable_ud) {
+			        if (verbs_enable_ud) {
 			            req->in.sr.wr.ud.ah = client->ah;
 			            req->in.sr.wr.ud.remote_qpn = client->qpn;
 			            req->in.sr.wr.ud.remote_qkey = 0;
@@ -318,14 +318,14 @@ namespace TL
 			}
 
 			//mp_send_prepare
-			int pt2pt_send_prepare(void *buf, int size, int peer, mp_reg_t *reg_t, mp_request_t *req_t)
+			int pt2pt_send_prepare(void *buf, int size, int peer, mp_key_t *mp_key, mp_request_t *mp_req)
 			{
 			    int ret = 0;
 			    verbs_request_t req;
-			    verbs_region_t reg = (struct mp_reg *)*reg_t;
+			    verbs_region_t reg = (verbs_region_t )*mp_key;
 			    client_t *client = &clients[client_index[peer]];
 			  
-			    req = verbs_new_request_async(client, MP_SEND, MP_PREPARED, NULL);
+			    req = verbs_new_request_async(client, MP_SEND, MP_PREPARED); //, stream);
 			    assert(req);
 
 			    mp_dbg_msg(oob_rank, "Preparing send message, req->id=%d \n", req->id);
@@ -338,7 +338,7 @@ namespace TL
 			        req->in.sr.num_sge = 1;
 			        req->in.sr.sg_list = &req->sg_entry;
 
-			        if (mp_enable_ud) {
+			        if (verbs_enable_ud) {
 			            req->in.sr.wr.ud.ah = client->ah;
 			            req->in.sr.wr.ud.remote_qpn = client->qpn;
 			            req->in.sr.wr.ud.remote_qkey = 0;
@@ -355,12 +355,12 @@ namespace TL
 			        req->in.sr.num_sge = 1;
 			        req->in.sr.sg_list = &(req->sg_entry);
 
-			        if (mp_enable_ud) {
+			        if (verbs_enable_ud) {
 			            req->in.sr.wr.ud.ah = client->ah;
 			            req->in.sr.wr.ud.remote_qpn = client->qpn;
 			            req->in.sr.wr.ud.remote_qkey = 0;
 
-			            mp_err_msg(oob_rank, "[%d] posintg send to qpn %d size: %d req: %p \n", mpi_comm_rank, req->in.sr.wr.ud.remote_qpn, size, req);
+			            mp_err_msg(oob_rank, "[%d] posintg send to qpn %d size: %d req: %p \n", oob_rank, req->in.sr.wr.ud.remote_qpn, size, req);
 			        }
 
 			        req->sg_entry.length = size;
@@ -390,18 +390,18 @@ namespace TL
 			}
 
 			//mp_send_post_on_stream
-			int pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream)
+			int pt2pt_b_send_post_async(mp_request_t *mp_req, asyncStream stream)
 			{
-			    int retcode;
 			    int ret = 0; 
-			    verbs_request_t req = *req_t;
+			    verbs_request_t req = (verbs_request_t) *mp_req;
 
 			    assert(req->status == MP_PREPARED);
+			    client_t *client = &clients[client_index[req->peer]];
 				req->stream = stream;
 
 				if (use_event_sync) {
 
-				    if (req->id <= client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
+				    if (req->id <= (int)client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
 				         mp_err_msg(oob_rank, "postd order is different from prepared order, last posted: %d being posted: %d \n",
 				                    client->last_posted_trigger_id[verbs_type_to_flow(req->type)], req->id);
 				         ret = MP_FAILURE;
@@ -423,7 +423,7 @@ namespace TL
 				    verbs_gds_client_track_posted_stream_req(client, req, TX_FLOW);
 
 					/*block stream on completion of this req*/
-				    if (client->last_posted_tracked_id[TX_FLOW] < req->id) {
+				    if ((int)client->last_posted_tracked_id[TX_FLOW] < req->id) {
 				        req->trigger = 1;
 
 				        client->last_posted_tracked_id[TX_FLOW] = req->id;
@@ -460,25 +460,25 @@ namespace TL
 			}
 
 			//mp_send_post_all_on_stream
-			int pt2pt_b_send_post_all_async(uint32_t count, mp_request_t *req_t, asyncStream stream)
+			int pt2pt_b_send_post_all_async(int count, mp_request_t *mp_req, asyncStream stream)
 			{
 			    int i, ret = 0, tot_local_reqs = 8; //??
 				if (use_event_sync)
 				{
 				   for (i=0; i<count; i++) 
 				   {
-						verbs_request_t req = req_t[i];
+						verbs_request_t req = (verbs_request_t) mp_req[i];
 						client_t *client = &clients[client_index[req->peer]];
 
 						/*BUG: can requests passed to post_all be differnt from the order they were prepared?*/
-						if (req->id <= client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
+						if (req->id <= (int)client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
 							mp_err_msg(oob_rank, "postd order is different from prepared order, last posted: %d being posted: %d \n",
 							          client->last_posted_trigger_id[verbs_type_to_flow(req->type)], req->id);
 							ret = MP_FAILURE;
 							goto out;
 						}
 						client->last_posted_trigger_id[verbs_type_to_flow(req->type)] = req->id;
-						mp_dbg_msg(oob_rank, "[%d] posting dword on stream:%p id:%d \n", mpi_comm_rank, stream, req->id);
+						mp_dbg_msg(oob_rank, "[%d] posting dword on stream:%p id:%d \n", oob_rank, stream, req->id);
 						/*delay posting until stream has reached this id*/
 						ret = gds_stream_post_poke_dword(stream,
 						                                &client->last_trigger_id[verbs_type_to_flow(req->type)],
@@ -493,12 +493,12 @@ namespace TL
 						verbs_gds_client_track_posted_stream_req(client, req, TX_FLOW);
 
 						/*block stream on completion of this req*/
-						if (client->last_posted_tracked_id[TX_FLOW] < req->id) {
+						if ((int)client->last_posted_tracked_id[TX_FLOW] < req->id) {
 						   req->trigger = 1;
 
 						   client->last_posted_tracked_id[TX_FLOW] = req->id;
 
-						   mp_dbg_msg(oob_rank, "[%d] posting poll on stream:%p id:%d \n", mpi_comm_rank, stream, req->id);
+						   mp_dbg_msg(oob_rank, "[%d] posting poll on stream:%p id:%d \n", oob_rank, stream, req->id);
 
 						   ret = gds_stream_post_poll_dword(stream,
 						       &client->last_tracked_id[verbs_type_to_flow(req->type)],
@@ -522,12 +522,12 @@ namespace TL
 			           gds_send_request = gds_send_request_local;
 			           gds_wait_request = gds_wait_request_local;
 			       } else {
-			           gds_send_request = malloc(count*sizeof(*gds_send_request));
-			           gds_wait_request = malloc(count*sizeof(*gds_wait_request));
+			           gds_send_request = (gds_send_request_t *) calloc(count, sizeof(*gds_send_request));
+			           gds_wait_request = (gds_wait_request_t *) calloc(count, sizeof(*gds_wait_request));
 			       }
 
 			       for (i=0; i<count; i++) {
-			           verbs_request_t req = req_t[i];
+			           verbs_request_t req = (verbs_request_t) mp_req[i];
 			           assert(req->status == MP_PREPARED);
 
 			           gds_send_request[i] = req->gds_send_info;
@@ -558,20 +558,20 @@ namespace TL
 			}
 
 			//mp_isend_post_on_stream
-			int pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream)
+			int pt2pt_nb_send_post_async(mp_request_t *mp_req, asyncStream stream)
 			{
 			    int retcode;
 			    int ret = 0; 
-			    verbs_request_t req = *req_t;
+			    verbs_request_t req = (verbs_request_t) *mp_req;
 
 			    assert(req->status == MP_PREPARED);
 
 			    req->stream = stream;
 
 				if (use_event_sync) {
-					client_t *client = &clients[client_index[req->peer]];
+					client_t *client = &clients[client_index[(int)req->peer]];
 
-					if (req->id <= client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
+					if (req->id <= (int)client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
 					     mp_err_msg(oob_rank, "postd order is different from prepared order, last posted: %d being posted: %d \n",
 					                client->last_posted_trigger_id[verbs_type_to_flow(req->type)], req->id);
 					     ret = MP_FAILURE;
@@ -611,7 +611,7 @@ namespace TL
 			}
 
 			//mp_isend_post_all_on_stream
-			int pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream)
+			int pt2pt_nb_send_post_all_async(int count, mp_request_t *mp_req, asyncStream stream)
 			{
 			    int ret = 0, i, tot_local_reqs=8;
 			    gds_send_request_t gds_send_request_local[tot_local_reqs];
@@ -621,11 +621,11 @@ namespace TL
 
 			    if (use_event_sync) {
 			       for (i=0; i<count; i++) {
-						verbs_request_t req = req_t[i];
+						verbs_request_t req = (verbs_request_t) mp_req[i];
 						client_t *client = &clients[client_index[req->peer]];
 
 						/*BUG: can requests passed to post_all be differnt from the order they were prepared?*/
-						if (req->id <= client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
+						if (req->id <= (int)client->last_posted_trigger_id[verbs_type_to_flow(req->type)]) {
 						    mp_err_msg(oob_rank, "posted order is different from prepared order, last posted: %d being posted: %d \n",
 						               client->last_posted_trigger_id[verbs_type_to_flow(req->type)], req->id);
 						    ret = MP_FAILURE;
@@ -633,7 +633,7 @@ namespace TL
 						}
 						client->last_posted_trigger_id[verbs_type_to_flow(req->type)] = req->id;
 
-						mp_dbg_msg(oob_rank, "[%d] posting dword on stream:%p id:%d \n", mpi_comm_rank, stream, req->id);
+						mp_dbg_msg(oob_rank, "[%d] posting dword on stream:%p id:%d \n", oob_rank, stream, req->id);
 
 						/*delay posting until stream has reached this id*/
 						ret = gds_stream_post_poke_dword(stream,
@@ -653,11 +653,11 @@ namespace TL
 					if (count <= tot_local_reqs) {
 					    gds_send_request = gds_send_request_local;
 					} else {
-					    gds_send_request = malloc(count*sizeof(gds_send_request_t));
+					    gds_send_request = (gds_send_request_t *) calloc(count, sizeof(*gds_send_request));
 					}
 
 					for (i=0; i<count; i++) {
-					    verbs_request_t req = req_t[i];
+					    verbs_request_t req = (verbs_request_t) mp_req[i];
 
 					    assert(req->status == MP_PREPARED);
 
@@ -686,12 +686,12 @@ namespace TL
 			}
 
 
-			int wait_async(mp_request_t *req_t, asyncStream stream)
+			int wait_async(mp_request_t *mp_req, asyncStream stream)
 			{
-				return wait_all_async(1, req_t, stream);
+				return wait_all_async(1, mp_req, stream);
 			}
 
-			int wait_all_async(int count, mp_request_t *req_t, asyncStream stream)
+			int wait_all_async(int count, mp_request_t *mp_req, asyncStream stream)
 			{
 			    int i, ret = 0;
 
@@ -702,13 +702,13 @@ namespace TL
 			    {
 					for (i=0; i<count; i++)
 					{
-						verbs_request_t req = req_t[i];
+						verbs_request_t req = (verbs_request_t) mp_req[i];
 						client_t *client = &clients[client_index[req->peer]];
 
 						assert (req->type > 0);
 						assert (req->status <= MP_PENDING);
 
-						if (client->last_posted_tracked_id[verbs_type_to_flow(req->type)] < req->id)
+						if ((int)client->last_posted_tracked_id[verbs_type_to_flow(req->type)] < req->id)
 						{
 							client->last_posted_tracked_id[verbs_type_to_flow(req->type)] = req->id;
 							req->trigger = 1;
@@ -734,11 +734,11 @@ namespace TL
 			        if (count <= tot_local_reqs) {
 			            gds_wait_request = gds_wait_request_local;
 			        } else {
-			            gds_wait_request = malloc(count*sizeof(gds_wait_request_t));
+			           gds_wait_request = (gds_wait_request_t *) calloc(count, sizeof(*gds_wait_request));
 			        }
 
 			        for (i=0; i<count; i++) {
-			            verbs_request_t req = req_t[i];
+			            verbs_request_t req = (verbs_request_t) mp_req[i];
 			            mp_dbg_msg(oob_rank, "posting wait cq req=%p id=%d\n", req, req->id);
 
 			            if (!verbs_req_can_be_waited(req)) {
@@ -771,171 +771,235 @@ namespace TL
 			    return ret;
 			}
 
-#if 0
-			int mp_iput_async(void *src, int size, mp_reg_t *reg_t, int peer, size_t displ,
-                       mp_window_t *window_t, mp_request_t *req_t, int flags, asyncStream stream)
+			int onesided_nb_put_async(void *src, int size, mp_key_t *mp_key, int peer, size_t displ,
+                       mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream)
 			{
-			  int ret = 0;
-			  verbs_request_t req = NULL;
-			  struct mp_reg *reg = *reg_t;
-			  struct mp_window *window = *window_t;
+				int ret = 0;
+				verbs_request_t req = NULL;
+				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_window_t window = (verbs_window_t) *window_t;
+				int client_id = client_index[peer];
+				client_t *client = &clients[client_id];
 
-			  if (mp_enable_ud) { 
-				mp_err_msg(oob_rank, "put/get not supported with UD \n");
-				ret = MP_FAILURE;
-				goto out;
-			  }
+				if (verbs_enable_ud) { 
+					mp_err_msg(oob_rank, "put/get not supported with UD \n");
+					ret = MP_FAILURE;
+					goto out;
+				}
 
-			  int client_id = client_index[peer];
-			  client_t *client = &clients[client_id];
+				assert(displ < window->rsize[client_id]);
+				req = verbs_new_request_async(client, MP_RDMA, MP_PENDING_NOWAIT); //, stream);
+				assert(req);
 
-			  assert(displ < window->rsize[client_id]);
+				mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
 
-			  req = new_stream_request(client, MP_RDMA, MP_PENDING_NOWAIT, stream);
-			  assert(req);
+				req->flags = flags;
+				req->in.sr.next = NULL;
+				if (flags & MP_PUT_NOWAIT) {
+				  mp_dbg_msg(oob_rank, "MP_PUT_NOWAIT set\n");
+				  req->in.sr.exp_send_flags = 0;
+				} else {
+				  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				}
+				if (flags & MP_PUT_INLINE) {
+				  mp_dbg_msg(oob_rank, "setting SEND_INLINE flag\n");
+				  req->in.sr.exp_send_flags |= IBV_EXP_SEND_INLINE;
+				}
+				req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = 1;
+				req->in.sr.sg_list = &req->sg_entry;
 
-			  mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
+				req->sg_entry.length = size;
+				req->sg_entry.lkey = reg->key;
+				req->sg_entry.addr = (uintptr_t)src;
 
-			  req->flags = flags;
-			  req->in.sr.next = NULL;
-			  if (flags & MP_PUT_NOWAIT) {
-			      mp_dbg_msg(oob_rank, "MP_PUT_NOWAIT set\n");
-			      req->in.sr.exp_send_flags = 0;
-			  } else {
-			      req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-			  }
-			  if (flags & MP_PUT_INLINE) {
-			      mp_dbg_msg(oob_rank, "setting SEND_INLINE flag\n");
-			      req->in.sr.exp_send_flags |= IBV_EXP_SEND_INLINE;
-			  }
-			  req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
-			  req->in.sr.wr_id = (uintptr_t) req;
-			  req->in.sr.num_sge = 1;
-			  req->in.sr.sg_list = &req->sg_entry;
+				req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
+				req->in.sr.wr.rdma.rkey = window->rkey[client_id];
 
-			  req->sg_entry.length = size;
-			  req->sg_entry.lkey = reg->key;
-			  req->sg_entry.addr = (uintptr_t)src;
+				ret = verbs_gds_post_send_async(stream, client, req);
+				if (ret) {
+				  mp_err_msg(oob_rank, "gds_stream_queue_send failed: err=%d(%s) \n", ret, strerror(ret));
+				  // BUG: leaking req ??
+				  goto out;
+				}
 
-			  req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
-			  req->in.sr.wr.rdma.rkey = window->rkey[client_id];
+				if (flags & MP_PUT_NOWAIT) {
+				  req->status = MP_COMPLETE;
+				} else {
+				  ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
+				  if (ret) {
+				      mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
+				      // BUG: leaking req ??
+				      goto out;
+				  }
+				}
+				*mp_req = req;
 
-			  ret = verbs_gds_post_send_async(stream, client, req);
-			  if (ret) {
-			      mp_err_msg(oob_rank, "gds_stream_queue_send failed: err=%d(%s) \n", ret, strerror(ret));
-			      // BUG: leaking req ??
-			      goto out;
-			  }
+			out:
+				// free req
+				if (ret) { 
+					if (req) verbs_release_request((verbs_request_t) req);
+				}
 
-			  if (flags & MP_PUT_NOWAIT) {
-			      req->status = MP_COMPLETE;
-			  } else {
-			      ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
-			      if (ret) {
-			          mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
-			          // BUG: leaking req ??
-			          goto out;
-			      }
-			  }
-			  *req_t = req;
-
-			 out:
-			  if (ret) { 
-			      // free req
-			      if (req)
-			          release_mp_request(req);
-			  }
-
-			  return ret;
+				return ret;
 			}
 
-			/*----------------------------------------------------------------------------*/
-
-			int mp_iget_async(void *dst, int size, mp_reg_t *reg_t, int peer, size_t displ,
-			        mp_window_t *window_t, mp_request_t *req_t, asyncStream stream)
+			int onesided_nb_get_async(void *dst, int size, mp_key_t *mp_key, int peer, size_t displ,
+			        mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream)
 			{
-			  int ret = 0;
-			  verbs_request_t req;
-			  struct mp_reg *reg = *reg_t;
-			  struct mp_window *window = *window_t;
 
-			  if (mp_enable_ud) { 
-				mp_err_msg(oob_rank, "put/get not supported with UD \n");
-				ret = MP_FAILURE;
-				goto out;
-			  }
+				int ret = 0;
+				verbs_request_t req = NULL;
+				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_window_t window = (verbs_window_t) *window_t;
+				int client_id = client_index[peer];
+				client_t *client = &clients[client_id];
 
-			  int client_id = client_index[peer];
-			  client_t *client = &clients[client_id];
+				if (verbs_enable_ud) { 
+					mp_err_msg(oob_rank, "put/get not supported with UD \n");
+					ret = MP_FAILURE;
+					goto out;
+				}
 
-			  assert(displ < window->rsize[client_id]);
+				assert(displ < window->rsize[client_id]);
 
-			  req = new_stream_request(client, MP_RDMA, MP_PENDING_NOWAIT, stream);
-			  assert(req);
+				req = verbs_new_request_async(client, MP_RDMA, MP_PENDING_NOWAIT); //, stream);
+				assert(req);
 
-			  req->in.sr.next = NULL;
-			  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-			  req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_READ;
-			  req->in.sr.wr_id = (uintptr_t) req;
-			  req->in.sr.num_sge = 1;
-			  req->in.sr.sg_list = &req->sg_entry;
+				req->in.sr.next = NULL;
+				req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_READ;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = 1;
+				req->in.sr.sg_list = &req->sg_entry;
 
-			  req->sg_entry.length = size;
-			  req->sg_entry.lkey = reg->key;
-			  req->sg_entry.addr = (uintptr_t)dst;
+				req->sg_entry.length = size;
+				req->sg_entry.lkey = reg->key;
+				req->sg_entry.addr = (uintptr_t)dst;
 
-			  req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
-			  req->in.sr.wr.rdma.rkey = window->rkey[client_id];
+				req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
+				req->in.sr.wr.rdma.rkey = window->rkey[client_id];
 
-			  ret = gds_stream_queue_send(stream, client->qp, &req->in.sr,
-			                              &req->out.bad_sr);
-			  if (ret) {
-			      mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
-			      goto out;
-			  }
+				ret = gds_stream_queue_send(stream, client->qp, &req->in.sr, &req->out.bad_sr);
+				if (ret) {
+				  mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
+				  goto out;
+				}
 
-			  ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
-			  if (ret) {
-			    mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
-			    goto out;
-			  }
+				ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
+				if (ret) {
+					mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
+					goto out;
+				}
 
-			  *req_t = req;
+				*mp_req = req;
 
-			 out:
-			  return ret;
+				out:
+					return ret;
 			}
 
-			/*----------------------------------------------------------------------------*/
-
-			int mp_iput_post_async(mp_request_t *req_t, asyncStream stream)
+			int onesided_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ,
+                    mp_window_t *window_t, mp_request_t *mp_req, int flags)
 			{
-			    int ret = 0; 
-			    verbs_request_t req = *req_t;
+				int ret = 0;
+				verbs_request_t req = NULL;
+				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_window_t window = (verbs_window_t) *window_t;
+				int client_id = client_index[peer];
+				client_t *client = &clients[client_id];
 
-			    assert(req->status == MP_PREPARED);
+				if (verbs_enable_ud) { 
+					mp_err_msg(oob_rank, "put/get not supported with UD \n");
+					ret = MP_FAILURE;
+					goto out;
+				}
 
-			    mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
-			    
-			    ret = gds_stream_post_send(stream, &req->gds_send_info);
-			    if (ret) {
-			        mp_err_msg(oob_rank, "gds_stream_post_send failed: %s \n", strerror(ret));
-			        goto out;
-			    }
+				assert(displ < window->rsize[client_id]);
+				req = verbs_new_request_async(client, MP_RDMA, MP_PREPARED); //, NULL);
+				assert(req);
 
-			    if (req->flags & MP_PUT_NOWAIT) {
-			        req->status = MP_COMPLETE;
-			    } else {
-			        req->status = MP_PENDING_NOWAIT;
-			    }
+				mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
+
+				req->flags = flags;
+				req->in.sr.next = NULL;
+				if (flags & MP_PUT_NOWAIT) {
+					mp_dbg_msg(oob_rank, "MP_PUT_NOWAIT set\n");
+					req->in.sr.exp_send_flags = 0;
+				} else {
+					req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				}
+
+				if (flags & MP_PUT_INLINE) {
+					mp_dbg_msg(oob_rank, "setting SEND_INLINE flag\n");
+					req->in.sr.exp_send_flags |= IBV_EXP_SEND_INLINE;
+				}
+
+				req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = 1;
+				req->in.sr.sg_list = &req->sg_entry;
+
+				req->sg_entry.length = size;
+				req->sg_entry.lkey = reg->key;
+				req->sg_entry.addr = (uintptr_t)src;
+
+				req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
+				req->in.sr.wr.rdma.rkey = window->rkey[client_id];
+
+				ret = gds_prepare_send(client->qp, &req->in.sr, &req->out.bad_sr, &req->gds_send_info);
+				if (ret) {
+				  mp_err_msg(oob_rank, "error %d in mp_prepare_send: %s \n", ret, strerror(ret));
+				  goto out;
+				}
+
+				if (flags & MP_PUT_NOWAIT) {
+				  //req->status = MP_COMPLETE;
+				} else {
+				  ret = gds_prepare_wait_cq(client->send_cq, &req->gds_wait_info, 0);
+				  if (ret) {
+				      mp_err_msg(oob_rank, "error %d gds_prepare_wait_cq failed: %s \n", ret, strerror(ret));
+				      goto out;
+				  }
+				}
+
+				*mp_req = (mp_request_t) req;
+
+				out:
+				if (ret) { 
+					// free req
+					if (req) verbs_release_request((verbs_request_t) req);
+				}
+				  
+				return ret;
+			}
+
+			int onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream)
+			{
+				int ret = 0; 
+				verbs_request_t req = (verbs_request_t) *mp_req;
+
+				assert(req->status == MP_PREPARED);
+
+				mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
+
+				ret = gds_stream_post_send(stream, &req->gds_send_info);
+				if (ret) {
+					mp_err_msg(oob_rank, "gds_stream_post_send failed: %s \n", strerror(ret));
+					goto out;
+				}
+
+				if (req->flags & MP_PUT_NOWAIT) {
+					req->status = MP_COMPLETE;
+				} else {
+					req->status = MP_PENDING_NOWAIT;
+				}
 
 			out:
 			    return ret;
 			}
 
-			/*----------------------------------------------------------------------------*/
-
-			int mp_iput_post_all_on_stream (uint32_t count, mp_request_t *req_t, asyncStream stream)
+			int onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream)
 			{
 			    int i, ret = 0;
 			    gds_send_request_t gds_send_request_local[8];
@@ -946,7 +1010,8 @@ namespace TL
 			    if (count <= 8) {
 			        gds_send_request = gds_send_request_local;
 			    } else {
-			        gds_send_request = malloc(count*sizeof(gds_send_request_t));
+					gds_send_request = (gds_send_request_t *) calloc(count, sizeof(*gds_send_request));
+
 			        if (!gds_send_request) {
 			            mp_err_msg(oob_rank, "cannot allocate memory\n");
 			            ret = ENOMEM;
@@ -955,7 +1020,7 @@ namespace TL
 			    }
 
 			    for (i=0; i<count; i++) {
-			        verbs_request_t req = req_t[i];
+			        verbs_request_t req = (verbs_request_t) mp_req[i];
 
 			        assert(req->status == MP_PREPARED);
 			        req->status = MP_PENDING_NOWAIT;
@@ -977,21 +1042,20 @@ namespace TL
 			    return ret;
 			}
 
-			/*----------------------------------------------------------------------------*/
-
-			int mp_wait32_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream)
+			int wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream)
 			{
 			    int ret = MP_SUCCESS;
-			    int cond_flags = 0;
+			    gds_wait_cond_flag_t cond_flags = GDS_WAIT_COND_GEQ;
 
 			    mp_dbg_msg(oob_rank, "ptr=%p value=%d\n", ptr, value);
 
 			    switch(flags) {
-			    case MP_WAIT_EQ:  cond_flags |= GDS_WAIT_COND_GEQ; break;
-			    case MP_WAIT_GEQ: cond_flags |= GDS_WAIT_COND_GEQ; break;
-			    case MP_WAIT_AND: cond_flags |= GDS_WAIT_COND_GEQ; break;
+			    case VERBS_WAIT_EQ:  cond_flags = GDS_WAIT_COND_GEQ; break;
+			    case VERBS_WAIT_GEQ: cond_flags = GDS_WAIT_COND_GEQ; break;
+			    case VERBS_WAIT_AND: cond_flags = GDS_WAIT_COND_GEQ; break;
 			    default: ret = EINVAL; goto out; break;
 			    }
+
 			    ret = gds_stream_post_poll_dword(stream, ptr, value, cond_flags, GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
 			    if (ret) {
 			        mp_err_msg(oob_rank, "error %d while posting poll on ptr=%p value=%08x flags=%08x\n", ret, ptr, value, flags);
@@ -999,7 +1063,6 @@ namespace TL
 			out:
 			    return ret;
 			}
-#endif
 	};
 }
 
@@ -1015,15 +1078,15 @@ static class update_tl_list_gds {
 
 #if 0
 static int mp_prepare_send(client_t *client, verbs_request_t req)
-int (void *buf, int size, int peer, mp_reg_t *reg_t, mp_request_t *req_t)
-int mp_send_on_stream (void *buf, int size, int peer, mp_reg_t *reg_t, 
+int (void *buf, int size, int peer, mp_key_t *mp_key, mp_request_t *req_t)
+int mp_send_on_stream (void *buf, int size, int peer, mp_key_t *mp_key, 
 		mp_request_t *req_t, asyncStream stream)
-int mp_isendv_on_stream (struct iovec *v, int nvecs, int peer, mp_reg_t *reg_t,
+int mp_isendv_on_stream (struct iovec *v, int nvecs, int peer, mp_key_t *mp_key,
                          mp_request_t *req_t, asyncStream stream)
-int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_reg_t *reg_t, mp_request_t *req_t)
+int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_key_t *mp_key, mp_request_t *req_t)
 int mp_send_post_on_stream (mp_request_t *req_t, asyncStream stream)
-int mp_send_post_all_on_stream (uint32_t count, mp_request_t *req_t, asyncStream stream)
+int mp_send_post_all_on_stream (int count, mp_request_t *req_t, asyncStream stream)
 
-int mp_put_prepare (void *src, int size, mp_reg_t *reg_t, int peer, size_t displ,
+int mp_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ,
                     mp_window_t *window_t, mp_request_t *req_t, int flags)
 #endif

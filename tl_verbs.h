@@ -8,6 +8,7 @@
 #ifdef HAVE_GDSYNC
 #include <gdsync.h>
 #include <gdsync/tools.h>
+#include <gdsync/core.h>
 #endif
 
 #ifdef HAVE_GDSYNC
@@ -142,7 +143,7 @@ struct verbs_request {
 };
 typedef struct verbs_request * verbs_request_t;
 
-struct verbs_reg {
+struct verbs_region {
     uint32_t key;
     struct ibv_mr *mr;
 };
@@ -151,7 +152,7 @@ typedef struct verbs_region * verbs_region_t;
 struct verbs_window {
    void **base_ptr;
    int size;
-   struct verbs_reg *reg;
+   struct verbs_region *reg;
    uint32_t lkey;
    uint32_t *rkey;
    uint64_t *rsize;
