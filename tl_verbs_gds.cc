@@ -899,6 +899,7 @@ namespace TL
 					return ret;
 			}
 
+			//mp_put_prepare
 			int onesided_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ,
                     mp_window_t *window_t, mp_request_t *mp_req, int flags)
 			{
@@ -1079,14 +1080,7 @@ static class update_tl_list_gds {
 #if 0
 static int mp_prepare_send(client_t *client, verbs_request_t req)
 int (void *buf, int size, int peer, mp_key_t *mp_key, mp_request_t *req_t)
-int mp_send_on_stream (void *buf, int size, int peer, mp_key_t *mp_key, 
-		mp_request_t *req_t, asyncStream stream)
 int mp_isendv_on_stream (struct iovec *v, int nvecs, int peer, mp_key_t *mp_key,
                          mp_request_t *req_t, asyncStream stream)
 int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_key_t *mp_key, mp_request_t *req_t)
-int mp_send_post_on_stream (mp_request_t *req_t, asyncStream stream)
-int mp_send_post_all_on_stream (int count, mp_request_t *req_t, asyncStream stream)
-
-int mp_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ,
-                    mp_window_t *window_t, mp_request_t *req_t, int flags)
 #endif
