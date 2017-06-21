@@ -34,10 +34,12 @@ ifdef use_gds
 CONFIGURE_FLAGS+=-DHAVE_GDSYNC
 GDS_INCLUDE=-I$(PREFIX)/include
 GDS_LD=-L$(PREFIX)/lib -lgdsync -lgdrapi 
+OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o tl_verbs_gds.o mp.o
 else
 GDS_PATH=
 GDS_INCLUDE=
 GDS_LD=
+OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o mp.o
 endif
 #===========================
 
@@ -52,7 +54,6 @@ endif
 	fi
 
 
-OBJ=oob.o oob_mpi.o oob_socket.o tl.o tl_verbs.o tl_verbs_gds.o mp.o
 
 .PHONY: all clean
 
