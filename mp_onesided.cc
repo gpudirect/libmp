@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 				memset(commBuf, (i+1)%CHAR_MAX, totSize);
  
 			for(j=0; j < WINDOW_SIZE; j++)	
-				MP_CHECK(mp_nb_put((void *)((uintptr_t)commBuf + j*SIZE), SIZE, mp_keys_put, !myId, j*SIZE, &mp_win, &mp_reqs_put[j], 0)); 
+				MP_CHECK(mp_iput((void *)((uintptr_t)commBuf + j*SIZE), SIZE, mp_keys_put, !myId, j*SIZE, &mp_win, &mp_reqs_put[j], 0)); 
 
 			for(j=0; j < WINDOW_SIZE; j++)	
 				MP_CHECK(mp_wait(&mp_reqs_put[j]));

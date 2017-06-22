@@ -49,8 +49,8 @@ int mp_init(int argc, char *argv[], int par1)
 
 	// ====== TL INIT
 #ifdef HAVE_GDSYNC
-	tl_comm = getTLObj(TL_INDEX_VERBS_GDS);
-	tl_type = TL_INDEX_VERBS_GDS;
+	tl_comm = getTLObj(TL_INDEX_VERBS_ASYNC);
+	tl_type = TL_INDEX_VERBS_ASYNC;
 #else
 	#ifdef HAVE_VERBS
 		tl_comm = getTLObj(TL_INDEX_VERBS);
@@ -63,7 +63,7 @@ int mp_init(int argc, char *argv[], int par1)
 
 	MP_CHECK_COMM_OBJ();
 	MP_CHECK(tl_comm->setupOOB(oob_comm));
-	//GDSync in case of Verbs 
+	//LibGDSync in case of Verbs 
 	MP_CHECK(tl_comm->setup_sublayer(par1));
 	MP_CHECK(tl_comm->setupNetworkDevices());
 	MP_CHECK(tl_comm->createEndpoints());

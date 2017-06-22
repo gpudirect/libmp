@@ -2,7 +2,7 @@
 
 //=============== PT2PT ===============
 //Non-Blocking
-int mp_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
+int mp_irecv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)
@@ -17,7 +17,7 @@ int mp_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_
 	return tl_comm->pt2pt_nb_receive(buf, size, peer, mp_req, mp_key);
 }
 
-int mp_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
+int mp_isend(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)
@@ -36,7 +36,7 @@ int mp_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_
 
 //=============== ONE-SIDED ===============
 //Non-Blocking
-int mp_nb_put(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags) {
+int mp_iput(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)
@@ -57,7 +57,7 @@ int mp_nb_put(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp
 	return tl_comm->onesided_nb_put(buf, size, mp_key, peer, displ, mp_win, mp_req, flags); 
 }
 
-int mp_nb_get(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req) {
+int mp_iget(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)

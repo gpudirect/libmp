@@ -1,6 +1,6 @@
 #include "common.h"
 #include "oob.h"
-#include "tl.h"
+#include "tl.hpp"
 
 extern int oob_size, oob_rank;
 extern int mp_warn_is_enabled, mp_dbg_is_enabled;
@@ -72,10 +72,11 @@ void mp_barrier();
 void mp_abort();
 
 //===== mp_comm.cc
-int mp_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
-int mp_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
-int mp_nb_put(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags);
-int mp_nb_get(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req);
+int mp_irecv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
+int mp_isend(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
+
+int mp_iput(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags);
+int mp_iget(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req);
 
 int mp_wait_word(uint32_t *ptr, uint32_t value, int flags);
 int mp_wait(mp_request_t * mp_req);
@@ -84,17 +85,19 @@ int mp_wait_all(int number, mp_request_t * mp_reqs);
 #ifdef HAVE_GDSYNC
 //===== mp_comm_async.cc
 int mp_send_prepare(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
-int mp_nb_send_post_async(mp_request_t * mp_req, cudaStream_t stream);
-int mp_nb_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
-int mp_nb_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream);
-int mp_b_send_post_async(mp_request_t * mp_req, cudaStream_t stream);
-int mp_b_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
-int mp_b_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream);
+int mp_isend_post_async(mp_request_t * mp_req, cudaStream_t stream);
+int mp_isend_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
+int mp_isend_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream);
+int mp_send_post_async(mp_request_t * mp_req, cudaStream_t stream);
+int mp_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
+int mp_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream);
+
 int mp_put_prepare(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags);
-int mp_nb_put_post_async(mp_request_t * mp_req, cudaStream_t stream);
-int mp_nb_put_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
-int mp_nb_put_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags, cudaStream_t stream);
-int mp_nb_get_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, cudaStream_t stream);
+int mp_iput_post_async(mp_request_t * mp_req, cudaStream_t stream);
+int mp_iput_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
+int mp_iput_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags, cudaStream_t stream);
+int mp_iget_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, cudaStream_t stream);
+
 int mp_wait_word_async(uint32_t *ptr, uint32_t value, int flags, cudaStream_t stream);
 int mp_wait_async(mp_request_t * mp_req, cudaStream_t stream);
 int mp_wait_all_async(int number, mp_request_t * mp_reqs, cudaStream_t stream);

@@ -7,13 +7,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string>
-#include <iostream>
-
-#include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
@@ -23,15 +18,15 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <time.h>
-#include <assert.h>
 #include <errno.h>
+#include <memory>
 
 #define MAX_OOB 20
 #define MAX_TL 20
 
 #define TL_INDEX_VERBS 0
 #define TL_INDEX_PSM 1
-#define TL_INDEX_VERBS_GDS 2
+#define TL_INDEX_VERBS_ASYNC 2
 
 #define OOB_PRIORITY_MPI 0
 #define OOB_PRIORITY_SOCKET 1
@@ -179,7 +174,7 @@ static void rmb(void)
 
 
 
-#ifdef HAVE_CUDA
+#if defined(HAVE_CUDA) || defined(HAVE_GDS)
 #include <cuda.h>
 #include <cuda_runtime.h>
 

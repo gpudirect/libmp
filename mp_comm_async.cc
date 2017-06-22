@@ -20,7 +20,7 @@ int mp_send_prepare(void * buf, size_t size, int peer, mp_request_t * mp_req, mp
 }
 
 //---------------- Non-Blocking ---------------- 
-int mp_nb_send_post_async(mp_request_t * mp_req, cudaStream_t stream) {
+int mp_isend_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req)
@@ -29,7 +29,7 @@ int mp_nb_send_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	return tl_comm->pt2pt_nb_send_post_async(mp_req, stream);
 }
 
-int mp_nb_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream) {
+int mp_isend_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || number <= 0)
@@ -38,7 +38,7 @@ int mp_nb_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t st
 	return tl_comm->pt2pt_nb_send_post_all_async(number, mp_req, stream);
 }
 
-int mp_nb_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream) {
+int mp_isend_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)
@@ -54,7 +54,7 @@ int mp_nb_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, m
 }
 
 //---------------- Blocking ---------------- 
-int mp_b_send_post_async(mp_request_t * mp_req, cudaStream_t stream) {
+int mp_send_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req)
@@ -63,7 +63,7 @@ int mp_b_send_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	return tl_comm->pt2pt_b_send_post_async(mp_req, stream);
 }
 
-int mp_b_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream) {
+int mp_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || number <= 0)
@@ -72,7 +72,7 @@ int mp_b_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t str
 	return tl_comm->pt2pt_b_send_post_all_async(number, mp_req, stream);
 }
 
-int mp_b_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream) {
+int mp_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)
@@ -110,7 +110,7 @@ int mp_put_prepare(void *buf, int size, mp_key_t * mp_key, int peer, size_t disp
 	return tl_comm->onesided_put_prepare(buf, size, mp_key, peer, displ, mp_win, mp_req, flags); 
 }
 
-int mp_nb_put_post_async(mp_request_t * mp_req, cudaStream_t stream) {
+int mp_iput_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req)
@@ -119,7 +119,7 @@ int mp_nb_put_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	return tl_comm->onesided_nb_put_post_async(mp_req, stream); 
 }
 
-int mp_nb_put_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream) {
+int mp_iput_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || number <= 0)
@@ -128,7 +128,7 @@ int mp_nb_put_post_all_async(int number, mp_request_t * mp_req, cudaStream_t str
 	return tl_comm->onesided_nb_put_post_all_async(number, mp_req, stream); 
 }
 
-int mp_nb_put_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags, cudaStream_t stream) {
+int mp_iput_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)
@@ -149,7 +149,7 @@ int mp_nb_put_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t dis
 	return tl_comm->onesided_nb_put_async(buf, size, mp_key, peer, displ, mp_win, mp_req, flags, stream); 
 }
 
-int mp_nb_get_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, cudaStream_t stream) {
+int mp_iget_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_key)
