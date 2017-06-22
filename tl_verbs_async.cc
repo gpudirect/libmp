@@ -1,5 +1,34 @@
-#include "tl_verbs.cc"
-#include "tl_verbs_async.h"
+#include <infiniband/peer_ops.h>
+#include <gdsync.h>
+#include <gdsync/tools.h>
+#include <gdsync/core.h>
+
+#include "tl_verbs.hpp"
+
+struct verbs_gds_client : verbs_client {
+	struct gds_qp *qp_async;
+	struct gds_cq *send_cq_async;
+	struct gds_cq *recv_cq_async;
+}
+typedef struct verbs_client_async * verbs_client_async_t;
+
+struct verbs_request_async : verbs_request {
+	union
+	{
+		struct ibv_recv_wr rr;
+		gds_send_wr sr;
+	} in;
+	union
+	{
+		gds_send_wr* bad_sr;
+		struct ibv_recv_wr* bad_rr;
+	} out;
+
+	struct CUstream_st *stream;
+	gds_send_request_t gds_send_info;
+	gds_wait_request_t gds_wait_info;
+}
+typedef struct verbs_request_async * verbs_request_async_t;
 
 namespace TL
 {

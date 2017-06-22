@@ -52,7 +52,7 @@ struct verbs_request * TL::Verbs::verbs_get_request()
   return req;
 }
 
-struct verbs_request * TL::Verbs::verbs_new_request(client_t *client, mp_req_type_t type, mp_state_t state) //, struct CUstream_st *stream)
+struct verbs_request * TL::Verbs::verbs_new_request(verbs_client_t client, mp_req_type_t type, mp_state_t state) //, struct CUstream_st *stream)
 {
   struct verbs_request *req = verbs_get_request();
   //mp_dbg_msg(oob_rank, "new req=%p\n", req);
@@ -113,42 +113,10 @@ inline int TL::Verbs::verbs_req_can_be_waited(struct verbs_request *req)
         verbs_req_type_tx(req->type) && !(req->flags & MP_PUT_NOWAIT));
 }
 
-int TL::Verbs::verbs_get_request_id(client_t *client, mp_req_type_t type)
+int TL::Verbs::verbs_get_request_id(verbs_client_t client, mp_req_type_t type)
 {
     assert(client->last_req_id < UINT_MAX);
     return ++client->last_req_id;
-}
-
-int TL::Verbs::verbs_post_recv(client_t *client, struct verbs_request *req)
-{
-    int progress_retry=0, ret=0, ret_progress=0;
-
-    if(!client || !req)
-        return MP_FAILURE;
-    do
-    {
-    	ret = ibv_post_recv(client->qp->qp, &req->in.rr, &req->out.bad_rr);
-        if(ret == ENOMEM)
-        {
-        	if(qp_query == 0)
-            {
-                verbs_query_print_qp(client->qp, req, 1);
-                qp_query=1;
-            }
-
-            ret_progress = verbs_progress_single_flow(RX_FLOW);
-            if(ret_progress != MP_SUCCESS)
-            {
-                mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
-                break;
-            }
-            mp_warn_msg(oob_rank, "RX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
-            progress_retry++;
-        }
-    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
-
-    qp_query=0;
-    return ret;
 }
 
 int TL::Verbs::verbs_query_print_qp(struct verbs_qp *qp, verbs_request_t req, int async)
@@ -192,7 +160,41 @@ int TL::Verbs::verbs_query_print_qp(struct verbs_qp *qp, verbs_request_t req, in
     return MP_SUCCESS;
 }
 
-int TL::Verbs::verbs_post_send(client_t *client, struct verbs_request *req)
+
+int TL::Verbs::verbs_post_recv(verbs_client_t client, struct verbs_request *req)
+{
+    int progress_retry=0, ret=0, ret_progress=0;
+
+    if(!client || !req)
+        return MP_FAILURE;
+    do
+    {
+    	ret = ibv_post_recv(client->qp->qp, &req->in.rr, &req->out.bad_rr);
+        if(ret == ENOMEM)
+        {
+        	if(qp_query == 0)
+            {
+                verbs_query_print_qp(client->qp, req, 1);
+                qp_query=1;
+            }
+
+            ret_progress = verbs_progress_single_flow(RX_FLOW);
+            if(ret_progress != MP_SUCCESS)
+            {
+                mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
+                break;
+            }
+            mp_warn_msg(oob_rank, "RX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+            progress_retry++;
+        }
+    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
+
+    qp_query=0;
+    return ret;
+}
+
+
+int TL::Verbs::verbs_post_send(verbs_client_t client, struct verbs_request *req)
 {
     int progress_retry=0, ret=0, ret_progress=0;
 
@@ -251,7 +253,7 @@ int TL::Verbs::verbs_progress_single_flow(mp_flow_t flow)
 
     //useful only for sync_event
     for (i=0; i<peer_count; i++) {
-        client_t *client = &clients[i];
+        verbs_client_t client = &clients[i];
         cq = (flow == TX_FLOW) ? client->send_cq : client->recv_cq; 
 
         // WARNING: can't progress a CQE if it is associated to an RX req
@@ -316,7 +318,7 @@ out:
     return ret;
 }
 
-int TL::Verbs::verbs_client_can_poll(client_t *client, mp_flow_t flow)
+int TL::Verbs::verbs_client_can_poll(verbs_client_t client, mp_flow_t flow)
 {
     verbs_request_t pending_req;
 
@@ -549,12 +551,12 @@ int TL::Verbs::createEndpoints() {
 	}
 	memset(client_index, -1, sizeof(int)*oob_size);
 
-	clients = (client_t *)calloc(peer_count, sizeof(client_t));
+	clients = (verbs_client_t )calloc(peer_count, sizeof(struct verbs_client));
 	if (clients == NULL) {
 		mp_err_msg(oob_rank, "allocation failed \n");
 		return MP_FAILURE;
 	}
-	memset(clients, 0, sizeof(client_t)*peer_count);
+	memset(clients, 0, sizeof(struct verbs_client)*peer_count);
 
 	qpinfo_all =(qpinfo_t *)calloc(oob_size, sizeof(qpinfo_t));
 	if (qpinfo_all == NULL) {
@@ -1102,7 +1104,7 @@ int TL::Verbs::pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t 
 	int ret = 0;
 	verbs_request_t req = NULL;
 	verbs_region_t reg = (verbs_region_t) *mp_mem_key;
-	client_t *client = &clients[client_index[peer]];
+	verbs_client_t client = &clients[client_index[peer]];
 
 	assert(reg);
 	req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
@@ -1151,7 +1153,7 @@ int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * m
 	int ret = 0;
 	struct verbs_request *req = NULL;
 	verbs_region_t reg = (verbs_region_t) *mp_mem_key;
-	client_t *client = &clients[client_index[peer]];
+	verbs_client_t client = &clients[client_index[peer]];
 
 	assert(reg);
 	req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
@@ -1395,7 +1397,7 @@ int TL::Verbs::onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, 
 	verbs_region_t reg = (verbs_region_t) *reg_t;
 	verbs_window_t window = (verbs_window_t) *window_t;
 	int client_id = client_index[peer];
-	client_t *client = &clients[client_id];
+	verbs_client_t client = &clients[client_id];
 
 	if (verbs_enable_ud) { 
 		mp_err_msg(oob_rank, "put/get not supported with UD \n");
@@ -1446,7 +1448,7 @@ int TL::Verbs::onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, s
 	verbs_region_t reg = (verbs_region_t) *reg_t;
 	verbs_window_t window = (verbs_window_t) *window_t;
 	int client_id = client_index[peer];
-	client_t *client = &clients[client_id];
+	verbs_client_t client = &clients[client_id];
 
 	if (verbs_enable_ud) { 
 		mp_err_msg(oob_rank, "put/get not supported with UD \n");

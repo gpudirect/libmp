@@ -1,5 +1,5 @@
 use_cuda:=1
-#use_gds:=1
+use_gds:=1
 
 PREFIX=$(HOME)/libmp
 CC=mpic++
