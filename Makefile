@@ -45,10 +45,16 @@ endif
 
 .PHONY: all clean
 
+ifdef use_gds
+all: raw_pt2pt raw_onesided mp_pt2pt mp_onesided mp_pt2pt_async
+else
 all: raw_pt2pt raw_onesided mp_pt2pt mp_onesided
-
+endif
 #mp: $(OBJ) mp.o
 #	$(LD) -o mp $(OBJ) mp.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDA_LD}
+
+mp_pt2pt_async: $(OBJ) mp_pt2pt_async.o
+	$(LD) -o mp_pt2pt_async $(OBJ) mp_pt2pt_async.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDA_LD} ${GDS_LD}
 
 mp_pt2pt: $(OBJ) mp_pt2pt.o
 	$(LD) -o mp_pt2pt $(OBJ) mp_pt2pt.o ${CFLAGS} ${CPPFLAGS} ${CONFIGURE_FLAGS} ${LDFLAGS} ${CUDA_LD} ${GDS_LD}
