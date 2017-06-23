@@ -1,6 +1,7 @@
 #include "tl.hpp"
 #include "tl_verbs_common.hpp"
 //#include "tl_verbs_types.hpp"
+#include <typeinfo>
 
 struct verbs_request {
   int peer;
@@ -40,15 +41,17 @@ struct verbs_client {
     uint32_t last_posted_tracked_id[N_FLOWS];
     uint32_t last_trigger_id[N_FLOWS]; //has to be moved to device
     uint32_t last_tracked_id[N_FLOWS];
-    struct verbs_request *last_posted_stream_req[N_FLOWS];
-    struct verbs_request *posted_stream_req[N_FLOWS];
-    struct verbs_request *last_waited_stream_req[N_FLOWS]; //head
-    struct verbs_request *waited_stream_req[N_FLOWS]; //tail
 
     /*ib related*/
-    struct verbs_qp *qp;
-    struct verbs_cq *send_cq;
-    struct verbs_cq *recv_cq;
+    struct ibv_qp *qp;
+    struct ibv_cq *send_cq;
+    uint32_t send_cq_curr_offset;
+    struct ibv_cq *recv_cq;
+    uint32_t recv_cq_curr_offset;
+    
+//    struct verbs_qp *qp;
+//    struct verbs_cq *send_cq;
+//    struct verbs_cq *recv_cq;
 
     struct ibv_mr *region_mr;
     //UD info
@@ -69,6 +72,41 @@ struct verbs_client {
   #endif
 };
 typedef struct verbs_client * verbs_client_t;
+
+inline int verbs_req_type_rx(mp_req_type_t type)
+{
+    assert(type > MP_NULL && type < MP_N_TYPES);
+    return (type == MP_RECV);
+}
+
+inline int verbs_req_type_tx(mp_req_type_t type)
+{
+    assert(type > MP_NULL && type < MP_N_TYPES);
+    return (type == MP_SEND) || (type == MP_RDMA);
+}
+
+inline const char * verbs_flow_to_str(mp_flow_t flow) {
+    return flow==TX_FLOW?"TX":"RX";
+}
+
+inline int verbs_req_valid(verbs_request_t req)
+{
+    return (req->type   > MP_NULL  && req->type   < MP_N_TYPES ) && 
+           (req->status > MP_UNDEF && req->status < MP_N_STATES);
+}
+
+inline mp_flow_t verbs_type_to_flow(mp_req_type_t type)
+{
+	return verbs_req_type_tx(type) ? TX_FLOW : RX_FLOW;
+}
+
+inline int verbs_req_can_be_waited(verbs_request_t req)
+{
+    assert(verbs_req_valid(req));
+    return verbs_req_type_rx(req->type) || (
+        verbs_req_type_tx(req->type) && !(req->flags & MP_PUT_NOWAIT));
+}
+
 
 namespace TL
 {
@@ -105,7 +143,7 @@ namespace TL
 			int cq_poll_count;
 
 			int verbs_enable_ud;
-			struct verbs_request *mp_request_free_list;
+			verbs_request_t mp_request_free_list;
 			mem_region_t *mem_region_list;
 			char ud_padding[UD_ADDITION];
 			mp_key_t ud_padding_reg;
@@ -129,24 +167,25 @@ namespace TL
 
 			/*to enable opaque requests*/
 			void verbs_allocate_requests();
-			struct verbs_request *verbs_get_request();
-			struct verbs_request *verbs_new_request(verbs_client_t client, mp_req_type_t type, mp_state_t state);
+			verbs_request_t verbs_get_request();
+			verbs_request_t verbs_new_request(verbs_client_t client, mp_req_type_t type, mp_state_t state);
 			void verbs_release_request(verbs_request_t req);
-			inline const char *verbs_flow_to_str(mp_flow_t flow);
-			inline int verbs_req_type_rx(mp_req_type_t type);
-			inline int verbs_req_type_tx(mp_req_type_t type);
-			inline int verbs_req_valid(struct verbs_request *req);
-			inline mp_flow_t verbs_type_to_flow(mp_req_type_t type);
-			inline int verbs_req_can_be_waited(struct verbs_request *req);
+//			inline const char *verbs_flow_to_str(mp_flow_t flow);
+//			inline int verbs_req_type_rx(mp_req_type_t type);
+//			inline int verbs_req_type_tx(mp_req_type_t type);
+//			inline int verbs_req_valid(verbs_request_t req);
+//			inline mp_flow_t verbs_type_to_flow(mp_req_type_t type);
+//			inline int verbs_req_can_be_waited(verbs_request_t req);
 			int verbs_get_request_id(verbs_client_t client, mp_req_type_t type);
-			int verbs_post_recv(verbs_client_t client, struct verbs_request *req);
-			int verbs_query_print_qp(struct verbs_qp *qp, verbs_request_t req, int async);
-			int verbs_post_send(verbs_client_t client, struct verbs_request *req);
+			int verbs_post_recv(verbs_client_t client, verbs_request_t req);
+			int verbs_query_print_qp(struct ibv_qp *qp, verbs_request_t req);
+			int verbs_post_send(verbs_client_t client, verbs_request_t req);
 			int verbs_progress_single_flow(mp_flow_t flow);
 			int verbs_client_can_poll(verbs_client_t client, mp_flow_t flow);
-			int verbs_progress_request(struct verbs_request *req);
-			int cleanup_request(struct verbs_request *req);
+			int verbs_progress_request(verbs_request_t req);
+			int cleanup_request(verbs_request_t req);
 			void verbs_env_vars();
+			int verbs_update_endpoints(verbs_client_t clients_local);
 
 		public:
 			~Verbs() {}

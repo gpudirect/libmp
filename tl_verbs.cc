@@ -1,10 +1,12 @@
 #include "tl.hpp"
 #include "tl_verbs.hpp"
+#include <iostream>
+#include <inttypes.h>
 
 void  TL::Verbs::verbs_allocate_requests() {
   int i;
   mem_region_t *mem_region;
-  struct verbs_request *mp_requests;
+  verbs_request_t mp_requests;
 
   assert (mp_request_free_list == NULL);
 
@@ -20,13 +22,13 @@ void  TL::Verbs::verbs_allocate_requests() {
     mem_region->next = mem_region_list;
   }
 
-  mem_region->region = (struct verbs_request *) calloc (verbs_request_limit, sizeof(struct verbs_request));
+  mem_region->region = (verbs_request_t ) calloc (verbs_request_limit, sizeof(struct verbs_request));
   if (mem_region == NULL) {
     mp_err_msg(oob_rank, "memory allocation for request_region failed \n");
     exit(-1);
   }
 
-  mp_requests = (struct verbs_request *) mem_region->region;
+  mp_requests = (verbs_request_t ) mem_region->region;
   mp_request_free_list = mp_requests;
   for (i=0; i<verbs_request_limit-1; i++) {
     mp_requests[i].next = mp_requests + i + 1;
@@ -34,9 +36,9 @@ void  TL::Verbs::verbs_allocate_requests() {
   mp_requests[i].next = NULL;
 }
 
-struct verbs_request * TL::Verbs::verbs_get_request()
+verbs_request_t  TL::Verbs::verbs_get_request()
 {
-  struct verbs_request *req = NULL;
+  verbs_request_t req = NULL;
 
   if (mp_request_free_list == NULL) {
     verbs_allocate_requests();
@@ -52,9 +54,9 @@ struct verbs_request * TL::Verbs::verbs_get_request()
   return req;
 }
 
-struct verbs_request * TL::Verbs::verbs_new_request(verbs_client_t client, mp_req_type_t type, mp_state_t state) //, struct CUstream_st *stream)
+verbs_request_t  TL::Verbs::verbs_new_request(verbs_client_t client, mp_req_type_t type, mp_state_t state) //, struct CUstream_st *stream)
 {
-  struct verbs_request *req = verbs_get_request();
+  verbs_request_t req = verbs_get_request();
   //mp_dbg_msg(oob_rank, "new req=%p\n", req);
   if (req) {
       req->peer = client->oob_rank;
@@ -79,47 +81,13 @@ void TL::Verbs::verbs_release_request(verbs_request_t req)
   mp_request_free_list = req;
 }
 
-inline const char * TL::Verbs::verbs_flow_to_str(mp_flow_t flow) {
-    return flow==TX_FLOW?"TX":"RX";
-}
-
-inline int TL::Verbs::verbs_req_type_rx(mp_req_type_t type)
-{
-    assert(type > MP_NULL && type < MP_N_TYPES);
-    return (type == MP_RECV);
-}
-
-inline int TL::Verbs::verbs_req_type_tx(mp_req_type_t type)
-{
-    assert(type > MP_NULL && type < MP_N_TYPES);
-    return (type == MP_SEND) || (type == MP_RDMA);
-}
-
-inline int TL::Verbs::verbs_req_valid(struct verbs_request *req)
-{
-    return (req->type   > MP_NULL  && req->type   < MP_N_TYPES ) && 
-           (req->status > MP_UNDEF && req->status < MP_N_STATES);
-}
-
-inline mp_flow_t TL::Verbs::verbs_type_to_flow(mp_req_type_t type)
-{
-	return verbs_req_type_tx(type) ? TX_FLOW : RX_FLOW;
-}
-
-inline int TL::Verbs::verbs_req_can_be_waited(struct verbs_request *req)
-{
-    assert(verbs_req_valid(req));
-    return verbs_req_type_rx(req->type) || (
-        verbs_req_type_tx(req->type) && !(req->flags & MP_PUT_NOWAIT));
-}
-
 int TL::Verbs::verbs_get_request_id(verbs_client_t client, mp_req_type_t type)
 {
     assert(client->last_req_id < UINT_MAX);
     return ++client->last_req_id;
 }
 
-int TL::Verbs::verbs_query_print_qp(struct verbs_qp *qp, verbs_request_t req, int async)
+int TL::Verbs::verbs_query_print_qp(struct ibv_qp *qp, verbs_request_t req)
 {
     assert(qp);
     struct ibv_qp_attr qp_attr;
@@ -128,7 +96,7 @@ int TL::Verbs::verbs_query_print_qp(struct verbs_qp *qp, verbs_request_t req, in
     memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
     memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
 
-    if (ibv_query_qp(qp->qp, &qp_attr, IBV_QP_STATE | IBV_QP_PATH_MTU | IBV_QP_CAP, &qp_init_attr))
+    if (ibv_query_qp(qp, &qp_attr, IBV_QP_STATE | IBV_QP_PATH_MTU | IBV_QP_CAP, &qp_init_attr))
     {
         mp_err_msg(oob_rank, "client query qp attr fail\n");
         return MP_FAILURE;
@@ -161,20 +129,22 @@ int TL::Verbs::verbs_query_print_qp(struct verbs_qp *qp, verbs_request_t req, in
 }
 
 
-int TL::Verbs::verbs_post_recv(verbs_client_t client, struct verbs_request *req)
+int TL::Verbs::verbs_post_recv(verbs_client_t client, verbs_request_t req)
 {
     int progress_retry=0, ret=0, ret_progress=0;
+
+    mp_dbg_msg(oob_rank, "\n");
 
     if(!client || !req)
         return MP_FAILURE;
     do
     {
-    	ret = ibv_post_recv(client->qp->qp, &req->in.rr, &req->out.bad_rr);
+    	ret = ibv_post_recv(client->qp, &req->in.rr, &req->out.bad_rr);
         if(ret == ENOMEM)
         {
         	if(qp_query == 0)
             {
-                verbs_query_print_qp(client->qp, req, 1);
+                verbs_query_print_qp(client->qp, req);
                 qp_query=1;
             }
 
@@ -194,7 +164,7 @@ int TL::Verbs::verbs_post_recv(verbs_client_t client, struct verbs_request *req)
 }
 
 
-int TL::Verbs::verbs_post_send(verbs_client_t client, struct verbs_request *req)
+int TL::Verbs::verbs_post_send(verbs_client_t client, verbs_request_t req)
 {
     int progress_retry=0, ret=0, ret_progress=0;
 
@@ -202,7 +172,7 @@ int TL::Verbs::verbs_post_send(verbs_client_t client, struct verbs_request *req)
         return MP_FAILURE;
     do
     {
-    	ret = ibv_exp_post_send(client->qp->qp, &req->in.sr, &req->out.bad_sr);
+    	ret = ibv_exp_post_send(client->qp, &req->in.sr, &req->out.bad_sr);
         if (ret) {
             if (ret == ENOMEM) {
                 // out of space error can happen too often to report
@@ -218,7 +188,7 @@ int TL::Verbs::verbs_post_send(verbs_client_t client, struct verbs_request *req)
         {
         	if(qp_query == 0)
             {
-                verbs_query_print_qp(client->qp, req, 0);
+                verbs_query_print_qp(client->qp, req);
                 qp_query=1;
             }
 
@@ -240,7 +210,7 @@ out:
 int TL::Verbs::verbs_progress_single_flow(mp_flow_t flow)
 {
     int i, ne = 0, ret = 0;
-    struct verbs_cq *cq = NULL; 
+    struct ibv_cq *cq = NULL; 
     int cqe_count = 0;
 
     if (!wc) {
@@ -258,13 +228,14 @@ int TL::Verbs::verbs_progress_single_flow(mp_flow_t flow)
 
         // WARNING: can't progress a CQE if it is associated to an RX req
         // which is dependent upon GPU work which has not been triggered yet
-        cqe_count = verbs_client_can_poll(client, flow);
-        cqe_count = MIN(cqe_count, cq_poll_count);
+        //Async only!!!
+        //cqe_count = verbs_client_can_poll(client, flow);
+        cqe_count = cq_poll_count; //MIN(cqe_count, cq_poll_count);
         if (!cqe_count) {
             printf("cannot poll client[%d] flow=%s\n", client->oob_rank, flow_str);
             continue;
         }
-        ne = ibv_poll_cq(cq->cq, cqe_count, wc);
+        ne = ibv_poll_cq(cq, cqe_count, wc);
         //printf("client[%d] flow=%s cqe_count=%d nw=%d\n", client->oob_rank, flow_str, cqe_count, ne);
         if (ne == 0) {
             //if (errno) printf("client[%d] flow=%s errno=%s\n", client->oob_rank, flow_str, strerror(errno));
@@ -281,8 +252,8 @@ int TL::Verbs::verbs_progress_single_flow(mp_flow_t flow)
                            client->oob_rank, j,
                            wc_curr->status, ibv_wc_status_str(wc_curr->status), 
                            wc_curr->opcode, wc_curr->byte_len, wc_curr->wr_id);
-
-                struct verbs_request *req = (struct verbs_request *) wc_curr->wr_id;
+				
+                verbs_request_t req = (verbs_request_t ) wc_curr->wr_id;
 
                 if (wc_curr->status != IBV_WC_SUCCESS) {
                     mp_err_msg(oob_rank, "ERROR!!! completion error, status:'%s' client:%d rank:%d req:%p flow:%s\n",
@@ -318,41 +289,7 @@ out:
     return ret;
 }
 
-int TL::Verbs::verbs_client_can_poll(verbs_client_t client, mp_flow_t flow)
-{
-    verbs_request_t pending_req;
-
-    pending_req = client->waited_stream_req[flow];
-
-    // no pending stream req
-    // or next non-completed req is at least the 1st pending stream req
-    int ret = 0;
-
-    while (pending_req) {
-        // re-reading each time as it might have been updated
-        int threshold_id = ACCESS_ONCE(client->last_tracked_id[flow]);
-        if (threshold_id < pending_req->id) {
-            mp_dbg_msg(oob_rank, "client[%d] stalling progress flow=%s threshold_id=%d req->id=%d\n", 
-                       client->oob_rank, verbs_flow_to_str(flow), threshold_id, pending_req->id);
-            break;
-        } else {
-            mp_dbg_msg(oob_rank, "client[%d] flow=%s threshold_id=%d req->id=%d\n", 
-                       client->oob_rank, verbs_flow_to_str(flow), threshold_id, pending_req->id);
-	    ret++;
-	    pending_req = pending_req->next;
-        }
-    }
-	
-    if (!pending_req) {
-        ret = cq_poll_count;
-    }
-
-    mp_dbg_msg(oob_rank, "pending_req=%p ret=%d\n", pending_req, ret);
-    return ret;
-}
-
-
-int TL::Verbs::verbs_progress_request(struct verbs_request *req)
+int TL::Verbs::verbs_progress_request(verbs_request_t req)
 {
 	switch(req->status) {
 		case MP_PREPARED:
@@ -375,7 +312,7 @@ int TL::Verbs::verbs_progress_request(struct verbs_request *req)
 	return 0;
 }
 
-int TL::Verbs::cleanup_request(struct verbs_request *req)
+int TL::Verbs::cleanup_request(verbs_request_t req)
 {
     if (req->sgv) {
         free(req->sgv);
@@ -576,18 +513,13 @@ int TL::Verbs::createEndpoints() {
 		clients[i].oob_rank = peer;
 		clients[i].last_req_id = 0;
 		clients[i].last_done_id = 0;
-		assert(sizeof(clients[i].last_waited_stream_req) == N_FLOWS*sizeof(void*));
 
 		memset(clients[i].last_posted_trigger_id, 0, sizeof(clients[0].last_posted_trigger_id));
 		memset(clients[i].last_posted_tracked_id, 0, sizeof(clients[0].last_posted_tracked_id));
 		memset(clients[i].last_tracked_id,        0, sizeof(clients[0].last_tracked_id));
 		memset(clients[i].last_trigger_id,        0, sizeof(clients[0].last_trigger_id));
-		memset(clients[i].last_waited_stream_req, 0, sizeof(clients[0].last_waited_stream_req));
-		memset(clients[i].waited_stream_req,      0, sizeof(clients[0].waited_stream_req));
-		memset(clients[i].last_posted_stream_req, 0, sizeof(clients[0].last_posted_stream_req));
-		memset(clients[i].posted_stream_req,      0, sizeof(clients[0].posted_stream_req));
-
 		memset(&ib_qp_init_attr, 0, sizeof(ib_qp_init_attr));
+
 		ib_qp_init_attr.cap.max_send_wr  = ib_tx_depth;
 		ib_qp_init_attr.cap.max_recv_wr  = ib_rx_depth;
 		ib_qp_init_attr.cap.max_send_sge = ib_max_sge;
@@ -632,27 +564,28 @@ int TL::Verbs::createEndpoints() {
         //todo: No need of IBV_QP_INIT_ATTR_PEER_DIRECT (IBV_EXP_QP_INIT_ATTR_PEER_DIRECT)
         //ib_qp_init_attr.comp_mask |= IBV_QP_INIT_ATTR_PEER_DIRECT;
         ib_qp_init_attr.peer_direct_attrs = NULL; //peer_attr;
-
-			clients[i].qp = (struct verbs_qp*)calloc(1, sizeof(struct verbs_qp));
+/*
+		clients[i].qp = (struct ibv_qp*)calloc(1, sizeof(struct ibv_qp));
         if (!clients[i].qp) {
                 mp_err_msg(oob_rank, "cannot allocate memory\n");
                 return MP_FAILURE;
         }
-
-        clients[i].qp->qp = ibv_exp_create_qp(ib_ctx->context, &ib_qp_init_attr);
-        if (!clients[i].qp->qp)  {
+*/
+        clients[i].qp = ibv_exp_create_qp(ib_ctx->context, &ib_qp_init_attr);
+        if (!clients[i].qp)  {
                 ret = EINVAL;
                 mp_err_msg(oob_rank, "error in ibv_exp_create_qp\n");
                 goto err_free_rx_cq;
 		}
-        clients[i].qp->send_cq.cq = clients[i].qp->qp->send_cq;
-        clients[i].qp->send_cq.curr_offset = 0;
-        clients[i].qp->recv_cq.cq = clients[i].qp->qp->recv_cq;
-        clients[i].qp->recv_cq.curr_offset = 0;
 
-			//======== QP CREATED
-		clients[i].send_cq = &clients[i].qp->send_cq;
-		clients[i].recv_cq = &clients[i].qp->recv_cq;
+		//======== QP CREATED
+        clients[i].send_cq = clients[i].qp->send_cq;
+        clients[i].send_cq_curr_offset = 0;
+        clients[i].recv_cq = clients[i].qp->recv_cq;
+        clients[i].recv_cq_curr_offset = 0;
+
+		//clients[i].send_cq = &clients[i].qp->send_cq;
+		//clients[i].recv_cq = &clients[i].qp->recv_cq;
 
 		assert(clients[i].qp);
 		assert(clients[i].send_cq);
@@ -672,14 +605,14 @@ int TL::Verbs::createEndpoints() {
 		  flags                      = IBV_QP_STATE | IBV_QP_PKEY_INDEX | IBV_QP_PORT | IBV_QP_ACCESS_FLAGS;
 		}
 
-		ret = ibv_modify_qp (clients[i].qp->qp, &ib_qp_attr, flags);
+		ret = ibv_modify_qp (clients[i].qp, &ib_qp_attr, flags);
 		if (ret != 0) {
 		  mp_err_msg(oob_rank, "Failed to modify QP to INIT: %d, %s\n", ret, strerror(errno));
 		  goto err_free_qps;
 		}
 
 		qpinfo_all[peer].lid = ib_port_attr.lid;
-		qpinfo_all[peer].qpn = clients[i].qp->qp->qp_num;
+		qpinfo_all[peer].qpn = clients[i].qp->qp_num;
 		qpinfo_all[peer].psn = 0;
 		mp_dbg_msg(oob_rank, "QP lid:%04x qpn:%06x psn:%06x\n", 
 		         qpinfo_all[peer].lid,
@@ -694,13 +627,12 @@ int TL::Verbs::createEndpoints() {
 		for (i=0; i<peer_count; i++)
 		{
 			mp_dbg_msg(oob_rank, "destroying QP client %d\n", i);
-			ret = ibv_destroy_qp(clients[i].qp->qp);
+			ret = ibv_destroy_qp(clients[i].qp);
 			if (ret)
 				mp_err_msg(oob_rank, "error %d destroying QP client %d\n", ret, i);
 		}
 	
 	err_free_rx_cq:
-		printf("destroying RX CQ\n");
 		ret = ibv_destroy_cq(recv_cq);
 		if (ret)
 			mp_err_msg(oob_rank, "error %d destroying RX CQ\n", ret);
@@ -748,8 +680,14 @@ int TL::Verbs::updateEndpoints() {
 		      | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN
 		      | IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC;
 		}
-
-		ret = ibv_modify_qp(clients[i].qp->qp, &ib_qp_attr, flags);
+		
+		assert(clients[i].qp);
+#if 0
+		mp_dbg_msg(oob_rank, "clients[%d].qp=%p\n", i, clients[i].qp);					
+		std::cout << typeid(clients).name() << " clients type\n";
+		std::cout << typeid(clients[i].qp).name() << " clients[i].qp type\n";
+#endif
+		ret = ibv_modify_qp(clients[i].qp, &ib_qp_attr, flags);
 		if (ret != 0) {
 		  printf("Failed to modify RC QP to RTR\n");
 		  return MP_FAILURE;
@@ -780,16 +718,16 @@ int TL::Verbs::updateEndpoints() {
 		    | IBV_QP_MAX_QP_RD_ATOMIC;
 		}
 
-		ret = ibv_modify_qp(clients[i].qp->qp, &ib_qp_attr, flags);
+		mp_dbg_msg(oob_rank, "2 ibv_modify_qp\n");
+		ret = ibv_modify_qp(clients[i].qp, &ib_qp_attr, flags);
 		if (ret != 0)
 		{
-			printf("Failed to modify RC QP to RTS\n");
+			mp_err_msg(oob_rank, "Failed to modify RC QP to RTS\n");
 			return MP_FAILURE;
 		}
 
 		if (verbs_enable_ud) {
-		  printf("setting up connection with peer: %d lid: %d qpn: %d \n", peer, qpinfo_all[peer].lid,
-		                 qpinfo_all[peer].qpn);
+		  mp_err_msg(oob_rank, "setting up connection with peer: %d lid: %d qpn: %d \n", peer, qpinfo_all[peer].lid, qpinfo_all[peer].qpn);
 
 		  struct ibv_ah_attr ib_ah_attr;
 		  memset(&ib_ah_attr, 0, sizeof(ib_ah_attr));
@@ -801,7 +739,7 @@ int TL::Verbs::updateEndpoints() {
 
 		  clients[i].ah = ibv_create_ah(ib_ctx->pd, &ib_ah_attr);
 		  if (!clients[i].ah) {
-		      printf("Failed to create AH\n");
+		      mp_err_msg(oob_rank, "Failed to create AH\n");
 		      return MP_FAILURE;
 		  }
 
@@ -959,29 +897,31 @@ int TL::Verbs::finalize() {
 	/*destroy IB resources*/
 	for (i=0; i<peer_count; i++) {
 	  	int ret=0;
+        
         assert(clients[i].qp);
-        assert(clients[i].qp->qp);
-        ret = ibv_destroy_qp(clients[i].qp->qp);
+        ret = ibv_destroy_qp(clients[i].qp);
         if (ret) {
             mp_err_msg(oob_rank, "error %d in destroy_qp\n", ret);
             retcode = ret;
         }
 
-        assert(clients[i].qp->send_cq.cq);
-        ret = ibv_destroy_cq(clients[i].qp->send_cq.cq);
+
+        assert(clients[i].send_cq);
+        ret = ibv_destroy_cq(clients[i].send_cq);
         if (ret) {
             mp_err_msg(oob_rank, "error %d in destroy_cq send_cq\n", ret);
             retcode = ret;
         }
 
-        assert(clients[i].qp->recv_cq.cq);
-        ret = ibv_destroy_cq(clients[i].qp->recv_cq.cq);
+        assert(clients[i].recv_cq);
+        ret = ibv_destroy_cq(clients[i].recv_cq);
         if (ret) {
             mp_err_msg(oob_rank, "error %d in destroy_cq recv_cq\n", ret);
             retcode = ret;
         }
 
-        free(clients[i].qp);
+
+        //free(clients[i]);
 	}
 
 	ibv_dealloc_pd (ib_ctx->pd);
@@ -1007,6 +947,8 @@ int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem
 
 	int flags=1;
 	assert(mp_mem_key);
+    mp_dbg_msg(oob_rank, "\n");
+
 	verbs_region_t reg = (verbs_region_t)calloc(1, sizeof(struct verbs_region));
 	if (!reg) {
 	  mp_err_msg(oob_rank, "malloc returned NULL while allocating struct mp_reg\n");
@@ -1026,6 +968,9 @@ int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem
 			mp_dbg_msg(oob_rank, "Addr:%p Memory type: CU_MEMORYTYPE_DEVICE\n", addr);
 	}
 #endif
+
+				    mp_dbg_msg(oob_rank, "After HAVE_CUDA\n");
+
 	if (verbs_enable_ud) {
 	  mp_warn_msg(oob_rank, "UD enabled, registering buffer for LOCAL_WRITE\n");
 	  flags = IBV_ACCESS_LOCAL_WRITE;
@@ -1048,6 +993,8 @@ int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem
 	reg->key = reg->mr->lkey;
 	mp_dbg_msg(oob_rank, "Registered key: key=%p value=%x buf=%p\n", reg, reg->key, addr);
 	*mp_mem_key = (mp_key_t)reg;
+
+				    mp_dbg_msg(oob_rank, "Exit\n");
 
 	return MP_SUCCESS;
 }
@@ -1106,7 +1053,9 @@ int TL::Verbs::pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t 
 	verbs_region_t reg = (verbs_region_t) *mp_mem_key;
 	verbs_client_t client = &clients[client_index[peer]];
 
+
 	assert(reg);
+	mp_dbg_msg(oob_rank, "start\n");
 	req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
 	assert(req);
 
@@ -1151,7 +1100,7 @@ out:
 
 int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
 	int ret = 0;
-	struct verbs_request *req = NULL;
+	verbs_request_t req = NULL;
 	verbs_region_t reg = (verbs_region_t) *mp_mem_key;
 	verbs_client_t client = &clients[client_index[peer]];
 
@@ -1268,7 +1217,7 @@ int TL::Verbs::wait_all(int count, mp_request_t *req_)
     int complete = 0, ret = 0;
     /*poll until completion*/
     while (complete < count) {
-        struct verbs_request *req = (verbs_request_t) req_[complete];
+        verbs_request_t req = (verbs_request_t) req_[complete];
 		if (!verbs_req_can_be_waited(req))
 		{
 		    mp_dbg_msg(oob_rank, "cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
@@ -1286,7 +1235,7 @@ int TL::Verbs::wait_all(int count, mp_request_t *req_)
     complete=0;
 
     while (complete < count) {
-        struct verbs_request *req = (verbs_request_t) req_[complete];
+        verbs_request_t req = (verbs_request_t) req_[complete];
         
         while (req->status != MP_COMPLETE) {
             ret = verbs_progress_single_flow (TX_FLOW);
@@ -1324,55 +1273,55 @@ out:
 /*one-sided operations: window creation, put and get*/
 int TL::Verbs::onesided_window_create(void *addr, size_t size, mp_window_t *window_t)
 {
-  int result = MP_SUCCESS;
-  verbs_window_t window;
-  typedef struct {
-    void *base_addr;
-    uint32_t rkey;
-    int size;
-  } exchange_win_info;
+	int result = MP_SUCCESS;
+	verbs_window_t window;
+	typedef struct {
+	void *base_addr;
+	uint32_t rkey;
+	int size;
+	} exchange_win_info;
 
-  exchange_win_info *exchange_win = NULL; 
-  int i, peer;
+	exchange_win_info *exchange_win = NULL; 
+	int i, peer;
 
-  window = (verbs_window_t) calloc(1, sizeof(struct verbs_window));
-  assert(window != NULL); 
+	window = (verbs_window_t) calloc(1, sizeof(struct verbs_window));
+	assert(window != NULL); 
 
-  window->base_ptr = (void ** ) calloc(peer_count, sizeof(void *));
-  assert(window->base_ptr != NULL);
-  window->rkey = (uint32_t * ) calloc(peer_count, sizeof(uint32_t));
-  assert(window->rkey != NULL);
-  window->rsize = (uint64_t * ) calloc(peer_count, sizeof(uint64_t));
-  assert(window->rsize != NULL);
+	window->base_ptr = (void ** ) calloc(peer_count, sizeof(void *));
+	assert(window->base_ptr != NULL);
+	window->rkey = (uint32_t * ) calloc(peer_count, sizeof(uint32_t));
+	assert(window->rkey != NULL);
+	window->rsize = (uint64_t * ) calloc(peer_count, sizeof(uint64_t));
+	assert(window->rsize != NULL);
 
-  exchange_win = (exchange_win_info * ) calloc(oob_size, sizeof(exchange_win_info));
-  assert(exchange_win != NULL); 
+	exchange_win = (exchange_win_info * ) calloc(oob_size, sizeof(exchange_win_info));
+	assert(exchange_win != NULL); 
 
-  result = register_key_buffer(addr, size, (mp_key_t *) &window->reg);  
-  assert(result == MP_SUCCESS); 
-  
-  exchange_win[oob_rank].base_addr = addr; 
-  exchange_win[oob_rank].rkey = window->reg->mr->rkey; 
-  exchange_win[oob_rank].size = size;
+	result = register_key_buffer(addr, size, (mp_key_t *) &window->reg);  
+	assert(result == MP_SUCCESS); 
 
-  oob_comm->allgather(NULL, 0, MP_CHAR, exchange_win, sizeof(exchange_win_info), MP_CHAR);
+	exchange_win[oob_rank].base_addr = addr; 
+	exchange_win[oob_rank].rkey = window->reg->mr->rkey; 
+	exchange_win[oob_rank].size = size;
 
-  /*populate window address info*/
-  for (i=0; i<peer_count; i++) { 
-      peer = clients[i].oob_rank;
- 
-      window->base_ptr[i] = exchange_win[peer].base_addr;
-      window->rkey[i] = exchange_win[peer].rkey;
-      window->rsize[i] = exchange_win[peer].size;
-  }
+	oob_comm->allgather(NULL, 0, MP_CHAR, exchange_win, sizeof(exchange_win_info), MP_CHAR);
 
-  *window_t = window;
+	/*populate window address info*/
+	for (i=0; i<peer_count; i++) { 
+	  peer = clients[i].oob_rank;
 
-  free(exchange_win);
+	  window->base_ptr[i] = exchange_win[peer].base_addr;
+	  window->rkey[i] = exchange_win[peer].rkey;
+	  window->rsize[i] = exchange_win[peer].size;
+	}
 
-  oob_comm->barrier();
+	*window_t = window;
 
-  return result;
+	free(exchange_win);
+
+	oob_comm->barrier();
+
+	return result;
 }
 
 int TL::Verbs::onesided_window_destroy(mp_window_t *window_t)

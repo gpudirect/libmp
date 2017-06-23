@@ -25,11 +25,11 @@ case ${HOSTNAME} in
     # GPU #0,2,4,6
     # HCA #0,1,2,3
     if (( $lrank > 4 )); then echo "too many ranks"; exit; fi
-    if (( $lrank == 0 )); then hlrank=1; dlrank=4; HCA=mlx5_2; fi
-    if (( $lrank == 1 )); then hlrank=1; dlrank=6; HCA=mlx5_3; fi 
-    #hlrank=$(($lrank / 2)) # 0,1
-    #dlrank=$(($lrank * 2)) # 0,2,4,6
-    #HCA=mlx5_${lrank}
+    #if (( $lrank == 0 )); then hlrank=1; dlrank=4; HCA=mlx5_2; fi
+    #if (( $lrank == 1 )); then hlrank=1; dlrank=6; HCA=mlx5_3; fi 
+    hlrank=$(($lrank / 2)) # 0,1
+    dlrank=$(($lrank * 2)) # 0,2,4,6
+    HCA=mlx5_${lrank}
     #CUDA_VISIBLE_DEVICES=$dlrank
     USE_CPU=${hlrank}
     MP_USE_GPU=${dlrank}
@@ -62,7 +62,7 @@ export \
 
 #IB Verbs ENV VARS
 export  VERBS_IB_HCA \
-        VERBS_GDS_EVENT_ASYNC VERBS_GDS_RX_CQ_ON_GPU VERBS_GDS_TX_CQ_ON_GPU VERBS_GDS_DBREC_ON_GPU
+        VERBS_ASYNC_EVENT_ASYNC VERBS_ASYNC_RX_CQ_ON_GPU VERBS_ASYNC_TX_CQ_ON_GPU VERBS_ASYNC_DBREC_ON_GPU
 
 #MP ENV VARS
 export \

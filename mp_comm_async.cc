@@ -202,3 +202,21 @@ int mp_wait_all_async(int number, mp_request_t * mp_reqs, cudaStream_t stream) {
 	
 	return tl_comm->wait_all_async(number, mp_reqs, stream);
 }
+
+int mp_progress_requests(int number, mp_request_t * mp_reqs) {
+	MP_CHECK_COMM_OBJ();
+
+	if(!mp_reqs)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	if(number <= 0)
+	{
+		mp_err_msg(oob_rank, "Erroneous number of requests (%d)\n", number);
+		return MP_FAILURE;
+	}	
+	
+	return tl_comm->progress_requests(number, mp_reqs);	
+}

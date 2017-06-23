@@ -72,10 +72,13 @@ int main(int argc, char *argv[])
 			}
 
 			MP_CHECK(mp_register_key_buffer(rBuf[i], BUF_SIZE, &mp_keys_recv[i]));
+			if(!myId) printf("[%d] mp_register_key_buffer recv\n", myId);
+
 			MP_CHECK(mp_irecv(rBuf[i], BUF_SIZE, i, &mp_reqs_recv[i], &mp_keys_recv[i]));
 			if(!myId) printf("[%d] Recv Client %d, request=%p\n", myId, i, &mp_reqs_recv[i]);
 
 			MP_CHECK(mp_register_key_buffer(sBuf[i], BUF_SIZE, &mp_keys_send[i]));
+			if(!myId) printf("[%d] mp_register_key_buffer send\n", myId);
 		}	
 	}
 	

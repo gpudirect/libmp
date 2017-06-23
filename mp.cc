@@ -60,15 +60,24 @@ int mp_init(int argc, char *argv[], int par1)
 		tl_type = TL_INDEX_PSM;
 	#endif
 #endif
+	mp_dbg_msg(oob_rank, "getTLObj\n");
 
 	MP_CHECK_COMM_OBJ();
 	MP_CHECK(tl_comm->setupOOB(oob_comm));
+	mp_dbg_msg(oob_rank, "setupOOB\n");
+
 	//LibGDSync in case of Verbs 
 	MP_CHECK(tl_comm->setup_sublayer(par1));
+	mp_dbg_msg(oob_rank, "setup_sublayer\n");
+
 	MP_CHECK(tl_comm->setupNetworkDevices());
+	mp_dbg_msg(oob_rank, "setupNetworkDevices\n");
 	MP_CHECK(tl_comm->createEndpoints());
+	mp_dbg_msg(oob_rank, "createEndpoints\n");
 	MP_CHECK(tl_comm->exchangeEndpoints());
+	mp_dbg_msg(oob_rank, "exchangeEndpoints\n");
 	MP_CHECK(tl_comm->updateEndpoints());
+	mp_dbg_msg(oob_rank, "updateEndpoints\n");
 	tl_comm->cleanupInit();
 
 #ifndef HAVE_CUDA

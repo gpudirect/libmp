@@ -101,4 +101,5 @@ int mp_iget_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ
 int mp_wait_word_async(uint32_t *ptr, uint32_t value, int flags, cudaStream_t stream);
 int mp_wait_async(mp_request_t * mp_req, cudaStream_t stream);
 int mp_wait_all_async(int number, mp_request_t * mp_reqs, cudaStream_t stream);
+int mp_progress_requests(int number, mp_request_t * mp_reqs);
 #endif

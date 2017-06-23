@@ -21,7 +21,7 @@ OMPI_params="$OMPI_params --mca btl_openib_cuda_rdma_limit 16777216"
 OMPI_params="$OMPI_params --map-by node"
 OMPI_params="$OMPI_params -x LD_LIBRARY_PATH -x PATH -x CUDA_PASCAL_FORCE_40_BIT=1 -x NCHUNK_X_BETHE=16 -x NGPU_X_BETHE=1 -x NCCL_SHM_DISABLE=1 -x NCCL_DEBUG=INFO"
 OMPI_params="$OMPI_params -x MP_ENABLE_WARN=1 -x MP_ENABLE_DEBUG=0 "
-OMPI_params="$OMPI_params -x MP_GPU_BUFFERS $GPUBUF "
+OMPI_params="$OMPI_params -x MP_GPU_BUFFERS=$GPUBUF "
 OMPI_params=""
 
 MVAPICH_params="$MVAPICH_params -genv MV2_USE_CUDA 1 -genv MV2_USE_GPUDIRECT 1 -genv MV2_CUDA_IPC 0 "
