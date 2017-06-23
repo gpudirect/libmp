@@ -71,12 +71,13 @@ int main(int argc, char *argv[])
 	for (i = 0; i < ITER_COUNT; i++)
 	{
 		if (!myId) { 
+ 			printf("Iter %d\n", i);
 			//Validate
 			if(use_gpu_buffers == 1)
 				CUDA_CHECK(cudaMemset(commBuf, (i+1)%CHAR_MAX, totSize));
 			else
 				memset(commBuf, (i+1)%CHAR_MAX, totSize);
- 
+ 			
 			for(j=0; j < WINDOW_SIZE; j++)	
 				MP_CHECK(mp_iput((void *)((uintptr_t)commBuf + j*SIZE), SIZE, mp_keys_put, !myId, j*SIZE, &mp_win, &mp_reqs_put[j], 0)); 
 

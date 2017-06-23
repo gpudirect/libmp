@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
 			}
 
 			tl_comm->register_key_buffer(rBuf[i], BUF_SIZE, &mp_keys_recv[i]);
-			tl_comm->pt2pt_nb_receive(rBuf[i], BUF_SIZE, i, &mp_reqs_recv[i], &mp_keys_recv[i]);
+			tl_comm->pt2pt_nb_recv(rBuf[i], BUF_SIZE, i, &mp_reqs_recv[i], &mp_keys_recv[i]);
 			if(!myId) printf("[%d] Recv Client %d, request=%p\n", myId, i, &mp_reqs_recv[i]);
 
 			tl_comm->register_key_buffer(sBuf[i], BUF_SIZE, &mp_keys_send[i]);

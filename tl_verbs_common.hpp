@@ -62,4 +62,11 @@ typedef struct mem_region {
 } mem_region_t;
 
 typedef uint64_t us_t;
+
+typedef struct {
+  void *base_addr;
+  uint32_t rkey;
+  int size;
+} exchange_win_info;
+
 #endif

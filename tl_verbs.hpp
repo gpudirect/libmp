@@ -170,12 +170,6 @@ namespace TL
 			verbs_request_t verbs_get_request();
 			verbs_request_t verbs_new_request(verbs_client_t client, mp_req_type_t type, mp_state_t state);
 			void verbs_release_request(verbs_request_t req);
-//			inline const char *verbs_flow_to_str(mp_flow_t flow);
-//			inline int verbs_req_type_rx(mp_req_type_t type);
-//			inline int verbs_req_type_tx(mp_req_type_t type);
-//			inline int verbs_req_valid(verbs_request_t req);
-//			inline mp_flow_t verbs_type_to_flow(mp_req_type_t type);
-//			inline int verbs_req_can_be_waited(verbs_request_t req);
 			int verbs_get_request_id(verbs_client_t client, mp_req_type_t type);
 			int verbs_post_recv(verbs_client_t client, verbs_request_t req);
 			int verbs_query_print_qp(struct ibv_qp *qp, verbs_request_t req);
@@ -185,7 +179,9 @@ namespace TL
 			int verbs_progress_request(verbs_request_t req);
 			int cleanup_request(verbs_request_t req);
 			void verbs_env_vars();
-			int verbs_update_endpoints(verbs_client_t clients_local);
+			int verbs_update_qp_rts(verbs_client_t client, int index, struct ibv_qp * qp);
+			int verbs_update_qp_rtr(verbs_client_t client, int index, struct ibv_qp * qp);
+			exchange_win_info * verbs_window_create(void *addr, size_t size, verbs_window_t *window_t);
 
 		public:
 			~Verbs() {}
@@ -237,8 +233,10 @@ namespace TL
 
 			//====================== PT2PT ======================
 			//point-to-point communications
-			int pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
+			int pt2pt_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
+			int pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
 			int pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
+			int pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
 
 			//====================== ONE-SIDED ======================
 			//one-sided operations: window creation, put and get

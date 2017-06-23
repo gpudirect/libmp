@@ -197,6 +197,7 @@ namespace TL
 			    return ret;
 			}
 
+			//=================================================== OVERRIDE ==============================================================
 			int verbs_progress_single_flow(mp_flow_t flow)
 			{
 			    int i, ne = 0, ret = 0;
@@ -280,12 +281,10 @@ namespace TL
 			    return ret;
 			}
 
-			//override
 			int verbs_post_recv(verbs_client_async_t client, verbs_request_async_t req)
 			{
 			    int progress_retry=0, ret=0, ret_progress=0;
 
-			    mp_dbg_msg(oob_rank, "\n");
 			    if(!client || !req)
 			        return MP_FAILURE;
 			    do
@@ -311,19 +310,30 @@ namespace TL
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
 
 		        qp_query=0;
+
+		        if (!use_event_sync) {
+				    mp_dbg_msg(oob_rank, "before gds_prepare_wait_cq\n");
+					ret = gds_prepare_wait_cq(client->recv_gcq, &req->gds_wait_info, 0);
+					if (ret) mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
+				}
 			    return ret;
 			}
 
-			int verbs_post_send(verbs_client_async_t client, verbs_request_async_t req)
+			int verbs_post_send(verbs_client_async_t client, verbs_request_async_t req, cudaStream_t stream, int async, int event_sync, int no_wait)
 			{
 			    int progress_retry=0, ret=0, ret_progress=0;
-
-			    mp_dbg_msg(oob_rank, "\n");
+			    us_t start = mp_get_cycles();
+			    us_t tmout = MP_PROGRESS_ERROR_CHECK_TMOUT_US;
+			
 			    if(!client || !req)
 			        return MP_FAILURE;
 			    do
 			    {
-					ret = gds_post_send (client->gqp, &req->in.sr, &req->out.bad_sr);
+			    	if(async)
+						ret = gds_stream_queue_send(stream, client->gqp, &req->in.sr, &req->out.bad_sr);
+					else
+						ret = gds_post_send (client->gqp, &req->in.sr, &req->out.bad_sr);
+
 			        if(ret == ENOMEM)
 			        {
 			        	if(qp_query == 0)
@@ -339,73 +349,42 @@ namespace TL
 			                break;
 			            }
 			            mp_warn_msg(oob_rank, "TX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+			          	if(async)
+			          	{
+							us_t now = mp_get_cycles();
+							long long dt = (long long)now-(long long)start;
+							if (dt > (long long)tmout) {
+								start = now;
+								mp_warn_msg(oob_rank, "TX_FLOW has been blocked for %lld secs, checking for GPU errors\n", dt/1000000);
+								int retcode = verbs_check_gpu_error();
+								if (retcode) {
+									mp_err_msg(oob_rank, "GPU error %d while progressing TX_FLOW\n", retcode);
+									ret = retcode;
+									//mp_enable_dbg(1);
+									goto out;
+								}
+							}	
+			          	}
+
 			            progress_retry++;
 			        }
 			    } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
 
 		        qp_query=0;
+
+		        if ((event_sync == 0 || event_sync == 2) && (no_wait == 0) ) {
+					ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
+					if (ret) {
+						mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
+						goto out;
+					}
+				} else {
+					if(no_wait == 1 && async == 1) req->status = MP_COMPLETE;
+				}
+				out:
 			    return ret;
 			}
 
-			//Progress TX_FLOW fix:
-			//progress (remove) some requests on the TX flow if is not possible to queue a send request
-			int verbs_post_send_async(cudaStream_t stream, verbs_client_async_t client, verbs_request_async_t req)
-			{
-			    int progress_retry=0;
-			    int ret = MP_SUCCESS;
-			    int ret_progress = MP_SUCCESS;
-
-			    if(!client || !req)
-			        return MP_FAILURE;
-
-			    us_t start = mp_get_cycles();
-			    us_t tmout = MP_PROGRESS_ERROR_CHECK_TMOUT_US;
-
-			    do
-			    {
-			        ret = gds_stream_queue_send(stream, client->gqp, &req->in.sr, &req->out.bad_sr);
-			        if(ret == ENOMEM)
-			        {
-			            if(qp_query == 0)
-			            {
-			                verbs_query_print_qp(client->gqp->qp, req);
-			                qp_query=1;
-			            }
-
-			            ret_progress = verbs_progress_single_flow(TX_FLOW);
-			            if(ret_progress != MP_SUCCESS)
-			            {
-			                mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
-			                ret = ret_progress;
-			                break;
-			            }
-			            ret_progress = verbs_progress_single_flow(RX_FLOW);
-			            if(ret_progress != MP_SUCCESS)
-			            {
-			                mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
-			                ret = ret_progress;
-			                break;
-			            }
-			            us_t now = mp_get_cycles();
-			            long long dt = (long long)now-(long long)start;
-			            if (dt > (long long)tmout) {
-			                start = now;
-			                mp_warn_msg(oob_rank, "TX_FLOW has been blocked for %lld secs, checking for GPU errors\n", dt/1000000);
-			                int retcode = verbs_check_gpu_error();
-			                if (retcode) {
-			                    mp_err_msg(oob_rank, "GPU error %d while progressing TX_FLOW\n", retcode);
-			                    ret = retcode;
-			                    //mp_enable_dbg(1);
-			                    goto out;
-			                }        
-			                ++progress_retry;
-			            }
-			        }
-			    } while(ret == ENOMEM);
-			out:
-			    qp_query=0;
-			    return ret;
-			}
 
 			void  verbs_allocate_requests() {
 				int i;
@@ -413,7 +392,6 @@ namespace TL
 				verbs_request_async_t mp_requests;
 
 				assert (mp_request_free_list == NULL);
-				mp_dbg_msg(oob_rank, "\n");
 				mem_region = (mem_region_t *) calloc (1, sizeof (mem_region_t));
 				if (mem_region == NULL) {
 					mp_err_msg(oob_rank, "memory allocation for mem_region failed \n");
@@ -443,7 +421,6 @@ namespace TL
 			verbs_request_async_t  verbs_get_request()
 			{
 				verbs_request_async_t req = NULL;
-				mp_dbg_msg(oob_rank, "\n");
 				if (mp_request_free_list == NULL) {
 					verbs_allocate_requests();
 					assert(mp_request_free_list != NULL);
@@ -460,21 +437,21 @@ namespace TL
 
 			verbs_request_async_t verbs_new_request(verbs_client_async_t client, mp_req_type_t type, mp_state_t state) //, struct CUstream_st *stream)
 			{
-			  verbs_request_async_t req = verbs_get_request();
-			  if (req) {
-				  	mp_dbg_msg(oob_rank, "\n");
-			      req->peer = client->oob_rank;
-			      req->sgv = NULL;
-			      req->next = NULL;
-			      req->prev = NULL;
-			      req->trigger = 0;
-			      req->type = type;
-			      req->status = state;
-			      req->id = verbs_get_request_id(client, type);
-			  }
+				verbs_request_async_t req = verbs_get_request();
+				if (req) {
+					req->peer = client->oob_rank;
+					req->sgv = NULL;
+					req->next = NULL;
+					req->prev = NULL;
+					req->trigger = 0;
+					req->type = type;
+					req->status = state;
+					req->id = verbs_get_request_id(client, type);
+				}
 
-			  return req;
+				return req;
 			}
+			//=========================================================================================================================
 
 			void verbs_env_vars() {
 				char *value = NULL;
@@ -674,98 +651,15 @@ namespace TL
 			}
 			
 			int updateEndpoints() {
-				#if 0
-				for (int i=0; i<peer_count; i++)
-					verbs_update_endpoints(&clients_async[i], i);	
-				#endif
-				int i, ret,flags;
-				struct ibv_qp_attr ib_qp_attr;
 
-				for (i=0; i<peer_count; i++)
-				{
-					peer = peers_list[i];
-					memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
-					if (verbs_enable_ud) { 
-					  ib_qp_attr.qp_state       = IBV_QPS_RTR;
-					  flags = IBV_QP_STATE;
-					} else { 
-					  ib_qp_attr.qp_state     			= IBV_QPS_RTR;
-					  ib_qp_attr.path_mtu     			= ib_port_attr.active_mtu;
-					  ib_qp_attr.dest_qp_num  			= qpinfo_all[peer].qpn;
-					  ib_qp_attr.rq_psn       			= qpinfo_all[peer].psn;
-					  ib_qp_attr.ah_attr.dlid 			= qpinfo_all[peer].lid;
-					  ib_qp_attr.max_dest_rd_atomic     = 1;
-					  ib_qp_attr.min_rnr_timer          = 12;
-					  ib_qp_attr.ah_attr.is_global      = 0;
-					  ib_qp_attr.ah_attr.sl             = 0;
-					  ib_qp_attr.ah_attr.src_path_bits  = 0;
-					  ib_qp_attr.ah_attr.port_num       = ib_port;
-					  flags = IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU
-					      | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN
-					      | IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC;
-					}
-					
-					assert(clients_async[i].gqp);
-					mp_dbg_msg(oob_rank, "clients_async[%d].qp=%p\n", i, clients_async[i].gqp);					
-					//std::cout << typeid(clients_async).name() << " clients_async type\n";
-					//std::cout << typeid(clients_async[i].gqp).name() << " clients_async[i].gqp type\n";
-					ret = ibv_modify_qp(clients_async[i].gqp->qp, &ib_qp_attr, flags);
-					if (ret != 0) {
-					  printf("Failed to modify RC QP to RTR\n");
-					  return MP_FAILURE;
-					}
+				for (int i=0; i<peer_count; i++) {
+					verbs_update_qp_rtr(&clients_async[i], i, clients_async[i].gqp->qp);
 				}
 
-				//Barrier with oob object
 				oob_comm->barrier();
 
-				for (i=0; i<peer_count; i++) {
-					int flags = 0;
-					peer = peers_list[i];
-
-					memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
-					if (verbs_enable_ud) { 
-					  ib_qp_attr.qp_state       = IBV_QPS_RTS;
-					  ib_qp_attr.sq_psn         = 0;
-					  flags = IBV_QP_STATE | IBV_QP_SQ_PSN; 
-					} else { 
-					  ib_qp_attr.qp_state       = IBV_QPS_RTS;
-					  ib_qp_attr.sq_psn         = 0;
-					  ib_qp_attr.timeout        = 20;
-					  ib_qp_attr.retry_cnt      = 7;
-					  ib_qp_attr.rnr_retry      = 7;
-					  ib_qp_attr.max_rd_atomic  = 1;
-					  flags = IBV_QP_STATE | IBV_QP_SQ_PSN | IBV_QP_TIMEOUT
-					    | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY
-					    | IBV_QP_MAX_QP_RD_ATOMIC;
-					}
-
-					ret = ibv_modify_qp(clients_async[i].gqp->qp, &ib_qp_attr, flags);
-					if (ret != 0)
-					{
-						mp_err_msg(oob_rank, "Failed to modify RC QP to RTS\n");
-						return MP_FAILURE;
-					}
-
-					if (verbs_enable_ud) {
-					  mp_err_msg(oob_rank, "setting up connection with peer: %d lid: %d qpn: %d \n", peer, qpinfo_all[peer].lid, qpinfo_all[peer].qpn);
-
-					  struct ibv_ah_attr ib_ah_attr;
-					  memset(&ib_ah_attr, 0, sizeof(ib_ah_attr));
-					  ib_ah_attr.is_global     = 0;
-					  ib_ah_attr.dlid          = qpinfo_all[peer].lid;
-					  ib_ah_attr.sl            = 0;
-					  ib_ah_attr.src_path_bits = 0;
-					  ib_ah_attr.port_num      = ib_port;
-
-					  clients_async[i].ah = ibv_create_ah(ib_ctx->pd, &ib_ah_attr);
-					  if (!clients_async[i].ah) {
-					      mp_err_msg(oob_rank, "Failed to create AH\n");
-					      return MP_FAILURE;
-					  }
-
-					  clients_async[i].qpn = qpinfo_all[peer].qpn; 
-					}
+				for (int i=0; i<peer_count; i++) {
+					verbs_update_qp_rts(&clients_async[i], i, clients_async[i].gqp->qp);
 				}
 
 				if (verbs_enable_ud) {
@@ -775,134 +669,133 @@ namespace TL
 
 				oob_comm->barrier();
 
-			#ifdef HAVE_IPC
-				//ipc connection setup
-				node_info_all = malloc(sizeof(struct node_info)*oob_size);
-				if (!node_info_all) {
-				  mp_err_msg(oob_rank, "Failed to allocate node info array \n");
-				return MP_FAILURE;
-				}
+				#ifdef HAVE_IPC
+					//ipc connection setup
+					node_info_all = malloc(sizeof(struct node_info)*oob_size);
+					if (!node_info_all) {
+					  mp_err_msg(oob_rank, "Failed to allocate node info array \n");
+					return MP_FAILURE;
+					}
 
-				if(!gethostname(node_info_all[oob_rank].hname, 20)) {
-				  mp_err_msg(oob_rank, "gethostname returned error \n");
-				return MP_FAILURE;
-				}
+					if(!gethostname(node_info_all[oob_rank].hname, 20)) {
+					  mp_err_msg(oob_rank, "gethostname returned error \n");
+					return MP_FAILURE;
+					}
 
-				CUDA_CHECK(cudaGetDevice(&node_info_all[oob_rank].gpu_id));
+					CUDA_CHECK(cudaGetDevice(&node_info_all[oob_rank].gpu_id));
 
-				oob_comm->allgather(NULL, 0, MP_CHAR, node_info_all, sizeof(struct node_info), MP_CHAR);
+					oob_comm->allgather(NULL, 0, MP_CHAR, node_info_all, sizeof(struct node_info), MP_CHAR);
 
-				int cidx, can_access_peer; 
-				for (i=0; i<oob_size; i++) {
-				can_access_peer = 0;
-				cidx = client_index[i];
+					int cidx, can_access_peer; 
+					for (i=0; i<oob_size; i++) {
+						can_access_peer = 0;
+						cidx = client_index[i];
 
-				if (i == oob_size) { 
-					/*pick first rank on the node as the leader*/
-					if (!smp_num_procs) smp_leader = i;
-					smp_local_rank = smp_num_procs;	      
-					smp_num_procs++;
-					ipc_num_procs++;
-					continue;
-				}
+						if (i == oob_size) { 
+							/*pick first rank on the node as the leader*/
+							if (!smp_num_procs) smp_leader = i;
+							smp_local_rank = smp_num_procs;	      
+							smp_num_procs++;
+							ipc_num_procs++;
+							continue;
+						}
 
-				if (!strcmp(node_info_all[i].hname, node_info_all[oob_rank].hname)) {
-					/*pick first rank on the node as the leader*/
-					if (!smp_num_procs) smp_leader = i; 
-					clients_async[cidx].is_local = 1;
-					clients_async[cidx].local_rank = smp_num_procs;
-					smp_num_procs++; 
-					CUDA_CHECK(cudaDeviceCanAccessPeer(&can_access_peer, node_info_all[oob_rank].gpu_id, node_info_all[i].gpu_id));
-				}
+						if (!strcmp(node_info_all[i].hname, node_info_all[oob_rank].hname)) {
+							/*pick first rank on the node as the leader*/
+							if (!smp_num_procs) smp_leader = i; 
+							clients_async[cidx].is_local = 1;
+							clients_async[cidx].local_rank = smp_num_procs;
+							smp_num_procs++; 
+							CUDA_CHECK(cudaDeviceCanAccessPeer(&can_access_peer, node_info_all[oob_rank].gpu_id, node_info_all[i].gpu_id));
+						}
 
-				if (can_access_peer) { 
-				  ipc_num_procs++;
-				      clients_async[cidx].can_use_ipc = 1;
-				} 
-				}
+						if (can_access_peer) { 
+							ipc_num_procs++;
+							clients_async[cidx].can_use_ipc = 1;
+						} 
+					}
 
-				if (smp_num_procs > 1) {
-				shm_client_bufsize = sizeof(smp_buffer_t)*smp_depth;
-				shm_proc_bufsize = shm_client_bufsize*smp_num_procs;
-				shm_filesize = sizeof(smp_buffer_t)*smp_depth*smp_num_procs*smp_num_procs;
+					if (smp_num_procs > 1) {
+						shm_client_bufsize = sizeof(smp_buffer_t)*smp_depth;
+						shm_proc_bufsize = shm_client_bufsize*smp_num_procs;
+						shm_filesize = sizeof(smp_buffer_t)*smp_depth*smp_num_procs*smp_num_procs;
 
-				//setup shared memory buffers 
-				sprintf(shm_filename, "/dev/shm/libmp_shmem-%s-%d.tmp", node_info_all[oob_rank].hname, getuid());
-				mp_dbg_msg(oob_rank, "shemfile %s\n", shm_filename);
+						//setup shared memory buffers 
+						sprintf(shm_filename, "/dev/shm/libmp_shmem-%s-%d.tmp", node_info_all[oob_rank].hname, getuid());
+						mp_dbg_msg(oob_rank, "shemfile %s\n", shm_filename);
 
-				shm_fd = open(shm_filename, O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
-				  if (shm_fd < 0) {
-				      mp_err_msg(oob_rank, "opening shm file failed \n");
-				      return MP_FAILURE;
-				}
+						shm_fd = open(shm_filename, O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+						if (shm_fd < 0) {
+						  mp_err_msg(oob_rank, "opening shm file failed \n");
+						  return MP_FAILURE;
+						}
 
-				if (smp_leader == oob_rank) {
-				  if (ftruncate(shm_fd, 0)) {
-				      mp_err_msg(oob_rank, "clearning up shm file failed \n");
-				          /* to clean up tmp shared file */
-				      return MP_FAILURE;
-				      }
+						if (smp_leader == oob_rank) {
+							if (ftruncate(shm_fd, 0)) {
+								mp_err_msg(oob_rank, "clearning up shm file failed \n");
+								/* to clean up tmp shared file */
+								return MP_FAILURE;
+							}
 
-				      if (ftruncate(shm_fd, shm_filesize)) {
-				          mp_err_msg(oob_rank, "setting up shm file failed \n");
-				          /* to clean up tmp shared file */
-				          return MP_FAILURE;
-					      }
-				}
-				}
+							if (ftruncate(shm_fd, shm_filesize)) {
+								mp_err_msg(oob_rank, "setting up shm file failed \n");
+								/* to clean up tmp shared file */
+								return MP_FAILURE;
+							}
+						}
+					}
 
-				oob_comm->barrier();
+					oob_comm->barrier();
 
-				if (smp_num_procs > 1) {
-					struct stat file_status;
+					if (smp_num_procs > 1) {
+						struct stat file_status;
 
-					/* synchronization between local processes */
-					do {
-						if (fstat(shm_fd, &file_status) != 0) {
-							mp_err_msg(oob_rank, "fstat on shm file failed \n");
+						/* synchronization between local processes */
+						do {
+							if (fstat(shm_fd, &file_status) != 0) {
+								mp_err_msg(oob_rank, "fstat on shm file failed \n");
+								/* to clean up tmp shared file */
+								return MP_FAILURE;
+							}
+							usleep(1);
+						} while (file_status.st_size != shm_filesize);
+
+						/* mmap of the shared memory file */
+						shm_mapptr = mmap(0, shm_filesize, (PROT_READ | PROT_WRITE), (MAP_SHARED), shm_fd, 0);
+						if (shm_mapptr == (void *) -1) {
+							mp_err_msg(oob_rank, "mmap on shm file failed \n");
 							/* to clean up tmp shared file */
 							return MP_FAILURE;
 						}
-						usleep(1);
-					} while (file_status.st_size != shm_filesize);
-
-					/* mmap of the shared memory file */
-					shm_mapptr = mmap(0, shm_filesize, (PROT_READ | PROT_WRITE), (MAP_SHARED), shm_fd, 0);
-					if (shm_mapptr == (void *) -1) {
-						mp_err_msg(oob_rank, "mmap on shm file failed \n");
-						/* to clean up tmp shared file */
-						return MP_FAILURE;
 					}
-				}
 
-				for (i=0; i<oob_size; i++) {
-					int j, cidx;
+					for (i=0; i<oob_size; i++) {
+						int j, cidx;
 
-					cidx = client_index[i]; 
+						cidx = client_index[i]; 
 
-					if (clients_async[cidx].is_local) {
-						assert(smp_local_rank >= 0);
+						if (clients_async[cidx].is_local) {
+							assert(smp_local_rank >= 0);
 
-						clients_async[cidx].smp.local_buffer = (void *)((char *)shm_mapptr 
-						+ shm_proc_bufsize*smp_local_rank 
-						+ shm_client_bufsize*clients_async[cidx].local_rank);
+							clients_async[cidx].smp.local_buffer = (void *)((char *)shm_mapptr 
+							+ shm_proc_bufsize*smp_local_rank 
+							+ shm_client_bufsize*clients_async[cidx].local_rank);
 
-						memset(clients_async[cidx].smp.local_buffer, 0, shm_client_bufsize);
+							memset(clients_async[cidx].smp.local_buffer, 0, shm_client_bufsize);
 
-						for (j=0; j<smp_depth; j++) { 
-							clients_async[cidx].smp.local_buffer[j].free = 1;
+							for (j=0; j<smp_depth; j++) { 
+								clients_async[cidx].smp.local_buffer[j].free = 1;
+							}
+
+							clients_async[cidx].smp.remote_buffer = (void *)((char *)shm_mapptr 
+																+ shm_proc_bufsize*clients[cidx].local_rank 
+																+ shm_client_bufsize*smp_local_rank);
 						}
-
-						clients_async[cidx].smp.remote_buffer = (void *)((char *)shm_mapptr 
-															+ shm_proc_bufsize*clients[cidx].local_rank 
-															+ shm_client_bufsize*smp_local_rank);
 					}
-				}
-			#endif
+				#endif
 
 				return MP_SUCCESS;
 			}
-
 
 			int finalize() {
 				int i, retcode=MP_SUCCESS;
@@ -933,7 +826,7 @@ namespace TL
 				return retcode;			
 			}
 
-			int pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+			int pt2pt_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
 				int ret = 0;
 				verbs_request_async_t req = NULL;
 				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
@@ -972,21 +865,12 @@ namespace TL
 				  req->sg_entry.addr = (uintptr_t)(buf);
 				}
 
-			    mp_dbg_msg(oob_rank, "before verbs_post_recv\n");
 				//progress (remove) some request on the RX flow if is not possible to queue a recv request
 				ret = verbs_post_recv(client, req);
 				if (ret) {
 					mp_err_msg(oob_rank, "Posting recv failed: %s \n", strerror(errno));
+					if (req) verbs_release_request((verbs_request_async_t) req);
 					goto out;
-				}
-
-				if (!use_event_sync) {
-				    mp_dbg_msg(oob_rank, "before gds_prepare_wait_cq\n");
-					ret = gds_prepare_wait_cq(client->recv_gcq, &req->gds_wait_info, 0);
-						if (ret) {
-						mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
-						goto out;
-					}
 				}
 				#endif
 
@@ -995,6 +879,50 @@ namespace TL
 			out:
 				return ret;
 			}
+
+			int pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+				int ret = 0;
+				verbs_request_async_t req = NULL;
+				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_client_async_t client = &clients_async[client_index[peer]];
+
+				if (nvecs > ib_max_sge) {
+					mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
+					ret = MP_FAILURE;
+					goto out;
+				}
+
+				assert(reg);
+				req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
+				assert(req);
+
+				mp_dbg_msg(oob_rank, "peer=%d req=%p v=%p nvecs=%d req id=%d reg=%p key=%x\n", peer, req, v, nvecs, req->id, reg, reg->key);
+
+				for (int i=0; i < nvecs; ++i) {
+					req->sgv[i].length = v[i].iov_len;
+					req->sgv[i].lkey = reg->key;
+					req->sgv[i].addr = (uint64_t)(v[i].iov_base);
+				}
+
+				req->in.rr.next = NULL;
+				req->in.rr.wr_id = (uintptr_t) req;
+				req->in.rr.num_sge = nvecs;
+				req->in.rr.sg_list = req->sgv;
+
+				//progress (remove) some request on the RX flow if is not possible to queue a recv request
+				ret = verbs_post_recv(client, req);
+				if (ret) {
+					mp_err_msg(oob_rank, "Posting recv failed: %s \n", strerror(errno));
+					if (req) verbs_release_request((verbs_request_async_t) req);
+					goto out;
+				}
+
+				*mp_req = (mp_request_t) req; 
+
+				out:
+				return ret;
+			}
+
 
 			int pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
 				int ret = 0;
@@ -1064,24 +992,73 @@ namespace TL
 				req->sg_entry.addr = (uintptr_t)(buf);
 
 				// progress (remove) some request on the TX flow if is not possible to queue a send request
-				ret = verbs_post_send(client, req);
+				ret = verbs_post_send(client, req, NULL, 0, use_event_sync, 0);
 				if (ret) {
 					mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
+					// free req
+					if (req) verbs_release_request((verbs_request_async_t) req);
 					goto out;
 				}
 
-				if (!use_event_sync) {
-					ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
-					if (ret) {
-					    mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
-					    goto out;
-					}
-				}
 				#endif
 				*mp_req = (mp_request_t) req;
 
 			out:
+					
 			    return ret;
+			}
+
+			int pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key)
+			{
+				int ret = 0;
+				verbs_request_async_t req = NULL;
+				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_client_async_t client = &clients_async[client_index[peer]];
+
+				if (nvecs > ib_max_sge) {
+					mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
+					ret = MP_FAILURE;
+					goto out;
+				}
+
+				assert(reg);
+				req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
+				assert(req);
+
+				req->sgv = (struct ibv_sge *) calloc(nvecs, sizeof(struct ibv_sge));
+				assert(req->sgv);
+
+				mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
+
+				for (int i=0; i < nvecs; ++i) {
+					req->sgv[i].length = v[i].iov_len;
+					req->sgv[i].lkey = reg->key;
+					req->sgv[i].addr = (uint64_t)(v[i].iov_base);
+				}
+
+				if (verbs_enable_ud) {
+				  req->in.sr.wr.ud.ah = client->ah;
+				  req->in.sr.wr.ud.remote_qpn = client->qpn;
+				  req->in.sr.wr.ud.remote_qkey = 0;
+				}
+
+				req->in.sr.next = NULL;
+				req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = nvecs;
+				req->in.sr.sg_list = req->sgv;
+
+				ret = verbs_post_send(client, req, NULL, 0, use_event_sync, 0);
+				if (ret) {
+					mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
+					// free req
+					if (req) verbs_release_request((verbs_request_async_t) req);
+					goto out;
+				}
+
+				out:
+				return ret;
 			}
 
 			int wait_all(int count, mp_request_t *req_)
@@ -1170,6 +1147,30 @@ namespace TL
 			    return ret;
 			}
 
+			int onesided_window_create(void *addr, size_t size, mp_window_t *window_t)
+			{
+				int i, peer;
+				verbs_window_t window;
+				exchange_win_info * exchange_win = verbs_window_create(addr, size, &window);
+				assert(exchange_win);
+
+				/*populate window address info*/
+				for (i=0; i<peer_count; i++) { 
+					peer = clients_async[i].oob_rank;
+
+					window->base_ptr[i] = exchange_win[peer].base_addr;
+					window->rkey[i] = exchange_win[peer].rkey;
+					window->rsize[i] = exchange_win[peer].size;
+				}
+
+				*window_t = (mp_window_t) window;
+				free(exchange_win);
+				oob_comm->barrier();
+
+				return MP_SUCCESS;
+			}
+
+
 			int onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
 			{
 				int ret = 0;
@@ -1209,19 +1210,13 @@ namespace TL
 				req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
 				req->in.sr.wr.rdma.rkey = window->rkey[client_id];
 
-				ret = verbs_post_send(client, req);
+				ret = verbs_post_send(client, req, NULL, 0, 2, flags & MP_PUT_NOWAIT);
 				if (ret) {
 					mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
+					if (req) verbs_release_request((verbs_request_async_t) req);
 					goto out;
 				}
 
-				if (!(flags & MP_PUT_NOWAIT)) {
-					ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
-					if (ret) {
-						mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
-						goto out;
-					}
-				}
 				*req_t = req;
 
 			out:
@@ -1261,15 +1256,10 @@ namespace TL
 				req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
 				req->in.sr.wr.rdma.rkey = window->rkey[client_id];
 
-				ret = verbs_post_send(client, req);
+				ret = verbs_post_send(client, req, NULL, 0, 2, 0);
 				if (ret) {
 					mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
-					goto out;
-				}
-
-				ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
-				if (ret) {
-					mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(errno));
+					if (req) verbs_release_request((verbs_request_async_t) req);
 					goto out;
 				}
 
@@ -1302,9 +1292,9 @@ namespace TL
 
 				return MP_SUCCESS;
 			}
-			//==========================================================================================================================
+			//=========================================================================================================================
 
-			//ASYNC
+			//==================================================== ASYNC ===============================================================
 			int pt2pt_nb_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, asyncStream stream)
 			{
 			    int ret = 0;
@@ -1366,19 +1356,12 @@ namespace TL
 			        req->sg_entry.lkey = reg->key;
 			        req->sg_entry.addr = (uintptr_t)(buf);
 
-			        ret = verbs_post_send_async(stream, client, req);
+			        ret = verbs_post_send(client, req, stream, 1, 2, 0);
 			        if (ret) {
-			            mp_err_msg(oob_rank, "verbs_post_send_on_stream failed: %s \n", strerror(ret));
-			            // BUG: leaking req ??
+			            mp_err_msg(oob_rank, "verbs_post_send failed: %s \n", strerror(ret));
+			            if (req) verbs_release_request((verbs_request_async_t) req);
 			            goto out;
-			        }
-
-			        ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
-			        if (ret) {
-			            mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
-			            // BUG: leaking req ??
-			            goto out;
-			        }
+					}
 			    }
 
 				*mp_req = (mp_request_t) req; 
@@ -1424,7 +1407,7 @@ namespace TL
 			                GDS_MEMORY_HOST);
 			        if (ret) {
 			            mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
-			            // BUG: leaking req ??
+						if (req) verbs_release_request((verbs_request_async_t) req);
 			            goto out;
 			        }
 			        
@@ -1475,7 +1458,7 @@ namespace TL
 			        ret = gds_stream_wait_cq(stream, client->send_gcq, 0);
 			        if (ret) {
 			            mp_err_msg(oob_rank, "gds_stream_wait_cq failed: %s \n", strerror(ret));
-			            // BUG: leaking req ??
+			            if (req) verbs_release_request((verbs_request_async_t) req);
 			            goto out;
 			        }
 			    }
@@ -1541,7 +1524,7 @@ namespace TL
 			        //ret = mp_prepare_send(client, req);
 			        if (ret) {
 			            mp_err_msg(oob_rank, "mp_prepare_send failed: %s \n", strerror(ret));
-			            // BUG: leaking req ??
+			            if (req) verbs_release_request((verbs_request_async_t) req);
 			            goto out;
 			        }
 
@@ -1936,30 +1919,19 @@ namespace TL
 				req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
 				req->in.sr.wr.rdma.rkey = window->rkey[client_id];
 
-				ret = verbs_post_send_async(stream, client, req);
+				ret = verbs_post_send(client, req, stream, 1, 2, flags & MP_PUT_NOWAIT);
 				if (ret) {
 				  mp_err_msg(oob_rank, "gds_stream_queue_send failed: err=%d(%s) \n", ret, strerror(ret));
-				  // BUG: leaking req ??
+				  if (req) verbs_release_request((verbs_request_async_t) req);
 				  goto out;
 				}
 
-				if (flags & MP_PUT_NOWAIT) {
-				  req->status = MP_COMPLETE;
-				} else {
-				  ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
-				  if (ret) {
-				      mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
-				      // BUG: leaking req ??
-				      goto out;
-				  }
-				}
 				*mp_req = req;
 
 			out:
 				// free req
-				if (ret) { 
-					if (req) verbs_release_request((verbs_request_async_t) req);
-				}
+				if (ret && req)
+					verbs_release_request((verbs_request_async_t) req);
 
 				return ret;
 			}
@@ -2009,6 +1981,7 @@ namespace TL
 				ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
 				if (ret) {
 					mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
+					if (req) verbs_release_request((verbs_request_async_t) req);
 					goto out;
 				}
 
@@ -2078,24 +2051,22 @@ namespace TL
 				} else {
 				  ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
 				  if (ret) {
-				      mp_err_msg(oob_rank, "error %d gds_prepare_wait_cq failed: %s \n", ret, strerror(ret));
-				      goto out;
+						mp_err_msg(oob_rank, "error %d gds_prepare_wait_cq failed: %s \n", ret, strerror(ret));
+						if (req) verbs_release_request((verbs_request_async_t) req);
+						goto out;
 				  }
 				}
 
 				*mp_req = (mp_request_t) req;
 
-				out:
-				if (ret) { 
-					// free req
-					if (req) verbs_release_request((verbs_request_async_t) req);
-				}
-				  
+				out:				  
 				return ret;
 			}
 
 			int onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream)
 			{
+				return onesided_nb_put_post_all_async (1, mp_req, stream);
+				#if 0
 				int ret = 0; 
 				verbs_request_async_t req = (verbs_request_async_t) *mp_req;
 
@@ -2115,8 +2086,9 @@ namespace TL
 					req->status = MP_PENDING_NOWAIT;
 				}
 
-			out:
+				out:
 			    return ret;
+			    #endif
 			}
 
 			int onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream)
@@ -2161,7 +2133,7 @@ namespace TL
 			out:
 			    return ret;
 			}
-
+			//=========================================================================================================================
 	};
 }
 

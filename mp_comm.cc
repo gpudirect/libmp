@@ -14,13 +14,29 @@ int mp_irecv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t 
 		return MP_FAILURE;
 	}
 
-	return tl_comm->pt2pt_nb_receive(buf, size, peer, mp_req, mp_key);
+	return tl_comm->pt2pt_nb_recv(buf, size, peer, mp_req, mp_key);
 }
+
+int mp_irecvv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
+	MP_CHECK_COMM_OBJ();
+
+	if(!mp_req || !mp_key || !v || nvecs <= 0)
+		return MP_FAILURE;
+
+	if(peer > oob_size)
+	{
+		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
+		return MP_FAILURE;
+	}
+
+	return tl_comm->pt2pt_nb_recvv(v, nvecs, peer, mp_req, mp_key);
+}
+
 
 int mp_isend(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_key)
+	if(!mp_req || !mp_key || !buf || size <= 0)
 		return MP_FAILURE;
 
 	if(peer > oob_size)
@@ -31,6 +47,22 @@ int mp_isend(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t 
 
 	return tl_comm->pt2pt_nb_send(buf, size, peer, mp_req, mp_key);
 }
+
+int mp_isendv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
+	MP_CHECK_COMM_OBJ();
+
+	if(!mp_req || !mp_key || !v || nvecs <= 0)
+		return MP_FAILURE;
+
+	if(peer > oob_size)
+	{
+		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
+		return MP_FAILURE;
+	}
+
+	return tl_comm->pt2pt_nb_sendv(v, nvecs, peer, mp_req, mp_key);
+}
+
 //Blocking
 
 

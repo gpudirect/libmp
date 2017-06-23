@@ -652,234 +652,237 @@ int TL::Verbs::exchangeEndpoints() {
 	return ret;
 }	
 
+int TL::Verbs::verbs_update_qp_rtr(verbs_client_t client, int index, struct ibv_qp * qp) {
+  int ret,flags;
+  struct ibv_qp_attr ib_qp_attr;
+  assert(qp);
+  
+  peer = peers_list[index];
+  memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
+  if (verbs_enable_ud) { 
+    ib_qp_attr.qp_state = IBV_QPS_RTR;
+    flags = IBV_QP_STATE;
+  } else { 
+    ib_qp_attr.qp_state           = IBV_QPS_RTR;
+    ib_qp_attr.path_mtu           = ib_port_attr.active_mtu;
+    ib_qp_attr.dest_qp_num        = qpinfo_all[peer].qpn;
+    ib_qp_attr.rq_psn             = qpinfo_all[peer].psn;
+    ib_qp_attr.ah_attr.dlid       = qpinfo_all[peer].lid;
+    ib_qp_attr.max_dest_rd_atomic     = 1;
+    ib_qp_attr.min_rnr_timer          = 12;
+    ib_qp_attr.ah_attr.is_global      = 0;
+    ib_qp_attr.ah_attr.sl             = 0;
+    ib_qp_attr.ah_attr.src_path_bits  = 0;
+    ib_qp_attr.ah_attr.port_num       = ib_port;
+    flags = IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU
+        | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN
+        | IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC;
+  }
+
+  ret = ibv_modify_qp(qp, &ib_qp_attr, flags);
+  if (ret != 0) {
+    printf("Failed to modify RC QP to RTR\n");
+    return MP_FAILURE;
+  }
+
+  return MP_SUCCESS;
+}
+
+int TL::Verbs::verbs_update_qp_rts(verbs_client_t client, int index, struct ibv_qp * qp) {
+  int ret, flags;
+  struct ibv_qp_attr ib_qp_attr;
+  assert(qp);
+  peer = peers_list[index];
+  memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
+  if (verbs_enable_ud) { 
+    ib_qp_attr.qp_state       = IBV_QPS_RTS;
+    ib_qp_attr.sq_psn         = 0;
+    flags = IBV_QP_STATE | IBV_QP_SQ_PSN; 
+  } else { 
+    ib_qp_attr.qp_state       = IBV_QPS_RTS;
+    ib_qp_attr.sq_psn         = 0;
+    ib_qp_attr.timeout        = 20;
+    ib_qp_attr.retry_cnt      = 7;
+    ib_qp_attr.rnr_retry      = 7;
+    ib_qp_attr.max_rd_atomic  = 1;
+    flags = IBV_QP_STATE | IBV_QP_SQ_PSN | IBV_QP_TIMEOUT
+      | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY
+      | IBV_QP_MAX_QP_RD_ATOMIC;
+  }
+
+  ret = ibv_modify_qp(qp, &ib_qp_attr, flags);
+  if (ret != 0) {
+    printf("Failed to modify RC QP to RTR\n");
+    return MP_FAILURE;
+  }
+
+  if (verbs_enable_ud) {
+    mp_err_msg(oob_rank, "setting up connection with peer: %d lid: %d qpn: %d \n", peer, qpinfo_all[peer].lid, qpinfo_all[peer].qpn);
+
+    struct ibv_ah_attr ib_ah_attr;
+    memset(&ib_ah_attr, 0, sizeof(ib_ah_attr));
+    ib_ah_attr.is_global     = 0;
+    ib_ah_attr.dlid          = qpinfo_all[peer].lid;
+    ib_ah_attr.sl            = 0;
+    ib_ah_attr.src_path_bits = 0;
+    ib_ah_attr.port_num      = ib_port;
+
+    client->ah = ibv_create_ah(ib_ctx->pd, &ib_ah_attr);
+    if (!client->ah) {
+        mp_err_msg(oob_rank, "Failed to create AH\n");
+        return MP_FAILURE;
+    }
+
+    client->qpn = qpinfo_all[peer].qpn; 
+  }
+
+  return MP_SUCCESS;
+}
 
 int TL::Verbs::updateEndpoints() {
-	int i, ret,flags;
-	struct ibv_qp_attr ib_qp_attr;
+  for (int i=0; i<peer_count; i++) {
+    verbs_update_qp_rtr(&clients[i], i, clients[i].qp);
+  }
 
-	for (i=0; i<peer_count; i++)
-	{
-		peer = peers_list[i];
-		memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
-		if (verbs_enable_ud) { 
-		  ib_qp_attr.qp_state       = IBV_QPS_RTR;
-		  flags = IBV_QP_STATE;
-		} else { 
-		  ib_qp_attr.qp_state     			= IBV_QPS_RTR;
-		  ib_qp_attr.path_mtu     			= ib_port_attr.active_mtu;
-		  ib_qp_attr.dest_qp_num  			= qpinfo_all[peer].qpn;
-		  ib_qp_attr.rq_psn       			= qpinfo_all[peer].psn;
-		  ib_qp_attr.ah_attr.dlid 			= qpinfo_all[peer].lid;
-		  ib_qp_attr.max_dest_rd_atomic     = 1;
-		  ib_qp_attr.min_rnr_timer          = 12;
-		  ib_qp_attr.ah_attr.is_global      = 0;
-		  ib_qp_attr.ah_attr.sl             = 0;
-		  ib_qp_attr.ah_attr.src_path_bits  = 0;
-		  ib_qp_attr.ah_attr.port_num       = ib_port;
-		  flags = IBV_QP_STATE | IBV_QP_AV | IBV_QP_PATH_MTU
-		      | IBV_QP_DEST_QPN | IBV_QP_RQ_PSN
-		      | IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC;
-		}
-		
-		assert(clients[i].qp);
-#if 0
-		mp_dbg_msg(oob_rank, "clients[%d].qp=%p\n", i, clients[i].qp);					
-		std::cout << typeid(clients).name() << " clients type\n";
-		std::cout << typeid(clients[i].qp).name() << " clients[i].qp type\n";
-#endif
-		ret = ibv_modify_qp(clients[i].qp, &ib_qp_attr, flags);
-		if (ret != 0) {
-		  printf("Failed to modify RC QP to RTR\n");
-		  return MP_FAILURE;
-		}
-	}
+  oob_comm->barrier();
 
-	//Barrier with oob object
-	oob_comm->barrier();
+  for (int i=0; i<peer_count; i++) {
+    verbs_update_qp_rts(&clients[i], i, clients[i].qp);
+  }
 
-	for (i=0; i<peer_count; i++) {
-		int flags = 0;
-		peer = peers_list[i];
+  if (verbs_enable_ud) {
+    int result = register_key_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
+    assert(result == MP_SUCCESS);
+  }
 
-		memset(&ib_qp_attr, 0, sizeof(struct ibv_qp_attr));
-		if (verbs_enable_ud) { 
-		  ib_qp_attr.qp_state       = IBV_QPS_RTS;
-		  ib_qp_attr.sq_psn         = 0;
-		  flags = IBV_QP_STATE | IBV_QP_SQ_PSN; 
-		} else { 
-		  ib_qp_attr.qp_state       = IBV_QPS_RTS;
-		  ib_qp_attr.sq_psn         = 0;
-		  ib_qp_attr.timeout        = 20;
-		  ib_qp_attr.retry_cnt      = 7;
-		  ib_qp_attr.rnr_retry      = 7;
-		  ib_qp_attr.max_rd_atomic  = 1;
-		  flags = IBV_QP_STATE | IBV_QP_SQ_PSN | IBV_QP_TIMEOUT
-		    | IBV_QP_RETRY_CNT | IBV_QP_RNR_RETRY
-		    | IBV_QP_MAX_QP_RD_ATOMIC;
-		}
+  oob_comm->barrier();
 
-		mp_dbg_msg(oob_rank, "2 ibv_modify_qp\n");
-		ret = ibv_modify_qp(clients[i].qp, &ib_qp_attr, flags);
-		if (ret != 0)
-		{
-			mp_err_msg(oob_rank, "Failed to modify RC QP to RTS\n");
-			return MP_FAILURE;
-		}
+  #ifdef HAVE_IPC
+    //ipc connection setup
+    node_info_all = malloc(sizeof(struct node_info)*oob_size);
+    if (!node_info_all) {
+      mp_err_msg(oob_rank, "Failed to allocate node info array \n");
+    return MP_FAILURE;
+    }
 
-		if (verbs_enable_ud) {
-		  mp_err_msg(oob_rank, "setting up connection with peer: %d lid: %d qpn: %d \n", peer, qpinfo_all[peer].lid, qpinfo_all[peer].qpn);
+    if(!gethostname(node_info_all[oob_rank].hname, 20)) {
+      mp_err_msg(oob_rank, "gethostname returned error \n");
+    return MP_FAILURE;
+    }
 
-		  struct ibv_ah_attr ib_ah_attr;
-		  memset(&ib_ah_attr, 0, sizeof(ib_ah_attr));
-		  ib_ah_attr.is_global     = 0;
-		  ib_ah_attr.dlid          = qpinfo_all[peer].lid;
-		  ib_ah_attr.sl            = 0;
-		  ib_ah_attr.src_path_bits = 0;
-		  ib_ah_attr.port_num      = ib_port;
+    CUDA_CHECK(cudaGetDevice(&node_info_all[oob_rank].gpu_id));
 
-		  clients[i].ah = ibv_create_ah(ib_ctx->pd, &ib_ah_attr);
-		  if (!clients[i].ah) {
-		      mp_err_msg(oob_rank, "Failed to create AH\n");
-		      return MP_FAILURE;
-		  }
+    oob_comm->allgather(NULL, 0, MP_CHAR, node_info_all, sizeof(struct node_info), MP_CHAR);
 
-		  clients[i].qpn = qpinfo_all[peer].qpn; 
-		}
-	}
+    int cidx, can_access_peer; 
+    for (i=0; i<oob_size; i++) {
+      can_access_peer = 0;
+      cidx = client_index[i];
 
-	if (verbs_enable_ud) {
-		int result = register_key_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
-		assert(result == MP_SUCCESS);
-	}
+      if (i == oob_size) { 
+        /*pick first rank on the node as the leader*/
+        if (!smp_num_procs) smp_leader = i;
+        smp_local_rank = smp_num_procs;       
+        smp_num_procs++;
+        ipc_num_procs++;
+        continue;
+      }
 
-	oob_comm->barrier();
+      if (!strcmp(node_info_all[i].hname, node_info_all[oob_rank].hname)) {
+        /*pick first rank on the node as the leader*/
+        if (!smp_num_procs) smp_leader = i; 
+        clients_async[cidx].is_local = 1;
+        clients_async[cidx].local_rank = smp_num_procs;
+        smp_num_procs++; 
+        CUDA_CHECK(cudaDeviceCanAccessPeer(&can_access_peer, node_info_all[oob_rank].gpu_id, node_info_all[i].gpu_id));
+      }
 
-#ifdef HAVE_IPC
-	//ipc connection setup
-	node_info_all = malloc(sizeof(struct node_info)*oob_size);
-	if (!node_info_all) {
-	  mp_err_msg(oob_rank, "Failed to allocate node info array \n");
-	return MP_FAILURE;
-	}
+      if (can_access_peer) { 
+        ipc_num_procs++;
+        clients_async[cidx].can_use_ipc = 1;
+      } 
+    }
 
-	if(!gethostname(node_info_all[oob_rank].hname, 20)) {
-	  mp_err_msg(oob_rank, "gethostname returned error \n");
-	return MP_FAILURE;
-	}
+    if (smp_num_procs > 1) {
+      shm_client_bufsize = sizeof(smp_buffer_t)*smp_depth;
+      shm_proc_bufsize = shm_client_bufsize*smp_num_procs;
+      shm_filesize = sizeof(smp_buffer_t)*smp_depth*smp_num_procs*smp_num_procs;
 
-	CUDA_CHECK(cudaGetDevice(&node_info_all[oob_rank].gpu_id));
+      //setup shared memory buffers 
+      sprintf(shm_filename, "/dev/shm/libmp_shmem-%s-%d.tmp", node_info_all[oob_rank].hname, getuid());
+      mp_dbg_msg(oob_rank, "shemfile %s\n", shm_filename);
 
-	oob_comm->allgather(NULL, 0, MP_CHAR, node_info_all, sizeof(struct node_info), MP_CHAR);
+      shm_fd = open(shm_filename, O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+      if (shm_fd < 0) {
+        mp_err_msg(oob_rank, "opening shm file failed \n");
+        return MP_FAILURE;
+      }
 
-	int cidx, can_access_peer; 
-	for (i=0; i<oob_size; i++) {
-	can_access_peer = 0;
-	cidx = client_index[i];
+      if (smp_leader == oob_rank) {
+        if (ftruncate(shm_fd, 0)) {
+          mp_err_msg(oob_rank, "clearning up shm file failed \n");
+          /* to clean up tmp shared file */
+          return MP_FAILURE;
+        }
 
-	if (i == oob_size) { 
-		/*pick first rank on the node as the leader*/
-		if (!smp_num_procs) smp_leader = i;
-		smp_local_rank = smp_num_procs;	      
-		smp_num_procs++;
-		ipc_num_procs++;
-		continue;
-	}
+        if (ftruncate(shm_fd, shm_filesize)) {
+          mp_err_msg(oob_rank, "setting up shm file failed \n");
+          /* to clean up tmp shared file */
+          return MP_FAILURE;
+        }
+      }
+    }
 
-	if (!strcmp(node_info_all[i].hname, node_info_all[oob_rank].hname)) {
-		/*pick first rank on the node as the leader*/
-		if (!smp_num_procs) smp_leader = i; 
-		clients[cidx].is_local = 1;
-		clients[cidx].local_rank = smp_num_procs;
-		smp_num_procs++; 
-		CUDA_CHECK(cudaDeviceCanAccessPeer(&can_access_peer, node_info_all[oob_rank].gpu_id, node_info_all[i].gpu_id));
-	}
+    oob_comm->barrier();
 
-	if (can_access_peer) { 
-	  ipc_num_procs++;
-	      clients[cidx].can_use_ipc = 1;
-	} 
-	}
+    if (smp_num_procs > 1) {
+      struct stat file_status;
 
-	if (smp_num_procs > 1) {
-	shm_client_bufsize = sizeof(smp_buffer_t)*smp_depth;
-	shm_proc_bufsize = shm_client_bufsize*smp_num_procs;
-	shm_filesize = sizeof(smp_buffer_t)*smp_depth*smp_num_procs*smp_num_procs;
+      /* synchronization between local processes */
+      do {
+        if (fstat(shm_fd, &file_status) != 0) {
+          mp_err_msg(oob_rank, "fstat on shm file failed \n");
+          /* to clean up tmp shared file */
+          return MP_FAILURE;
+        }
+        usleep(1);
+      } while (file_status.st_size != shm_filesize);
 
-	//setup shared memory buffers 
-	sprintf(shm_filename, "/dev/shm/libmp_shmem-%s-%d.tmp", node_info_all[oob_rank].hname, getuid());
-	mp_dbg_msg(oob_rank, "shemfile %s\n", shm_filename);
+      /* mmap of the shared memory file */
+      shm_mapptr = mmap(0, shm_filesize, (PROT_READ | PROT_WRITE), (MAP_SHARED), shm_fd, 0);
+      if (shm_mapptr == (void *) -1) {
+        mp_err_msg(oob_rank, "mmap on shm file failed \n");
+        /* to clean up tmp shared file */
+        return MP_FAILURE;
+      }
+    }
 
-	shm_fd = open(shm_filename, O_RDWR | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
-	  if (shm_fd < 0) {
-	      mp_err_msg(oob_rank, "opening shm file failed \n");
-	      return MP_FAILURE;
-	}
+    for (i=0; i<oob_size; i++) {
+      int j, cidx;
 
-	if (smp_leader == oob_rank) {
-	  if (ftruncate(shm_fd, 0)) {
-	      mp_err_msg(oob_rank, "clearning up shm file failed \n");
-	          /* to clean up tmp shared file */
-	      return MP_FAILURE;
-	      }
+      cidx = client_index[i]; 
 
-	      if (ftruncate(shm_fd, shm_filesize)) {
-	          mp_err_msg(oob_rank, "setting up shm file failed \n");
-	          /* to clean up tmp shared file */
-	          return MP_FAILURE;
-		      }
-	}
-	}
+      if (clients_async[cidx].is_local) {
+        assert(smp_local_rank >= 0);
 
-	oob_comm->barrier();
+        clients_async[cidx].smp.local_buffer = (void *)((char *)shm_mapptr 
+        + shm_proc_bufsize*smp_local_rank 
+        + shm_client_bufsize*clients_async[cidx].local_rank);
 
-	if (smp_num_procs > 1) {
-		struct stat file_status;
+        memset(clients_async[cidx].smp.local_buffer, 0, shm_client_bufsize);
 
-		/* synchronization between local processes */
-		do {
-			if (fstat(shm_fd, &file_status) != 0) {
-				mp_err_msg(oob_rank, "fstat on shm file failed \n");
-				/* to clean up tmp shared file */
-				return MP_FAILURE;
-			}
-			usleep(1);
-		} while (file_status.st_size != shm_filesize);
+        for (j=0; j<smp_depth; j++) { 
+          clients_async[cidx].smp.local_buffer[j].free = 1;
+        }
 
-		/* mmap of the shared memory file */
-		shm_mapptr = mmap(0, shm_filesize, (PROT_READ | PROT_WRITE), (MAP_SHARED), shm_fd, 0);
-		if (shm_mapptr == (void *) -1) {
-			mp_err_msg(oob_rank, "mmap on shm file failed \n");
-			/* to clean up tmp shared file */
-			return MP_FAILURE;
-		}
-	}
+        clients_async[cidx].smp.remote_buffer = (void *)((char *)shm_mapptr 
+                          + shm_proc_bufsize*clients[cidx].local_rank 
+                          + shm_client_bufsize*smp_local_rank);
+      }
+    }
+  #endif
 
-	for (i=0; i<oob_size; i++) {
-		int j, cidx;
-
-		cidx = client_index[i]; 
-
-		if (clients[cidx].is_local) {
-			assert(smp_local_rank >= 0);
-
-			clients[cidx].smp.local_buffer = (void *)((char *)shm_mapptr 
-			+ shm_proc_bufsize*smp_local_rank 
-			+ shm_client_bufsize*clients[cidx].local_rank);
-
-			memset(clients[cidx].smp.local_buffer, 0, shm_client_bufsize);
-
-			for (j=0; j<smp_depth; j++) { 
-				clients[cidx].smp.local_buffer[j].free = 1;
-			}
-
-			clients[cidx].smp.remote_buffer = (void *)((char *)shm_mapptr 
-												+ shm_proc_bufsize*clients[cidx].local_rank 
-												+ shm_client_bufsize*smp_local_rank);
-		}
-	}
-#endif
-
-	return MP_SUCCESS;
+  return MP_SUCCESS;
 }
 
 void TL::Verbs::cleanupInit() {
@@ -947,13 +950,13 @@ int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem
 
 	int flags=1;
 	assert(mp_mem_key);
-    mp_dbg_msg(oob_rank, "\n");
 
 	verbs_region_t reg = (verbs_region_t)calloc(1, sizeof(struct verbs_region));
 	if (!reg) {
 	  mp_err_msg(oob_rank, "malloc returned NULL while allocating struct mp_reg\n");
 	  return MP_FAILURE;
 	}
+
 //GPUDirect RDMA
 #ifdef HAVE_CUDA
 	/*set SYNC MEMOPS if its device buffer*/
@@ -969,8 +972,6 @@ int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem
 	}
 #endif
 
-				    mp_dbg_msg(oob_rank, "After HAVE_CUDA\n");
-
 	if (verbs_enable_ud) {
 	  mp_warn_msg(oob_rank, "UD enabled, registering buffer for LOCAL_WRITE\n");
 	  flags = IBV_ACCESS_LOCAL_WRITE;
@@ -984,17 +985,13 @@ int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem
 	// maintain a registration cache yet
 	reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
 	if (!reg->mr) {
-		mp_err_msg(oob_rank, "ibv_reg_mr returned NULL for addr:%p size:%zu errno=%d(%s)\n", 
-	            		addr, length, errno, strerror(errno));
-
+		mp_err_msg(oob_rank, "ibv_reg_mr returned NULL for addr:%p size:%zu errno=%d(%s)\n", addr, length, errno, strerror(errno));
 		return MP_FAILURE;
 	}
 
 	reg->key = reg->mr->lkey;
 	mp_dbg_msg(oob_rank, "Registered key: key=%p value=%x buf=%p\n", reg, reg->key, addr);
 	*mp_mem_key = (mp_key_t)reg;
-
-				    mp_dbg_msg(oob_rank, "Exit\n");
 
 	return MP_SUCCESS;
 }
@@ -1031,7 +1028,6 @@ mp_key_t * TL::Verbs::create_keys(int number) {
 
 
 mp_request_t * TL::Verbs::create_requests(int number) {
-
 	verbs_request_t * req;
 	if(number <= 0) {
 		mp_err_msg(oob_rank, "erroneuos requests number specified (%d)\n", number);
@@ -1047,7 +1043,7 @@ mp_request_t * TL::Verbs::create_requests(int number) {
 	return (mp_request_t *) req;
 }
 
-int TL::Verbs::pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+int TL::Verbs::pt2pt_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
 	int ret = 0;
 	verbs_request_t req = NULL;
 	verbs_region_t reg = (verbs_region_t) *mp_mem_key;
@@ -1055,7 +1051,6 @@ int TL::Verbs::pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t 
 
 
 	assert(reg);
-	mp_dbg_msg(oob_rank, "start\n");
 	req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
 	assert(req);
 
@@ -1096,6 +1091,47 @@ int TL::Verbs::pt2pt_nb_receive(void * buf, size_t size, int peer, mp_request_t 
 	*mp_req = (mp_request_t) req; 
 out:
 	return ret;
+}
+
+int TL::Verbs::pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+  int ret = 0;
+  verbs_request_t req = NULL;
+  verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+  verbs_client_t client = &clients[client_index[peer]];
+
+  if (nvecs > ib_max_sge) {
+    mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
+    ret = MP_FAILURE;
+    goto out;
+  }
+
+  assert(reg);
+  req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
+  assert(req);
+
+  mp_dbg_msg(oob_rank, "peer=%d req=%p v=%p nvecs=%d req id=%d reg=%p key=%x\n", peer, req, v, nvecs, req->id, reg, reg->key);
+
+  for (int i=0; i < nvecs; ++i) {
+    req->sgv[i].length = v[i].iov_len;
+    req->sgv[i].lkey = reg->key;
+    req->sgv[i].addr = (uint64_t)(v[i].iov_base);
+  }
+
+  req->in.rr.next = NULL;
+  req->in.rr.wr_id = (uintptr_t) req;
+  req->in.rr.num_sge = nvecs;
+  req->in.rr.sg_list = req->sgv;
+
+  //progress (remove) some request on the RX flow if is not possible to queue a recv request
+  ret = verbs_post_recv(client, req);
+  if (ret) {
+    mp_err_msg(oob_rank, "Posting recv failed: %s \n", strerror(errno));
+    goto out;
+  }
+
+  *mp_req = (mp_request_t) req; 
+out:
+  return ret;
 }
 
 int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
@@ -1175,6 +1211,52 @@ int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * m
 
 out:
     return ret;
+}
+
+int TL::Verbs::pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key)
+{
+  int ret = 0;
+  verbs_request_t req = NULL;
+  verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+  verbs_client_t client = &clients[client_index[peer]];
+
+  if (nvecs > ib_max_sge) {
+    mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
+    ret = MP_FAILURE;
+    goto out;
+  }
+
+  assert(reg);
+  req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
+  assert(req);
+  req->sgv = (struct ibv_sge *) calloc(nvecs, sizeof(struct ibv_sge));
+  assert(req->sgv);
+
+  mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
+
+  for (int i=0; i < nvecs; ++i) {
+    req->sgv[i].length = v[i].iov_len;
+    req->sgv[i].lkey = reg->key;
+    req->sgv[i].addr = (uint64_t)(v[i].iov_base);
+  }
+
+  if (verbs_enable_ud) {
+      req->in.sr.wr.ud.ah = client->ah;
+      req->in.sr.wr.ud.remote_qpn = client->qpn;
+      req->in.sr.wr.ud.remote_qkey = 0;
+  }
+
+  req->in.sr.next = NULL;
+  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+  req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
+  req->in.sr.wr_id = (uintptr_t) req;
+  req->in.sr.num_sge = nvecs;
+  req->in.sr.sg_list = req->sgv;
+
+  ret = verbs_post_send(client, req);
+
+ out:
+  return ret;
 }
 
 int TL::Verbs::wait_word(uint32_t *ptr, uint32_t value, int flags)
@@ -1271,57 +1353,60 @@ out:
 
 //====================== ONE-SIDED ======================
 /*one-sided operations: window creation, put and get*/
+exchange_win_info * TL::Verbs::verbs_window_create(void *addr, size_t size, verbs_window_t *window_t) 
+{
+  int result = MP_SUCCESS;
+  verbs_window_t window;
+
+  exchange_win_info *exchange_win = NULL; 
+
+  window = (verbs_window_t) calloc(1, sizeof(struct verbs_window));
+  assert(window != NULL); 
+
+  window->base_ptr = (void ** ) calloc(peer_count, sizeof(void *));
+  assert(window->base_ptr != NULL);
+  window->rkey = (uint32_t * ) calloc(peer_count, sizeof(uint32_t));
+  assert(window->rkey != NULL);
+  window->rsize = (uint64_t * ) calloc(peer_count, sizeof(uint64_t));
+  assert(window->rsize != NULL);
+
+  exchange_win = (exchange_win_info * ) calloc(oob_size, sizeof(exchange_win_info));
+  assert(exchange_win != NULL); 
+
+  result = register_key_buffer(addr, size, (mp_key_t *) &window->reg);  
+  assert(result == MP_SUCCESS); 
+
+  exchange_win[oob_rank].base_addr = addr;
+  exchange_win[oob_rank].rkey = window->reg->mr->rkey; 
+  exchange_win[oob_rank].size = size;
+
+  oob_comm->allgather(NULL, 0, MP_CHAR, exchange_win, sizeof(exchange_win_info), MP_CHAR);
+  //loop
+  *window_t = window;
+
+  return exchange_win;
+}
+
 int TL::Verbs::onesided_window_create(void *addr, size_t size, mp_window_t *window_t)
 {
-	int result = MP_SUCCESS;
-	verbs_window_t window;
-	typedef struct {
-	void *base_addr;
-	uint32_t rkey;
-	int size;
-	} exchange_win_info;
+  int i, peer;
+  verbs_window_t window;
+  exchange_win_info * exchange_win = verbs_window_create(addr, size, &window);
+  assert(exchange_win);
 
-	exchange_win_info *exchange_win = NULL; 
-	int i, peer;
+  /*populate window address info*/
+  for (i=0; i<peer_count; i++) { 
+    peer = clients[i].oob_rank;
 
-	window = (verbs_window_t) calloc(1, sizeof(struct verbs_window));
-	assert(window != NULL); 
+    window->base_ptr[i] = exchange_win[peer].base_addr;
+    window->rkey[i] = exchange_win[peer].rkey;
+    window->rsize[i] = exchange_win[peer].size;
+  }
+  *window_t = (mp_window_t) window;
+  free(exchange_win);
+  oob_comm->barrier();
 
-	window->base_ptr = (void ** ) calloc(peer_count, sizeof(void *));
-	assert(window->base_ptr != NULL);
-	window->rkey = (uint32_t * ) calloc(peer_count, sizeof(uint32_t));
-	assert(window->rkey != NULL);
-	window->rsize = (uint64_t * ) calloc(peer_count, sizeof(uint64_t));
-	assert(window->rsize != NULL);
-
-	exchange_win = (exchange_win_info * ) calloc(oob_size, sizeof(exchange_win_info));
-	assert(exchange_win != NULL); 
-
-	result = register_key_buffer(addr, size, (mp_key_t *) &window->reg);  
-	assert(result == MP_SUCCESS); 
-
-	exchange_win[oob_rank].base_addr = addr; 
-	exchange_win[oob_rank].rkey = window->reg->mr->rkey; 
-	exchange_win[oob_rank].size = size;
-
-	oob_comm->allgather(NULL, 0, MP_CHAR, exchange_win, sizeof(exchange_win_info), MP_CHAR);
-
-	/*populate window address info*/
-	for (i=0; i<peer_count; i++) { 
-	  peer = clients[i].oob_rank;
-
-	  window->base_ptr[i] = exchange_win[peer].base_addr;
-	  window->rkey[i] = exchange_win[peer].rkey;
-	  window->rsize[i] = exchange_win[peer].size;
-	}
-
-	*window_t = window;
-
-	free(exchange_win);
-
-	oob_comm->barrier();
-
-	return result;
+  return MP_SUCCESS;
 }
 
 int TL::Verbs::onesided_window_destroy(mp_window_t *window_t)
@@ -1392,47 +1477,47 @@ out:
 
 int TL::Verbs::onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
 {
-	int ret = 0;
-	verbs_request_t req;
-	verbs_region_t reg = (verbs_region_t) *reg_t;
-	verbs_window_t window = (verbs_window_t) *window_t;
-	int client_id = client_index[peer];
-	verbs_client_t client = &clients[client_id];
+  int ret = 0;
+  verbs_request_t req;
+  verbs_region_t reg = (verbs_region_t) *reg_t;
+  verbs_window_t window = (verbs_window_t) *window_t;
+  int client_id = client_index[peer];
+  verbs_client_t client = &clients[client_id];
 
-	if (verbs_enable_ud) { 
-		mp_err_msg(oob_rank, "put/get not supported with UD \n");
-		ret = MP_FAILURE;
-		goto out;
-	}
+  if (verbs_enable_ud) { 
+  	mp_err_msg(oob_rank, "put/get not supported with UD \n");
+  	ret = MP_FAILURE;
+  	goto out;
+  }
 
-	assert(displ < window->rsize[client_id]);
+  assert(displ < window->rsize[client_id]);
 
-	req = verbs_new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
+  req = verbs_new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
 
-	req->in.sr.next = NULL;
-	req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-	req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
-	req->in.sr.wr_id = (uintptr_t) req;
-	req->in.sr.num_sge = 1;
-	req->in.sr.sg_list = &req->sg_entry;
+  req->in.sr.next = NULL;
+  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+  req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+  req->in.sr.wr_id = (uintptr_t) req;
+  req->in.sr.num_sge = 1;
+  req->in.sr.sg_list = &req->sg_entry;
 
-	req->sg_entry.length = size;
-	req->sg_entry.lkey = reg->key;
-	req->sg_entry.addr = (uintptr_t)dst;
+  req->sg_entry.length = size;
+  req->sg_entry.lkey = reg->key;
+  req->sg_entry.addr = (uintptr_t)dst;
 
-	req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
-	req->in.sr.wr.rdma.rkey = window->rkey[client_id];
+  req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
+  req->in.sr.wr.rdma.rkey = window->rkey[client_id];
 
-	ret = verbs_post_send(client, req);
-	if (ret) {
-		mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
-		goto out;
-	}
+  ret = verbs_post_send(client, req);
+  if (ret) {
+  	mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
+  	goto out;
+  }
 
-	*req_t = req;
+  *req_t = req;
 
-out:
-	return ret;
+  out:
+  return ret;
 }
 
 //============== GPUDirect Async - Verbs_GDS class ==============
@@ -1463,8 +1548,3 @@ static class update_tl_list_verbs {
 			add_tl_creator(TL_INDEX_VERBS, create_verbs);
 		}
 } list_tl_verbs;
-
-#if 0
-int mp_irecvv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request_t *req_t)
-int mp_isendv (struct iovec *v, int nvecs, int peer, mp_key_t *reg_t, mp_request_t *req_t)
-#endif
