@@ -6,7 +6,7 @@ CC=mpic++
 LD=mpic++ 
 #nvcc
 NVCC=nvcc
-CPPFLAGS=-I. -I${MPI_HOME}/include -DHAVE_VERBS
+CPPFLAGS=-I. -I$(PREFIX)/include -I${MPI_HOME}/include -DHAVE_VERBS
 # -DMACOSX
 CFLAGS=-O2 -g
 LDFLAGS=-L${MPI_HOME}/lib64 -lmpi -libverbs

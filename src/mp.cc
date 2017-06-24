@@ -1,4 +1,7 @@
 #include "mp.h"
+#include "common.h"
+#include "oob.h"
+#include "tl.hpp"
 
 int oob_size=0, oob_rank=0;
 int mp_warn_is_enabled=0, mp_dbg_is_enabled=0;

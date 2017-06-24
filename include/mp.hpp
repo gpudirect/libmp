@@ -1,6 +1,10 @@
-#include "common.h"
-#include "oob.h"
-#include "tl.hpp"
+#pragma once
+
+#include <sys/uio.h> // for struct iov
+#include <stdint.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <mpi.h>
 
 extern int oob_size, oob_rank;
 extern int mp_warn_is_enabled, mp_dbg_is_enabled;
