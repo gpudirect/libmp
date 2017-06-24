@@ -1,10 +1,24 @@
 #pragma once
 
-#include <sys/uio.h> // for struct iov
-#include <stdint.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <mpi.h>
+#if HAVE_CONFIG_H
+#  include <config.h>
+#endif /* HAVE_CONFIG_H */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <string.h>
+#include <assert.h>
+#include <limits.h>
+#include <inttypes.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <errno.h>
+#include <memory>
 
 extern int oob_size, oob_rank;
 extern int mp_warn_is_enabled, mp_dbg_is_enabled;
