@@ -16,7 +16,7 @@ AM_CFLAGS = -g -Wall
 
 EXTRA_DIST = autogen.sh
 
-include_HEADERS = include/mp.hpp
+include_HEADERS = src/mp.hpp
 #libmpincludedir = include/$(includedir)/mp
 #libmpinclude_HEADERS = include/mp/device.cuh
 
