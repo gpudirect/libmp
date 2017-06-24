@@ -1,7 +1,7 @@
 #ifndef OOB_H
 #define OOB_H
 
-#include "common.h"
+#include "common.hpp"
 
 namespace OOB
 {
