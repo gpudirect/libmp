@@ -1,4 +1,4 @@
-#include "tl_verbs_common.h"
+#include "tl_verbs_common.hpp"
 #include <infiniband/peer_ops.h>
 #include <gdsync.h>
 #include <gdsync/tools.h>

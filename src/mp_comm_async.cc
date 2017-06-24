@@ -1,4 +1,4 @@
-#include "mp.h"
+#include "mp.hpp"
 
 // SA Model: GPU Synchronous, CPU Asynchronous
 

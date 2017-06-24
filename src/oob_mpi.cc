@@ -1,5 +1,5 @@
 #include <mpi.h>
-#include "oob.h"
+#include "oob.hpp"
 
 
 #define MPI_CHECK(stmt)                                             \

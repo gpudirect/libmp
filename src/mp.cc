@@ -1,6 +1,6 @@
-#include "mp.h"
-#include "common.h"
-#include "oob.h"
+#include "mp.hpp"
+#include "common.hpp"
+#include "oob.hpp"
 #include "tl.hpp"
 
 int oob_size=0, oob_rank=0;
