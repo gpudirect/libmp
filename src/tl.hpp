@@ -1,8 +1,8 @@
 #ifndef TL_H
 #define TL_H
 
-#include "common.h"
-#include "oob.h"
+#include "common.hpp"
+#include "oob.hpp"
 
 namespace TL
 {
