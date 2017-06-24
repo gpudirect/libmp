@@ -19,6 +19,7 @@
 #include <time.h>
 #include <errno.h>
 #include <memory>
+#include "mp_common.hpp"
 
 extern int oob_size, oob_rank;
 extern int mp_warn_is_enabled, mp_dbg_is_enabled;
