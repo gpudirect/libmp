@@ -29,4 +29,4 @@ src_libmp_la_LDFLAGS = -version-info 3:0:0
 noinst_HEADERS = src/common.hpp src/oob.hpp src/tl.hpp src/tl_verbs.hpp src/tl_verbs_common.hpp src/tl_verbs_types_async.hpp
 
 
-SUBDIRS = . examples benchmarks comm_benchmarks
+SUBDIRS = . examples
