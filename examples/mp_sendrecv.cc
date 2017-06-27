@@ -48,8 +48,8 @@ int sr_exchange (int size, int iter_count, int window_size, int validate)
     mp_region_t * reg = NULL; 
 
     buf_size = size*window_size;
-    buf = malloc (buf_size);
-    memset(buf, 0, buf_size); 
+    buf = calloc(buf_size, sizeof(char));
+    if(!buf) mp_abort();
 
     if(use_gpu_buffers == 1)
     {
@@ -59,7 +59,6 @@ int sr_exchange (int size, int iter_count, int window_size, int validate)
     else
     {
         buf_d = (char *) calloc(buf_size, sizeof(char));
-        memset(buf_d, 0, buf_size);
     }
 
     /*allocating requests and regions*/
@@ -98,11 +97,11 @@ int sr_exchange (int size, int iter_count, int window_size, int validate)
             }
 
             for(j=0; j < window_size; j++)
-                MP_CHECK(mp_isend ((void *)((uintptr_t)buf_d + size*j), size, peer, reg, &req[j])); 
+                MP_CHECK(mp_isend ((void *)((uintptr_t)buf_d + size*j), size, peer, &reg[0], &req[j])); 
         
         } else {
             for(j=0; j < window_size; j++)
-                MP_CHECK(mp_irecv ((void *)((uintptr_t)buf_d + size*j), size, peer, reg, &req[j]));
+                MP_CHECK(mp_irecv ((void *)((uintptr_t)buf_d + size*j), size, peer, &reg[0], &req[j]));
           
             dbg_msg("calling Barrier\n");
             mp_barrier();
@@ -137,6 +136,7 @@ int sr_exchange (int size, int iter_count, int window_size, int validate)
     CUDA_CHECK(cudaDeviceSynchronize());
 
     MP_CHECK(mp_unregister_regions(1, reg));
+    
     if(use_gpu_buffers == 1) CUDA_CHECK(cudaFree(buf_d));
     else free(buf_d);
 
@@ -178,33 +178,12 @@ int main (int argc, char *argv[])
         mp_abort();
     }
 
-#if 0
-    char hostname[256] = {0};
-    assert(0 == gethostname(hostname, sizeof(hostname)));
-    const char *deb = getenv("DEBUGGER");
-    if (deb && atoi(deb) > 0) {
-        printf("%s: press a key\n", hostname); fflush(stdout);
-        char c;
-        scanf("%c", &c);
-        printf("going on...\n");
-    } else {
-        printf("%s: sleeping 2s\n", hostname);
-        sleep(2);
-    }
-#endif
-
     if(device_id > MP_DEFAULT)
     {
         // CUDA init
         CUDA_CHECK(cudaSetDevice(device_id));
         CUDA_CHECK(cudaFree(0));        
     }
-#if 0    
-    if (gpu_init(-1)) {
-        fprintf(stderr, "got error while initializing GPU\n");
-        mp_abort();
-    }
-#endif
 
     peer = !my_rank;
     iter_count = ITER_COUNT_SMALL;

@@ -18,7 +18,7 @@ int mp_irecv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request
 		return MP_FAILURE;
 	}
 
-	return tl_comm->pt2pt_nb_recv(buf, size, peer,  mp_reg, mp_req);
+	return tl_comm->pt2pt_nb_recv(buf, size, peer, mp_reg, mp_req);
 }
 
 int mp_irecvv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {

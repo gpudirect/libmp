@@ -28,7 +28,7 @@ endif
 
 bin_PROGRAMS = mp_pt2pt mp_onesided mp_sendrecv
 if HAVE_GDSYNC
-bin_PROGRAMS += mp_pt2pt_async
+bin_PROGRAMS += mp_pt2pt_async mp_sendrecv_async
 endif
 
 noinst_PROGRAMS = 
@@ -41,6 +41,7 @@ mp_onesided_SOURCES = mp_onesided.cc
 mp_sendrecv_SOURCES = mp_sendrecv.cc
 if HAVE_GDSYNC
 mp_pt2pt_async_SOURCES = mp_pt2pt_async.cc
+mp_sendrecv_async_SOURCES = mp_sendrecv_async.cc
 endif
 
 SUFFIXES= .cu
