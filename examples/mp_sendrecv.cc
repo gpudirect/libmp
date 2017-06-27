@@ -27,6 +27,7 @@
  ****/
 
 #include "mp_common_examples.hpp"
+
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
@@ -39,7 +40,7 @@ static int __dbg_msg(const char *fmt, ...)
     static int enable_debug_prints = -1;
     int ret = 0;
     if (-1 == enable_debug_prints) {
-        const char *value = getenv("ENABLE_DEBUG_MSG");
+        const char *value = getenv("MP_ENABLE_APP_DEBUG");
         if (value != NULL)
             enable_debug_prints = atoi(value);
         else
@@ -92,8 +93,16 @@ int sr_exchange (int size, int iter_count, int window_size, int validate)
     buf = malloc (buf_size);
     memset(buf, 0, buf_size); 
 
-    CUDA_CHECK(cudaMalloc((void **)&buf_d, buf_size));
-    CUDA_CHECK(cudaMemset(buf_d, 0, buf_size)); 
+    if(use_gpu_buffers == 1)
+    {
+        CUDA_CHECK(cudaMalloc((void **)&buf_d, buf_size));
+        CUDA_CHECK(cudaMemset(buf_d, 0, buf_size));         
+    }
+    else
+    {
+        buf_d = (char *) calloc(buf_size, sizeof(char));
+        memset(buf_d, 0, buf_size);
+    }
 
     /*allocating requests and regions*/
     req = mp_create_request(window_size);
@@ -107,9 +116,17 @@ int sr_exchange (int size, int iter_count, int window_size, int validate)
         if (!my_rank) {
 
             if (validate) {
-                CUDA_CHECK(cudaMemset(buf_d, (i+1)%CHAR_MAX, buf_size));
-                CUDA_CHECK(cudaDeviceSynchronize());
+                if(use_gpu_buffers == 1)
+                {
+                    CUDA_CHECK(cudaMemset(buf_d, (i+1)%CHAR_MAX, buf_size));
+                    CUDA_CHECK(cudaDeviceSynchronize());
+                }
+                else
+                {
+                    memset(buf_d, (i+1)%CHAR_MAX, buf_size);
+                }
             }
+
             dbg_msg("calling Barrier\n");
             mp_barrier();
 
@@ -162,8 +179,9 @@ int sr_exchange (int size, int iter_count, int window_size, int validate)
     CUDA_CHECK(cudaDeviceSynchronize());
 
     MP_CHECK(mp_unregister_regions(1, reg));
+    if(use_gpu_buffers == 1) CUDA_CHECK(cudaFree(buf_d));
+    else free(buf_d);
 
-    CUDA_CHECK(cudaFree(buf_d));
     free(buf);
     free(req);
 
@@ -186,6 +204,8 @@ int main (int argc, char *argv[])
     envVar = getenv("MP_GPU_BUFFERS"); 
     if (envVar != NULL) {
         use_gpu_buffers = atoi(envVar);
+        if(use_gpu_buffers == 1)
+            dbg_msg("Using GPU buffers, GPUDirect RDMA\n");
     }
 
     ret = mp_init(argc, argv, device_id);
