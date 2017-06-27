@@ -751,7 +751,7 @@ int TL::Verbs::updateEndpoints() {
   }
 
   if (verbs_enable_ud) {
-    int result = register_key_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
+    int result = register_region_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
     assert(result == MP_SUCCESS);
   }
 
@@ -946,10 +946,10 @@ int TL::Verbs::finalize() {
 }
 
 // ===== COMMUNICATION
-int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem_key) {
+int TL::Verbs::register_region_buffer(void * addr, size_t length, mp_region_t * mp_reg) {
 
 	int flags=1;
-	assert(mp_mem_key);
+	assert(mp_reg);
 
 	verbs_region_t reg = (verbs_region_t)calloc(1, sizeof(struct verbs_region));
 	if (!reg) {
@@ -991,12 +991,12 @@ int TL::Verbs::register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem
 
 	reg->key = reg->mr->lkey;
 	mp_dbg_msg(oob_rank, "Registered key: key=%p value=%x buf=%p\n", reg, reg->key, addr);
-	*mp_mem_key = (mp_key_t)reg;
+	*mp_reg = (mp_region_t)reg;
 
 	return MP_SUCCESS;
 }
 
-int TL::Verbs::unregister_key(mp_key_t *reg_)
+int TL::Verbs::unregister_region(mp_region_t *reg_)
 {
 	verbs_region_t reg = (verbs_region_t) *reg_; 
 
@@ -1008,7 +1008,7 @@ int TL::Verbs::unregister_key(mp_key_t *reg_)
 	return MP_SUCCESS;
 }
 
-mp_key_t * TL::Verbs::create_keys(int number) {
+mp_region_t * TL::Verbs::create_regions(int number) {
 
 	verbs_region_t * reg;
 
@@ -1023,7 +1023,7 @@ mp_key_t * TL::Verbs::create_keys(int number) {
 	  return NULL;
 	}
 
-	return (mp_key_t *) reg;
+	return (mp_region_t *) reg;
 }
 
 
@@ -1043,10 +1043,10 @@ mp_request_t * TL::Verbs::create_requests(int number) {
 	return (mp_request_t *) req;
 }
 
-int TL::Verbs::pt2pt_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+int TL::Verbs::pt2pt_nb_recv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 	int ret = 0;
 	verbs_request_t req = NULL;
-	verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+	verbs_region_t reg = (verbs_region_t) *mp_reg;
 	verbs_client_t client = &clients[client_index[peer]];
 
 
@@ -1093,10 +1093,10 @@ out:
 	return ret;
 }
 
-int TL::Verbs::pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+int TL::Verbs::pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
   int ret = 0;
   verbs_request_t req = NULL;
-  verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+  verbs_region_t reg = (verbs_region_t) *mp_reg;
   verbs_client_t client = &clients[client_index[peer]];
 
   if (nvecs > ib_max_sge) {
@@ -1134,10 +1134,10 @@ out:
   return ret;
 }
 
-int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 	int ret = 0;
 	verbs_request_t req = NULL;
-	verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+	verbs_region_t reg = (verbs_region_t) *mp_reg;
 	verbs_client_t client = &clients[client_index[peer]];
 
 	assert(reg);
@@ -1213,11 +1213,11 @@ out:
     return ret;
 }
 
-int TL::Verbs::pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key)
+int TL::Verbs::pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req)
 {
   int ret = 0;
   verbs_request_t req = NULL;
-  verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+  verbs_region_t reg = (verbs_region_t) *mp_reg;
   verbs_client_t client = &clients[client_index[peer]];
 
   if (nvecs > ib_max_sge) {
@@ -1373,7 +1373,7 @@ exchange_win_info * TL::Verbs::verbs_window_create(void *addr, size_t size, verb
   exchange_win = (exchange_win_info * ) calloc(oob_size, sizeof(exchange_win_info));
   assert(exchange_win != NULL); 
 
-  result = register_key_buffer(addr, size, (mp_key_t *) &window->reg);  
+  result = register_region_buffer(addr, size, (mp_region_t *) &window->reg);  
   assert(result == MP_SUCCESS); 
 
   exchange_win[oob_rank].base_addr = addr;
@@ -1414,7 +1414,7 @@ int TL::Verbs::onesided_window_destroy(mp_window_t *window_t)
   verbs_window_t window = (verbs_window_t) *window_t;
   int result = MP_SUCCESS;
 
-  unregister_key((mp_key_t *) &window->reg);
+  unregister_region((mp_region_t *) &window->reg);
   
   free(window->base_ptr);
   free(window->rkey);
@@ -1424,7 +1424,7 @@ int TL::Verbs::onesided_window_destroy(mp_window_t *window_t)
   return result;
 }
 
-int TL::Verbs::onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
+int TL::Verbs::onesided_nb_put (void *src, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
 {
 	int ret = 0;
 	verbs_request_t req;
@@ -1475,7 +1475,7 @@ out:
 	return ret;
 }
 
-int TL::Verbs::onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
+int TL::Verbs::onesided_nb_get(void *dst, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
 {
   int ret = 0;
   verbs_request_t req;
@@ -1522,9 +1522,9 @@ int TL::Verbs::onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, s
 
 //============== GPUDirect Async - Verbs_GDS class ==============
 int TL::Verbs::setup_sublayer(int par1) { return MP_SUCCESS; }
-int TL::Verbs::pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_send_prepare(void *buf, int size, int peer, mp_key_t *reg_t, mp_request_t *req_t) { return MP_FAILURE; }
+int TL::Verbs::pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { return MP_FAILURE; }
+int TL::Verbs::pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { return MP_FAILURE; }
+int TL::Verbs::pt2pt_send_prepare(void *buf, int size, int peer, mp_region_t *reg_t, mp_request_t *req_t) { return MP_FAILURE; }
 int TL::Verbs::pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::pt2pt_b_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
@@ -1532,9 +1532,9 @@ int TL::Verbs::pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyn
 int TL::Verbs::wait_async (mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::wait_all_async(int count, mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_nb_put_async(void *src, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_nb_get_async(void *dst, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) { return MP_FAILURE; }
+int TL::Verbs::onesided_nb_put_async(void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream) { return MP_FAILURE; }
+int TL::Verbs::onesided_nb_get_async(void *dst, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
+int TL::Verbs::onesided_put_prepare (void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) { return MP_FAILURE; }
 int TL::Verbs::onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::progress_requests (int count, mp_request_t *req_) { return MP_FAILURE; }

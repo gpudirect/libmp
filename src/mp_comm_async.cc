@@ -1,18 +1,18 @@
 #include "oob.hpp"
 #include "tl.hpp"
 #include "mp_external.hpp"
-#include "mp_common.hpp"
 #include "mp.hpp"
+#include "mp_common.hpp"
 
 
 // SA Model: GPU Synchronous, CPU Asynchronous
 
 //============================== PT2PT ==============================
 //Prepare and Post
-int mp_send_prepare(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key) {
+int mp_send_prepare(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_key)
+	if(!mp_req || !mp_reg)
 		return MP_FAILURE;
 
 	if(peer > oob_size)
@@ -21,7 +21,7 @@ int mp_send_prepare(void * buf, size_t size, int peer, mp_request_t * mp_req, mp
 		return MP_FAILURE;
 	}
 
-	return tl_comm->pt2pt_send_prepare(buf, size, peer, mp_req, mp_key);
+	return tl_comm->pt2pt_send_prepare(buf, size, peer, mp_reg, mp_req);
 }
 
 //---------------- Non-Blocking ---------------- 
@@ -43,10 +43,10 @@ int mp_isend_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stre
 	return tl_comm->pt2pt_nb_send_post_all_async(number, mp_req, stream);
 }
 
-int mp_isend_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream) {
+int mp_isend_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_key)
+	if(!mp_req || !mp_reg)
 		return MP_FAILURE;
 
 	if(peer > oob_size)
@@ -55,7 +55,7 @@ int mp_isend_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_
 		return MP_FAILURE;
 	}
 
-	return tl_comm->pt2pt_nb_send_async(buf, size, peer, mp_req, mp_key, stream);
+	return tl_comm->pt2pt_nb_send_async(buf, size, peer, mp_reg, mp_req, stream);
 }
 
 //---------------- Blocking ---------------- 
@@ -77,10 +77,10 @@ int mp_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t strea
 	return tl_comm->pt2pt_b_send_post_all_async(number, mp_req, stream);
 }
 
-int mp_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, cudaStream_t stream) {
+int mp_send_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_key)
+	if(!mp_req || !mp_reg)
 		return MP_FAILURE;
 
 	if(peer > oob_size)
@@ -89,15 +89,15 @@ int mp_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_k
 		return MP_FAILURE;
 	}
 
-	return tl_comm->pt2pt_b_send_async(buf, size, peer, mp_req, mp_key, stream);
+	return tl_comm->pt2pt_b_send_async(buf, size, peer, mp_reg, mp_req, stream);
 }
 
 //============================== ONE-SIDED ==============================
 //---------------- Non-Blocking ---------------- 
-int mp_put_prepare(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags) {
+int mp_put_prepare(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_key)
+	if(!mp_req || !mp_reg)
 		return MP_FAILURE;
 
 	if(peer > oob_size)
@@ -112,7 +112,7 @@ int mp_put_prepare(void *buf, int size, mp_key_t * mp_key, int peer, size_t disp
 		return MP_FAILURE;
 	}
 
-	return tl_comm->onesided_put_prepare(buf, size, mp_key, peer, displ, mp_win, mp_req, flags); 
+	return tl_comm->onesided_put_prepare(buf, size, mp_reg, peer, displ, mp_win, mp_req, flags); 
 }
 
 int mp_iput_post_async(mp_request_t * mp_req, cudaStream_t stream) {
@@ -133,10 +133,10 @@ int mp_iput_post_all_async(int number, mp_request_t * mp_req, cudaStream_t strea
 	return tl_comm->onesided_nb_put_post_all_async(number, mp_req, stream); 
 }
 
-int mp_iput_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags, cudaStream_t stream) {
+int mp_iput_async(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_key)
+	if(!mp_req || !mp_reg)
 		return MP_FAILURE;
 
 	if(peer > oob_size)
@@ -151,13 +151,13 @@ int mp_iput_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ
 		return MP_FAILURE;
 	}
 
-	return tl_comm->onesided_nb_put_async(buf, size, mp_key, peer, displ, mp_win, mp_req, flags, stream); 
+	return tl_comm->onesided_nb_put_async(buf, size, mp_reg, peer, displ, mp_win, mp_req, flags, stream); 
 }
 
-int mp_iget_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, cudaStream_t stream) {
+int mp_iget_async(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_key)
+	if(!mp_req || !mp_reg)
 		return MP_FAILURE;
 
 	if(peer > oob_size)
@@ -166,7 +166,7 @@ int mp_iget_async(void *buf, int size, mp_key_t * mp_key, int peer, size_t displ
 		return MP_FAILURE;
 	}
 
-	return tl_comm->onesided_nb_get_async(buf, size, mp_key, peer, displ, mp_win, mp_req, stream); 
+	return tl_comm->onesided_nb_get_async(buf, size, mp_reg, peer, displ, mp_win, mp_req, stream); 
 }
 
 //============================== WAIT ==============================

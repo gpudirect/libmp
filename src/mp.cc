@@ -1,8 +1,8 @@
 #include "oob.hpp"
 #include "tl.hpp"
 #include "mp_external.hpp"
-#include "mp_common.hpp"
 #include "mp.hpp"
+#include "mp_common.hpp"
 
 int oob_size=0, oob_rank=0;
 int mp_warn_is_enabled=0, mp_dbg_is_enabled=0;
@@ -106,12 +106,12 @@ mp_request_t * mp_create_request(int number) {
 	return tl_comm->create_requests(number);
 }
 
-mp_key_t * mp_create_keys(int number) {
+mp_region_t * mp_create_regions(int number) {
 	MP_CHECK_TL_OBJ();
-	return tl_comm->create_keys(number);
+	return tl_comm->create_regions(number);
 }
 
-int mp_unregister_keys(int number, mp_key_t * mp_keys) {
+int mp_unregister_regions(int number, mp_region_t * mp_keys) {
 	MP_CHECK_TL_OBJ();
 	int i;
 	if(!mp_keys)
@@ -128,15 +128,15 @@ int mp_unregister_keys(int number, mp_key_t * mp_keys) {
 
 	for(i=0; i<number; i++) {
 		if(mp_keys[i])
-			tl_comm->unregister_key(&mp_keys[i]);
+			tl_comm->unregister_region(&mp_keys[i]);
 	}
 
 	return MP_SUCCESS;
 }
 
-int mp_register_key_buffer(void * addr, size_t length, mp_key_t * mp_key) {
+int mp_register_region_buffer(void * addr, size_t length, mp_region_t * mp_key) {
 	MP_CHECK_TL_OBJ();
-	return tl_comm->register_key_buffer(addr, length, mp_key);
+	return tl_comm->register_region_buffer(addr, length, mp_key);
 }
 
 int mp_window_create(void *addr, size_t size, mp_window_t *window_t) {

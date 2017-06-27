@@ -141,5 +141,5 @@ AM_CONDITIONAL(HAVE_VERBS, [ test x$want_libibverbs = xyes ])
 AM_CONDITIONAL(HAVE_GDSYNC, [ test x$want_libgdsync = xyes ])
 AM_CONDITIONAL(HAVE_MPI, [ test x$want_mpi = xyes ])
 
-AC_CONFIG_FILES([Makefile libmp.spec.in examples/Makefile])
+AC_CONFIG_FILES([Makefile libmp.spec examples/Makefile])
 AC_OUTPUT

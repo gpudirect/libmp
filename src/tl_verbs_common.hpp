@@ -40,13 +40,13 @@ typedef struct {
 } ib_context_t;
 
 
-struct verbs_region {
+struct verbs_region : mp_region {
     uint32_t key;
     struct ibv_mr *mr;
 };
 typedef struct verbs_region * verbs_region_t;
 
-struct verbs_window {
+struct verbs_window : mp_window {
    void **base_ptr;
    int size;
    struct verbs_region *reg;

@@ -1,4 +1,5 @@
-#include "mp.hpp"
+#include "mp_common_examples.hpp"
+
 
 #define BUF_SIZE 20
 
@@ -9,17 +10,18 @@ int main(int argc, char *argv[])
 	char *envVar = NULL;
 	char ** sBuf, ** rBuf;
 	char ** hostBuf;
-	int gpu_id=0;
+	int device_id=MP_DEFAULT;
 
-	mp_key_t * mp_keys_recv, * mp_keys_send;
+	mp_region_t * mp_regs_recv, * mp_regs_send;
 	mp_request_t * mp_reqs_recv, * mp_reqs_send;
 	
+	//GPUDirect Async
 	envVar = getenv("MP_USE_GPU");
 	if (envVar != NULL) {
-		gpu_id = atoi(envVar);
+		device_id = atoi(envVar);
 	}
 
-	ret = mp_init(argc, argv, gpu_id);
+	ret = mp_init(argc, argv, device_id);
 	if(ret)
 		exit(EXIT_FAILURE);
 
@@ -32,6 +34,7 @@ int main(int argc, char *argv[])
 					peersNum, myId, libmp_version, oob_type, tl_type);
 
 
+	//GPUDirect RDMA
 	envVar = getenv("MP_GPU_BUFFERS"); 
 	if (envVar != NULL) {
 		use_gpu_buffers = atoi(envVar);
@@ -44,8 +47,8 @@ int main(int argc, char *argv[])
 	rBuf 			= (char **) calloc(peersNum, sizeof(char *));
 	sBuf 			= (char **) calloc(peersNum, sizeof(char *));
 	hostBuf 		= (char **) calloc(peersNum, sizeof(char *));
-	mp_keys_recv 	= mp_create_keys(peersNum);
-	mp_keys_send 	= mp_create_keys(peersNum);
+	mp_regs_recv 	= mp_create_regions(peersNum);
+	mp_regs_send 	= mp_create_regions(peersNum);
 	mp_reqs_recv 	= mp_create_request(peersNum);
 	mp_reqs_send 	= mp_create_request(peersNum);
 
@@ -71,14 +74,14 @@ int main(int argc, char *argv[])
 				memset(sBuf[i], ('a'+myId), BUF_SIZE);
 			}
 
-			MP_CHECK(mp_register_key_buffer(rBuf[i], BUF_SIZE, &mp_keys_recv[i]));
-			if(!myId) printf("[%d] mp_register_key_buffer recv\n", myId);
+			MP_CHECK(mp_register_region_buffer(rBuf[i], BUF_SIZE, &mp_regs_recv[i]));
+			if(!myId) printf("[%d] mp_register_region_buffer recv\n", myId);
 
-			MP_CHECK(mp_irecv(rBuf[i], BUF_SIZE, i, &mp_reqs_recv[i], &mp_keys_recv[i]));
+			MP_CHECK(mp_irecv(rBuf[i], BUF_SIZE, i, &mp_regs_recv[i], &mp_reqs_recv[i]));
 			if(!myId) printf("[%d] Recv Client %d, request=%p\n", myId, i, &mp_reqs_recv[i]);
 
-			MP_CHECK(mp_register_key_buffer(sBuf[i], BUF_SIZE, &mp_keys_send[i]));
-			if(!myId) printf("[%d] mp_register_key_buffer send\n", myId);
+			MP_CHECK(mp_register_region_buffer(sBuf[i], BUF_SIZE, &mp_regs_send[i]));
+			if(!myId) printf("[%d] mp_register_region_buffer send\n", myId);
 		}	
 	}
 	
@@ -91,7 +94,7 @@ int main(int argc, char *argv[])
 	for(i=0; i<peersNum; i++) {
 		if(i != myId)
 		{
-			MP_CHECK(mp_isend_async(sBuf[i], BUF_SIZE, i, &mp_reqs_send[i], &mp_keys_send[i], NULL));
+			MP_CHECK(mp_isend_async(sBuf[i], BUF_SIZE, i, &mp_regs_send[i], &mp_reqs_send[i], NULL));
 			if(!myId) printf("[%d] Send Client %d, request=%p\n", myId, i, &mp_reqs_send[i]);
 		}
 	}
@@ -150,13 +153,13 @@ int main(int argc, char *argv[])
 	if(use_gpu_buffers == 1)
 		free(hostBuf);
 	
-	MP_CHECK(mp_unregister_keys(peersNum, mp_keys_recv));
-	MP_CHECK(mp_unregister_keys(peersNum, mp_keys_send));
+	MP_CHECK(mp_unregister_regions(peersNum, mp_regs_recv));
+	MP_CHECK(mp_unregister_regions(peersNum, mp_regs_send));
 
 	free(rBuf);
 	free(sBuf);
-	free(mp_keys_recv);
-	free(mp_keys_send);
+	free(mp_regs_recv);
+	free(mp_regs_send);
 	free(mp_reqs_recv);
 	free(mp_reqs_send);
 	

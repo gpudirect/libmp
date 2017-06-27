@@ -81,11 +81,13 @@ enum mp_put_flags {
     MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
 };
 
-//cast done inside tl layer
-typedef void * mp_request_t;
-typedef void * mp_key_t;
-typedef void * mp_window_t;
+struct mp_request{};
+struct mp_region {};
+struct mp_window {};
 
+typedef struct mp_request * mp_request_t;
+typedef struct mp_region * mp_region_t;
+typedef struct mp_window * mp_window_t;
 
 #ifndef ACCESS_ONCE
 #define ACCESS_ONCE(V)                          \

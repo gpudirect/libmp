@@ -663,7 +663,7 @@ namespace TL
 				}
 
 				if (verbs_enable_ud) {
-					int result = register_key_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
+					int result = register_region_buffer(ud_padding, UD_ADDITION, &ud_padding_reg);
 					assert(result == MP_SUCCESS);
 				}
 
@@ -826,10 +826,10 @@ namespace TL
 				return retcode;			
 			}
 
-			int pt2pt_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+			int pt2pt_nb_recv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 				int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_client_async_t client = &clients_async[client_index[peer]];
 
 				assert(reg);
@@ -880,10 +880,10 @@ namespace TL
 				return ret;
 			}
 
-			int pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+			int pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 				int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_client_async_t client = &clients_async[client_index[peer]];
 
 				if (nvecs > ib_max_sge) {
@@ -924,10 +924,10 @@ namespace TL
 			}
 
 
-			int pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key) {
+			int pt2pt_nb_send(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 				int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_client_async_t client = &clients_async[client_index[peer]];
 
 				assert(reg);
@@ -1008,11 +1008,11 @@ namespace TL
 			    return ret;
 			}
 
-			int pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key)
+			int pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req)
 			{
 				int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_mem_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_client_async_t client = &clients_async[client_index[peer]];
 
 				if (nvecs > ib_max_sge) {
@@ -1171,7 +1171,7 @@ namespace TL
 			}
 
 
-			int onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
+			int onesided_nb_put (void *src, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
 			{
 				int ret = 0;
 				verbs_request_async_t req;
@@ -1223,7 +1223,7 @@ namespace TL
 				return ret;
 			}
 
-			int onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
+			int onesided_nb_get(void *dst, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
 			{
 				int ret = 0;
 				verbs_request_async_t req;
@@ -1295,11 +1295,11 @@ namespace TL
 			//=========================================================================================================================
 
 			//==================================================== ASYNC ===============================================================
-			int pt2pt_nb_send_async(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key, asyncStream stream)
+			int pt2pt_nb_send_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream stream)
 			{
 			    int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 			    verbs_client_async_t client = &clients_async[client_index[peer]];
 			    
 			    if (use_event_sync) {
@@ -1371,11 +1371,11 @@ namespace TL
 			}
 
 			//mp_send_on_stream
-			int pt2pt_b_send_async(void *buf, int size, int peer, mp_key_t *mp_key,  mp_request_t *mp_req, asyncStream stream)
+			int pt2pt_b_send_async(void *buf, int size, int peer, mp_region_t * mp_reg,  mp_request_t *mp_req, asyncStream stream)
 			{
 			    int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_client_async_t client = &clients_async[client_index[peer]];
 
 			    if (use_event_sync) {
@@ -1470,11 +1470,11 @@ namespace TL
 			}
 
 			//mp_send_prepare
-			int pt2pt_send_prepare(void *buf, int size, int peer, mp_key_t *mp_key, mp_request_t *mp_req)
+			int pt2pt_send_prepare(void *buf, int size, int peer, mp_region_t * mp_reg, mp_request_t *mp_req)
 			{
 			    int ret = 0;
 			    verbs_request_async_t req;
-			    verbs_region_t reg = (verbs_region_t )*mp_key;
+			    verbs_region_t reg = (verbs_region_t )*mp_reg;
 			    verbs_client_async_t client = &clients_async[client_index[peer]];
 			  
 			    req = verbs_new_request(client, MP_SEND, MP_PREPARED); //, stream);
@@ -1873,12 +1873,12 @@ namespace TL
 			    return ret;
 			}
 
-			int onesided_nb_put_async(void *src, int size, mp_key_t *mp_key, int peer, size_t displ,
+			int onesided_nb_put_async(void *src, int size, mp_region_t * mp_reg, int peer, size_t displ,
                        mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream)
 			{
 				int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_window_t window = (verbs_window_t) *window_t;
 				int client_id = client_index[peer];
 				verbs_client_async_t client = &clients_async[client_id];
@@ -1936,13 +1936,13 @@ namespace TL
 				return ret;
 			}
 
-			int onesided_nb_get_async(void *dst, int size, mp_key_t *mp_key, int peer, size_t displ,
+			int onesided_nb_get_async(void *dst, int size, mp_region_t * mp_reg, int peer, size_t displ,
 			        mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream)
 			{
 
 				int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_window_t window = (verbs_window_t) *window_t;
 				int client_id = client_index[peer];
 				verbs_client_async_t client = &clients_async[client_id];
@@ -1992,12 +1992,12 @@ namespace TL
 			}
 
 			//mp_put_prepare
-			int onesided_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ,
+			int onesided_put_prepare (void *src, int size, mp_region_t * mp_reg, int peer, size_t displ,
                     mp_window_t *window_t, mp_request_t *mp_req, int flags)
 			{
 				int ret = 0;
 				verbs_request_async_t req = NULL;
-				verbs_region_t reg = (verbs_region_t) *mp_key;
+				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_window_t window = (verbs_window_t) *window_t;
 				int client_id = client_index[peer];
 				verbs_client_async_t client = &clients_async[client_id];
@@ -2149,8 +2149,8 @@ static class update_tl_list_async {
 
 #if 0
 static int mp_prepare_send(verbs_client_async_t client, verbs_request_async_t req)
-int (void *buf, int size, int peer, mp_key_t *mp_key, mp_request_t *req_t)
-int mp_isendv_on_stream (struct iovec *v, int nvecs, int peer, mp_key_t *mp_key,
+int (void *buf, int size, int peer, mp_region_t * mp_reg, mp_request_t *req_t)
+int mp_isendv_on_stream (struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg,
                          mp_request_t *req_t, asyncStream stream)
-int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_key_t *mp_key, mp_request_t *req_t)
+int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t *req_t)
 #endif

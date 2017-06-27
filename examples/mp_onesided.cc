@@ -1,29 +1,4 @@
-#include <mp.hpp>
-#include <cuda.h>
-#include <cuda_runtime.h>
-
-#define CUDA_CHECK(stmt)                                \
-do {                                                    \
-    cudaError_t result = (stmt);                        \
-    if (cudaSuccess != result) {                        \
-        fprintf(stderr, "[%s] [%d] cuda failed with %s \n",   \
-         __FILE__, __LINE__, cudaGetErrorString(result));\
-        exit(-1);                                       \
-    }                                                   \
-    assert(cudaSuccess == result);                      \
-} while (0)
-
-
-#define CU_CHECK(stmt)                                  \
-do {                                                    \
-    CUresult result = (stmt);                           \
-    if (CUDA_SUCCESS != result) {                       \
-        fprintf(stderr, "[%s] [%d] cu failed with %d \n",    \
-         __FILE__, __LINE__, result);    \
-        exit(-1);                                       \
-    }                                                   \
-    assert(CUDA_SUCCESS == result);                     \
-} while (0)
+#include "mp_common_examples.hpp"
 
 #define SIZE 20
 #define WINDOW_SIZE 64
@@ -37,21 +12,21 @@ int main(int argc, char *argv[])
 	char * commBuf;
 	char * hostBuf;
 	int totSize=SIZE*WINDOW_SIZE;
-	int gpu_id=0;
+	int device_id=MP_DEFAULT;
 
-	mp_key_t * mp_keys_put;
+	mp_region_t * mp_regs_put;
 	mp_request_t * mp_reqs_put;
 	mp_window_t mp_win;
 
+	//GPUDirect Async
 	envVar = getenv("MP_USE_GPU");
 	if (envVar != NULL) {
-		gpu_id = atoi(envVar);
+		device_id = atoi(envVar);
 	}
 
-	ret = mp_init(argc, argv, gpu_id);
+	ret = mp_init(argc, argv, device_id);
 	if(ret)
 		exit(EXIT_FAILURE);
-
 
 	mp_query_param(MP_PARAM_VERSION, &libmp_version);
 	mp_query_param(MP_OOB_TYPE, &oob_type);
@@ -66,6 +41,7 @@ int main(int argc, char *argv[])
 		mp_abort();
 	}
 
+	//GPUDirect RDMA
 	envVar = getenv("MP_GPU_BUFFERS"); 
 	if (envVar != NULL) {
 		use_gpu_buffers = atoi(envVar);
@@ -74,7 +50,7 @@ int main(int argc, char *argv[])
 	printf("Rank %d, Using GPU buffers: %d\n", myId, use_gpu_buffers);
 
 	// ===== Create mem objs
-	mp_keys_put 	= mp_create_keys(1);
+	mp_regs_put 	= mp_create_regions(1);
 	mp_reqs_put 	= mp_create_request(WINDOW_SIZE);
 
 	hostBuf = (char *) calloc(totSize, sizeof(char));
@@ -90,7 +66,7 @@ int main(int argc, char *argv[])
 		memset(commBuf, 0, totSize);
 	}
 
-	MP_CHECK(mp_register_key_buffer(commBuf, totSize, &mp_keys_put[0]));
+	MP_CHECK(mp_register_region_buffer(commBuf, totSize, &mp_regs_put[0]));
 	MP_CHECK(mp_window_create(commBuf, totSize, &mp_win));
 
 	for (i = 0; i < ITER_COUNT; i++)
@@ -104,7 +80,7 @@ int main(int argc, char *argv[])
 				memset(commBuf, (i+1)%CHAR_MAX, totSize);
  			
 			for(j=0; j < WINDOW_SIZE; j++)	
-				MP_CHECK(mp_iput((void *)((uintptr_t)commBuf + j*SIZE), SIZE, mp_keys_put, !myId, j*SIZE, &mp_win, &mp_reqs_put[j], 0)); 
+				MP_CHECK(mp_iput((void *)((uintptr_t)commBuf + j*SIZE), SIZE, mp_regs_put, !myId, j*SIZE, &mp_win, &mp_reqs_put[j], 0)); 
 
 			for(j=0; j < WINDOW_SIZE; j++)	
 				MP_CHECK(mp_wait(&mp_reqs_put[j]));
@@ -134,7 +110,7 @@ int main(int argc, char *argv[])
 	if(!myId) printf("Test passed!\n");
 	// ===== Cleanup
 	MP_CHECK(mp_window_destroy(&mp_win));
-	MP_CHECK(mp_unregister_keys(1, mp_keys_put));
+	MP_CHECK(mp_unregister_regions(1, mp_regs_put));
 
 	if(use_gpu_buffers == 1)
 	{

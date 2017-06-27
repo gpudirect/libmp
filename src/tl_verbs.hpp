@@ -3,7 +3,7 @@
 //#include "tl_verbs_types.hpp"
 #include <typeinfo>
 
-struct verbs_request {
+struct verbs_request : mp_request {
   int peer;
   mp_req_type_t type;
   int status;
@@ -146,7 +146,7 @@ namespace TL
 			verbs_request_t mp_request_free_list;
 			mem_region_t *mem_region_list;
 			char ud_padding[UD_ADDITION];
-			mp_key_t ud_padding_reg;
+			mp_region_t ud_padding_reg;
 			int mp_request_active_count;
 			int verbs_request_limit;
 			struct ibv_wc *wc;
@@ -221,9 +221,9 @@ namespace TL
 			void cleanupInit();
 			int finalize();
 			// ===== COMMUNICATION
-			int register_key_buffer(void * addr, size_t length, mp_key_t * mp_mem_key);
-			int unregister_key(mp_key_t *reg_);
-			mp_key_t * create_keys(int number);
+			int register_region_buffer(void * addr, size_t length, mp_region_t * mp_reg);
+			int unregister_region(mp_region_t *reg_);
+			mp_region_t * create_regions(int number);
 			mp_request_t * create_requests(int number);
 
 			//====================== WAIT ======================
@@ -233,37 +233,37 @@ namespace TL
 
 			//====================== PT2PT ======================
 			//point-to-point communications
-			int pt2pt_nb_recv(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
-			int pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
-			int pt2pt_nb_send(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
-			int pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_request_t * mp_req, mp_key_t * mp_mem_key);
+			int pt2pt_nb_recv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
+			int pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
+			int pt2pt_nb_send(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
+			int pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
 
 			//====================== ONE-SIDED ======================
 			//one-sided operations: window creation, put and get
 			int onesided_window_create(void *addr, size_t size, mp_window_t *window_t);
 			int onesided_window_destroy(mp_window_t *window_t);
-			int onesided_nb_put (void *src, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags);
-			int onesided_nb_get(void *dst, int size, mp_key_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t);
+			int onesided_nb_put (void *src, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags);
+			int onesided_nb_get(void *dst, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req);
 
 			//============== GPUDirect Async - Verbs_Async class ==============
 			int setup_sublayer(int par1);
-	        int pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream);
-	        int pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_request_t * mp_req, mp_key_t * mp_mem_key, asyncStream async_stream);
-	        int pt2pt_send_prepare(void *buf, int size, int peer, mp_key_t *reg_t, mp_request_t *req_t);
-			int pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream);
-			int pt2pt_b_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream);
-			int pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream);
-			int pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream);
-			int wait_async (mp_request_t *req_t, asyncStream stream);
-	        int wait_all_async(int count, mp_request_t *req_t, asyncStream stream);
-	        int wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream);
-			int onesided_nb_put_async(void *src, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream);
-			int onesided_nb_get_async(void *dst, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream);
-			int onesided_put_prepare (void *src, int size, mp_key_t *mp_key, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags);
+			int pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream);
+			int pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream);
+			int pt2pt_send_prepare(void *buf, int size, int peer, mp_region_t *reg_t, mp_request_t *mp_req);
+			int pt2pt_b_send_post_async(mp_request_t * mp_req, asyncStream stream);
+			int pt2pt_b_send_post_all_async(int count, mp_request_t * mp_req, asyncStream stream);
+			int pt2pt_nb_send_post_async(mp_request_t * mp_req, asyncStream stream);
+			int pt2pt_nb_send_post_all_async(int count, mp_request_t * mp_req, asyncStream stream);
+			int wait_async (mp_request_t * mp_req, asyncStream stream);
+			int wait_all_async(int count, mp_request_t * mp_req, asyncStream stream);
+			int wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream);
+			int onesided_nb_put_async(void *src, int size, mp_region_t *mp_region, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream);
+			int onesided_nb_get_async(void *dst, int size, mp_region_t *mp_region, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream);
+			int onesided_put_prepare (void *src, int size, mp_region_t *mp_region, int peer, size_t displ, mp_window_t *window_t, mp_request_t * mp_req, int flags);
 			int onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream);
 			int onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream);
 			//useful only with gds??
-			int progress_requests (int count, mp_request_t *req_);
+			int progress_requests (int count, mp_request_t * mp_req);
 			//================================================================
 	};
 }

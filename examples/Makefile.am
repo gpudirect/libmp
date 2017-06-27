@@ -26,9 +26,11 @@ AM_CPPFLAGS += -I$(MPI_PATH)/include
 AM_LDFLAGS += -L$(MPI_PATH)/lib -lmpi
 endif
 
-
+if HAVE_GDSYNC
+bin_PROGRAMS = mp_pt2pt mp_pt2pt_async mp_onesided
+else
 bin_PROGRAMS = mp_pt2pt mp_onesided
-#mp_putget mp_sendrecv mp_sendrecv_kernel mp_sendrecv_stream
+endif
 
 noinst_PROGRAMS = 
 
@@ -37,6 +39,9 @@ CXXLD=$(MPICXX)
 
 mp_pt2pt_SOURCES = mp_pt2pt.cc
 mp_onesided_SOURCES = mp_onesided.cc
+if HAVE_GDSYNC
+mp_pt2pt_async_SOURCES = mp_pt2pt_async.cc
+endif
 
 SUFFIXES= .cu
 
