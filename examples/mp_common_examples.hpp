@@ -29,7 +29,7 @@ static int __dbg_msg(const char *fmt, ...)
     return ret;
 }
 
-#if define(HAVE_CUDA) || define(HAVE_GDSYNC)
+#if defined(HAVE_CUDA) || defined(HAVE_GDSYNC)
 
 #include <cuda.h>
 #include <cuda_runtime.h>
