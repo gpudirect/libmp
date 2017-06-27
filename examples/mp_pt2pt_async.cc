@@ -131,6 +131,19 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	for(i=0; i<peersNum; i++) {
+		if(i != myId)
+		{
+			if(use_gpu_buffers == 1)
+			{
+				CUDA_CHECK(cudaMemcpy(hostBuf[i], rBuf[i], BUF_SIZE, cudaMemcpyDeviceToHost));
+				printf("[%d] Received from [%d]: %s\n", myId, i, hostBuf[i]);
+			}
+			else
+				printf("[%d] Received from [%d]: %s\n", myId, i, rBuf[i]);
+		}
+	}
+
 	// ===== Cleanup
 	for(i=0; i<peersNum; i++)
 	{
