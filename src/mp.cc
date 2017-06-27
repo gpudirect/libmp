@@ -111,10 +111,10 @@ mp_region_t * mp_create_regions(int number) {
 	return tl_comm->create_regions(number);
 }
 
-int mp_unregister_regions(int number, mp_region_t * mp_keys) {
+int mp_unregister_regions(int number, mp_region_t * mp_regs) {
 	MP_CHECK_TL_OBJ();
 	int i;
-	if(!mp_keys)
+	if(!mp_regs)
 	{
 		mp_err_msg(oob_rank, "Keys not initialized\n");
 		return MP_FAILURE;
@@ -127,16 +127,16 @@ int mp_unregister_regions(int number, mp_region_t * mp_keys) {
 	}	
 
 	for(i=0; i<number; i++) {
-		if(mp_keys[i])
-			tl_comm->unregister_region(&mp_keys[i]);
+		if(mp_regs[i])
+			tl_comm->unregister_region(&mp_regs[i]);
 	}
 
 	return MP_SUCCESS;
 }
 
-int mp_register_region_buffer(void * addr, size_t length, mp_region_t * mp_key) {
+int mp_register_region_buffer(void * addr, size_t length, mp_region_t * mp_reg) {
 	MP_CHECK_TL_OBJ();
-	return tl_comm->register_region_buffer(addr, length, mp_key);
+	return tl_comm->register_region_buffer(addr, length, mp_reg);
 }
 
 int mp_window_create(void *addr, size_t size, mp_window_t *window_t) {

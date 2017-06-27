@@ -31,7 +31,7 @@ typedef struct mp_window * mp_window_t;
 
 #define MP_SUCCESS 0
 #define MP_FAILURE 1
-#define MP_DEFAULT 0
+#define MP_DEFAULT -1
 
 #define MP_CHECK(stmt)                                  \
 do {                                                    \

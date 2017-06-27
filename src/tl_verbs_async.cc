@@ -4,6 +4,10 @@
 #include <gdsync/tools.h>
 #include <gdsync/core.h>
 
+#define CHECK_GPU(gid) {						\
+	if(gid <= MP_DEFAULT) return MP_FAILURE;	\
+}
+
 struct verbs_request_async : verbs_request {
 	union
 	{
@@ -1289,10 +1293,17 @@ namespace TL
 				
 				//TODO: additional checks
 				gpu_id = par1;
-				mp_dbg_msg(oob_rank, "Using gpu_id %d\n", gpu_id);
-				CUDA_CHECK(cudaSetDevice(gpu_id));
-				//LibGDSync issue #18
-				cudaFree(0);
+				if(gpu_id == MP_DEFAULT)
+				{
+					mp_warn_msg("GPU_ID = MP_DEFAULT -> No GPUDirect Async support\n");
+				}
+				else
+				{
+					CUDA_CHECK(cudaSetDevice(gpu_id));
+					mp_dbg_msg(oob_rank, "Using gpu_id %d\n", gpu_id);
+					//LibGDSync issue #18
+					cudaFree(0);					
+				}
 
 				return MP_SUCCESS;
 			}
@@ -1305,7 +1316,9 @@ namespace TL
 				verbs_request_async_t req = NULL;
 				verbs_region_t reg = (verbs_region_t) *mp_reg;
 			    verbs_client_async_t client = &clients_async[client_index[peer]];
-			    
+			 	
+			 	CHECK_GPU(gpu_id);
+
 			    if (use_event_sync) {
 			        req = verbs_new_request(client, MP_SEND, MP_PREPARED); //, stream);
 			        assert(req);
@@ -1397,7 +1410,8 @@ namespace TL
 				verbs_request_async_t req = NULL;
 				verbs_region_t reg = (verbs_region_t) *mp_reg;
 				verbs_client_async_t client = &clients_async[client_index[peer]];
-
+				CHECK_GPU(gpu_id);
+			    
 			    if (use_event_sync) {
 			        req = verbs_new_request(client, MP_SEND, MP_PREPARED); //, stream);
 			        assert(req);
@@ -1528,7 +1542,8 @@ namespace TL
 			    verbs_request_async_t req;
 			    verbs_region_t reg = (verbs_region_t )*mp_reg;
 			    verbs_client_async_t client = &clients_async[client_index[peer]];
-			  
+			  	CHECK_GPU(gpu_id);
+
 			    req = verbs_new_request(client, MP_SEND, MP_PREPARED); //, stream);
 			    assert(req);
 
@@ -1603,6 +1618,8 @@ namespace TL
 			int pt2pt_b_send_post_all_async(int count, mp_request_t *mp_req, asyncStream stream)
 			{
 			    int i, ret = 0, tot_local_reqs = 8; //??
+			    CHECK_GPU(gpu_id);
+
 				if (use_event_sync)
 				{
 				   for (i=0; i<count; i++) 
@@ -1740,6 +1757,7 @@ namespace TL
 			    int ret = 0, i, tot_local_reqs=8;
 			    gds_send_request_t gds_send_request_local[tot_local_reqs];
 			    gds_send_request_t *gds_send_request;
+			    CHECK_GPU(gpu_id);
 
 			    mp_dbg_msg(oob_rank, " Entering \n");
 
@@ -1871,6 +1889,7 @@ namespace TL
 				gds_wait_cond_flag_t cond_flags = GDS_WAIT_COND_GEQ;
 				size_t n_descs = 0;
 				gds_descriptor_t descs[1];
+				CHECK_GPU(gpu_id);
 
 				mp_dbg_msg(oob_rank, "ptr=%p value=%d\n", ptr, value);
 
@@ -1912,6 +1931,7 @@ namespace TL
 			int wait_all_async(int count, mp_request_t *mp_req, asyncStream stream)
 			{
 			    int i, ret = 0;
+			    CHECK_GPU(gpu_id);
 
 			    if (!count)
 			        return MP_FAILURE;
@@ -2017,6 +2037,8 @@ namespace TL
 				int client_id = client_index[peer];
 				verbs_client_async_t client = &clients_async[client_id];
 
+				CHECK_GPU(gpu_id);
+
 				if (verbs_enable_ud) { 
 					mp_err_msg(oob_rank, "put/get not supported with UD \n");
 					ret = MP_FAILURE;
@@ -2080,6 +2102,7 @@ namespace TL
 				verbs_window_t window = (verbs_window_t) *window_t;
 				int client_id = client_index[peer];
 				verbs_client_async_t client = &clients_async[client_id];
+				CHECK_GPU(gpu_id);
 
 				if (verbs_enable_ud) { 
 					mp_err_msg(oob_rank, "put/get not supported with UD \n");
@@ -2230,7 +2253,8 @@ namespace TL
 			    int i, ret = 0;
 			    gds_send_request_t gds_send_request_local[8];
 			    gds_send_request_t *gds_send_request = NULL;
-
+			    CHECK_GPU(gpu_id);
+			    
 			    mp_dbg_msg(oob_rank, "count=%d\n", count);
 
 			    if (count <= 8) {
