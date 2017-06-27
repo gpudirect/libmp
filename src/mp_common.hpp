@@ -31,11 +31,11 @@
 #define OOB_PRIORITY_MPI 0
 #define OOB_PRIORITY_SOCKET 1
 
-#define OOB_SUCCESS 0
-#define OOB_FAILURE	1
-
 #define MP_SUCCESS 0
 #define MP_FAILURE 1
+
+#define OOB_SUCCESS 0
+#define OOB_FAILURE	1
 
 #define MAX_PEERS 50
 
@@ -85,6 +85,7 @@ enum mp_put_flags {
 typedef void * mp_request_t;
 typedef void * mp_key_t;
 typedef void * mp_window_t;
+
 
 #ifndef ACCESS_ONCE
 #define ACCESS_ONCE(V)                          \

@@ -19,14 +19,14 @@
 #include <time.h>
 #include <errno.h>
 #include <memory>
-#include "mp_common.hpp"
 
-extern int oob_size, oob_rank;
-extern int mp_warn_is_enabled, mp_dbg_is_enabled;
-extern OOB::Communicator * oob_comm;
-extern TL::Communicator * tl_comm;
-extern int oob_type;
-extern int tl_type;
+//cast done inside tl layer
+typedef void * mp_request_t;
+typedef void * mp_key_t;
+typedef void * mp_window_t;
+
+#define MP_SUCCESS 0
+#define MP_FAILURE 1
 
 #define MP_CHECK(stmt)                                  \
 do {                                                    \
@@ -102,6 +102,9 @@ int mp_wait(mp_request_t * mp_req);
 int mp_wait_all(int number, mp_request_t * mp_reqs);
 
 #ifdef HAVE_GDSYNC
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 //===== mp_comm_async.cc
 int mp_send_prepare(void * buf, size_t size, int peer, mp_request_t * mp_req, mp_key_t * mp_key);
 int mp_isend_post_async(mp_request_t * mp_req, cudaStream_t stream);

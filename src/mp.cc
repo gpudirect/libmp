@@ -1,6 +1,8 @@
-#include "mp.hpp"
 #include "oob.hpp"
 #include "tl.hpp"
+#include "mp_external.hpp"
+#include "mp_common.hpp"
+#include "mp.hpp"
 
 int oob_size=0, oob_rank=0;
 int mp_warn_is_enabled=0, mp_dbg_is_enabled=0;
@@ -53,16 +55,18 @@ int mp_init(int argc, char *argv[], int par1)
 #ifdef HAVE_GDSYNC
 	tl_comm = getTLObj(TL_INDEX_VERBS_ASYNC);
 	tl_type = TL_INDEX_VERBS_ASYNC;
+	mp_dbg_msg(oob_rank, "getTLObj(TL_INDEX_VERBS_ASYNC)\n");
 #else
 	#ifdef HAVE_VERBS
 		tl_comm = getTLObj(TL_INDEX_VERBS);
 		tl_type = TL_INDEX_VERBS;
+		mp_dbg_msg(oob_rank, "getTLObj(TL_INDEX_VERBS)\n");
 	#else
 		tl_comm = getTLObj(TL_INDEX_PSM);
 		tl_type = TL_INDEX_PSM;
+		mp_dbg_msg(oob_rank, "getTLObj(TL_INDEX_PSM)\n");
 	#endif
 #endif
-	mp_dbg_msg(oob_rank, "getTLObj\n");
 
 	MP_CHECK_COMM_OBJ();
 	MP_CHECK(tl_comm->setupOOB(oob_comm));
@@ -71,7 +75,6 @@ int mp_init(int argc, char *argv[], int par1)
 	//LibGDSync in case of Verbs 
 	MP_CHECK(tl_comm->setup_sublayer(par1));
 	mp_dbg_msg(oob_rank, "setup_sublayer\n");
-
 	MP_CHECK(tl_comm->setupNetworkDevices());
 	mp_dbg_msg(oob_rank, "setupNetworkDevices\n");
 	MP_CHECK(tl_comm->createEndpoints());

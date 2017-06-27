@@ -1,13 +1,33 @@
 CUDA_PATH = @CUDA_PATH@
 MPI_PATH = @MPI_PATH@
 
-AM_CPPFLAGS  = -I$(CUDA_PATH)/include -I$(MPI_PATH)/include
-AM_CPPFLAGS += -D__STDC_FORMAT_MACROS
+#AM_CPPFLAGS = $AM_MAKEFLAGS
+AM_CPPFLAGS = -D__STDC_FORMAT_MACROS
 AM_CPPFLAGS += -I$(top_srcdir)/include
+AM_CPPFLAGS += -I$(top_srcdir)/src
 
-AM_LDFLAGS   = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lmpi -lcuda -lcudart
+AM_LDFLAGS = -L$(top_srcdir)/lib $(top_builddir)/src/libmp.la
 
-bin_PROGRAMS = mp_pt2pt
+if HAVE_CUDA
+AM_CPPFLAGS += -I$(CUDA_PATH)/include
+AM_LDFLAGS += -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcuda -lcudart
+endif
+
+if HAVE_GDSYNC
+AM_LDFLAGS += -libverbs -lgdsync -lgdrapi
+endif
+
+if HAVE_VERBS
+AM_LDFLAGS += -libverbs
+endif
+
+if HAVE_MPI
+AM_CPPFLAGS += -I$(MPI_PATH)/include
+AM_LDFLAGS += -L$(MPI_PATH)/lib -lmpi
+endif
+
+
+bin_PROGRAMS = mp_pt2pt mp_onesided
 #mp_putget mp_sendrecv mp_sendrecv_kernel mp_sendrecv_stream
 
 noinst_PROGRAMS = 
@@ -16,15 +36,7 @@ CCLD=$(MPICXX)
 CXXLD=$(MPICXX)
 
 mp_pt2pt_SOURCES = mp_pt2pt.cc
-
-mp_putget_SOURCES = mp_putget.c
-
-mp_sendrecv_SOURCES = mp_sendrecv.c
-
-mp_sendrecv_stream_SOURCES = mp_sendrecv_stream.c
-
-mp_sendrecv_kernel_SOURCES = mp_sendrecv_kernel.cu
-
+mp_onesided_SOURCES = mp_onesided.cc
 
 SUFFIXES= .cu
 

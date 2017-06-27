@@ -33,7 +33,7 @@ MVAPICH_params="$MVAPICH_params -genv MP_GPU_BUFFERS $GPUBUF "
 #MVAPICH_params=""
 
 set -x
-$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile ./wrapper.sh $TEST_NAME
+$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile $HOME/libmp/scripts/wrapper.sh $HOME/libmp/bin/$TEST_NAME
 
 #-verbose
 #nvprof -o nvprof-singlestream.%q{MV2_COMM_WORLD_LOCAL_RANK}.nvprof

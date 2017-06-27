@@ -1,32 +1,47 @@
 CUDA_PATH = @CUDA_PATH@
 MPI_PATH = @MPI_PATH@
 
+
 AM_CPPFLAGS  = -I$(srcdir)
 AM_CPPFLAGS += -I$(srcdir)/include
 AM_CPPFLAGS += -I$(srcdir)/src
-AM_CPPFLAGS += -I$(CUDA_PATH)/include
 AM_CPPFLAGS += -D__STDC_FORMAT_MACROS
+AM_LDFLAGS =
+SRC_LIST = src/mp.cc src/mp_comm.cc src/oob.cc src/oob_mpi.cc src/tl.cc src/tl_verbs.cc
 
-AM_LDFLAGS   = -L$(CUDA_PATH)/lib64
+if HAVE_CUDA
+AM_CPPFLAGS += -I$(CUDA_PATH)/include
+AM_LDFLAGS += -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcuda -lcudart
+endif
 
-lib_LTLIBRARIES = src/libmp.la
+if HAVE_GDSYNC
+AM_LDFLAGS += -libverbs -lgdsync -lgdrapi
+SRC_LIST += src/mp_comm_async.cc src/tl_verbs_async.cc
+endif
+
+if HAVE_VERBS
+AM_LDFLAGS += -libverbs
+endif
+
+if HAVE_MPI
+AM_CPPFLAGS += -I$(MPI_PATH)/include
+AM_LDFLAGS += -L$(MPI_PATH)/lib -lmpi
+endif
 
 ACLOCAL_AMFLAGS = -Iconfig
 AM_CFLAGS = -g -Wall
 
+lib_LTLIBRARIES = src/libmp.la
+
 EXTRA_DIST = autogen.sh
 
-include_HEADERS = src/mp.hpp src/mp_common.hpp
+include_HEADERS = src/mp.hpp
+noinst_HEADERS = src/mp_common.hpp src/mp_external.hpp src/oob.hpp src/tl.hpp src/tl_verbs.hpp src/tl_verbs_common.hpp src/tl_verbs_types_async.hpp
 #libmpincludedir = include/$(includedir)/mp
 #libmpinclude_HEADERS = include/mp/device.cuh
 
 src_libmp_la_CFLAGS = $(AM_CFLAGS)
-
-src_libmp_la_SOURCES = src/mp.cc src/mp_comm.cc src/mp_comm_async.cc src/oob.cc src/oob_mpi.cc src/tl.cc src/tl_verbs.cc src/tl_verbs_async.cc
-
+src_libmp_la_SOURCES = $(SRC_LIST)
 src_libmp_la_LDFLAGS = -version-info 3:0:0
-
-noinst_HEADERS = src/common.hpp src/oob.hpp src/tl.hpp src/tl_verbs.hpp src/tl_verbs_common.hpp src/tl_verbs_types_async.hpp
-
 
 SUBDIRS = . examples
