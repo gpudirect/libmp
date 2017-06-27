@@ -1,9 +1,8 @@
+#include "tl_verbs.hpp"
 #include <infiniband/peer_ops.h>
 #include <gdsync.h>
 #include <gdsync/tools.h>
 #include <gdsync/core.h>
-
-#include "tl_verbs.hpp"
 
 struct verbs_request_async : verbs_request {
 	union
@@ -39,6 +38,11 @@ struct verbs_client_async : verbs_client {
     verbs_request_async_t waited_stream_req[N_FLOWS]; //tail
 };
 typedef struct verbs_client_async * verbs_client_async_t;
+
+#if (GDS_API_MAJOR_VERSION==2 && GDS_API_MINOR_VERSION>=2) || (GDS_API_MAJOR_VERSION>2)
+#define HAS_GDS_DESCRIPTOR_API 1
+#endif
+
 
 namespace TL
 {
@@ -1325,13 +1329,29 @@ namespace TL
 
 			        client->last_posted_trigger_id[verbs_type_to_flow((mp_req_type_t)req->type)] = req->id;
 
-			        ret = gds_stream_post_poke_dword(stream, &client->last_trigger_id[verbs_type_to_flow((mp_req_type_t)req->type)], req->id, GDS_MEMORY_HOST);
-			        if (ret) {
-			            mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
-			            // BUG: leaking req ??
-			            goto out;
-			        }
-
+			        #if HAS_GDS_DESCRIPTOR_API
+						size_t n_descs = 0;
+						gds_descriptor_t descs[2];
+						descs[n_descs].tag = GDS_TAG_WRITE_VALUE32;
+						ret = gds_prepare_write_value32(&descs[n_descs].write32,
+						                                &client->last_trigger_id[mp_type_to_flow(req->type)],
+						                                req->id,
+						                                GDS_MEMORY_HOST);
+						++n_descs;
+						if (ret) {
+						    mp_err_msg("gds_stream_queue_send failed: %s \n", strerror(ret));
+						    // BUG: leaking req ??
+						    goto out;
+						}
+						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
+					#else
+				        ret = gds_stream_post_poke_dword(stream, &client->last_trigger_id[verbs_type_to_flow((mp_req_type_t)req->type)], req->id, GDS_MEMORY_HOST);
+					#endif
+						if (ret) {
+							mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
+							// BUG: leaking req ??
+							goto out;
+						}
 			        verbs_client_track_posted_stream_req(client, req, TX_FLOW);
 			    } else {
 			        req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT); //, stream);
@@ -1400,11 +1420,23 @@ namespace TL
 			        req->sg_entry.addr = (uintptr_t)(buf);
 					client->last_posted_trigger_id[verbs_type_to_flow(req->type)] = req->id;
 
-					/*delay posting until stream has reached this id*/
-			        ret = gds_stream_post_poke_dword(stream,
-			                &client->last_trigger_id[verbs_type_to_flow(req->type)],
-			                req->id,
-			                GDS_MEMORY_HOST);
+					#if HAS_GDS_DESCRIPTOR_API
+						size_t n_descs = 0;
+						gds_descriptor_t descs[2];
+						descs[n_descs].tag = GDS_TAG_WRITE_VALUE32;
+						ret = gds_prepare_write_value32(&descs[n_descs].write32,
+						                                &client->last_trigger_id[mp_type_to_flow(req->type)],
+						                                req->id,
+						                                GDS_MEMORY_HOST);
+						++n_descs;
+					#else
+						/*delay posting until stream has reached this id*/
+				        ret = gds_stream_post_poke_dword(stream,
+				                &client->last_trigger_id[verbs_type_to_flow(req->type)],
+				                req->id,
+				                GDS_MEMORY_HOST);
+				    #endif
+
 			        if (ret) {
 			            mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
 						if (req) verbs_release_request((verbs_request_async_t) req);
@@ -1417,16 +1449,36 @@ namespace TL
 			        if ((int)client->last_posted_tracked_id[TX_FLOW] < req->id) {
 			            req->trigger = 1;
 			            client->last_posted_tracked_id[TX_FLOW] = req->id;
-			            ret = gds_stream_post_poll_dword(stream,
-			                &client->last_tracked_id[verbs_type_to_flow(req->type)],
-			                req->id,
-			                GDS_WAIT_COND_GEQ,
-			                GDS_MEMORY_HOST);
+
+			            #if HAS_GDS_DESCRIPTOR_API
+				            descs[n_descs].tag = GDS_TAG_WAIT_VALUE32;
+				            ret = gds_prepare_wait_value32(&descs[n_descs].wait32,
+				                                          &client->last_tracked_id[mp_type_to_flow(req->type)],
+				                                          req->id,
+				                                          GDS_WAIT_COND_GEQ,
+				                                          GDS_MEMORY_HOST);
+				            ++n_descs;        
+						#else
+				            ret = gds_stream_post_poll_dword(stream,
+				                &client->last_tracked_id[verbs_type_to_flow(req->type)],
+				                req->id,
+				                GDS_WAIT_COND_GEQ,
+				                GDS_MEMORY_HOST);
+				        #endif
+
 			            if (ret) {
 			                mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
 			                goto out;
 			            }
 			        }
+			        #if HAS_GDS_DESCRIPTOR_API
+						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
+						if (ret) {
+							mp_err_msg(oob_rank, "gds_stream_post_descriptors failed: %s\n", strerror(ret));
+							goto out;
+						}
+					#endif
+
 			    } else {
 			        req = verbs_new_request(client, MP_SEND, MP_PENDING); //, stream);
 
@@ -1568,10 +1620,20 @@ namespace TL
 						client->last_posted_trigger_id[verbs_type_to_flow(req->type)] = req->id;
 						mp_dbg_msg(oob_rank, "[%d] posting dword on stream:%p id:%d \n", oob_rank, stream, req->id);
 						/*delay posting until stream has reached this id*/
-						ret = gds_stream_post_poke_dword(stream,
-						                                &client->last_trigger_id[verbs_type_to_flow(req->type)],
-						                                req->id,
-						                                GDS_MEMORY_HOST);
+						#if HAS_GDS_DESCRIPTOR_API
+							descs[n_descs].tag = GDS_TAG_WRITE_VALUE32;
+							ret = gds_prepare_write_value32(&descs[n_descs].write32,
+							                               &client->last_trigger_id[mp_type_to_flow(req->type)],
+							                               req->id,
+							                               GDS_MEMORY_HOST);
+							++n_descs;
+						#else
+
+							ret = gds_stream_post_poke_dword(stream,
+							                                &client->last_trigger_id[verbs_type_to_flow(req->type)],
+							                                req->id,
+							                                GDS_MEMORY_HOST);
+						#endif
 						if (ret) {
 						   mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
 						   // BUG: leaking req ??
@@ -1588,17 +1650,38 @@ namespace TL
 
 						   mp_dbg_msg(oob_rank, "[%d] posting poll on stream:%p id:%d \n", oob_rank, stream, req->id);
 
-						   ret = gds_stream_post_poll_dword(stream,
-						       &client->last_tracked_id[verbs_type_to_flow(req->type)],
-						       req->id,
-						       GDS_WAIT_COND_GEQ,
-						       GDS_MEMORY_HOST);
+						   #if HAS_GDS_DESCRIPTOR_API
+				               descs[n_descs].tag = GDS_TAG_WAIT_VALUE32;
+				               ret = gds_prepare_wait_value32(&descs[n_descs].wait32,
+				                                              &client->last_tracked_id[mp_type_to_flow(req->type)],
+				                                              req->id,
+				                                              GDS_WAIT_COND_GEQ,
+				                                              GDS_MEMORY_HOST);
+				               ++n_descs;        
+							#else
+
+
+							   	ret = gds_stream_post_poll_dword(stream,
+							       &client->last_tracked_id[verbs_type_to_flow(req->type)],
+							       req->id,
+							       GDS_WAIT_COND_GEQ,
+							       GDS_MEMORY_HOST);
+
+							#endif
+
 						   if (ret) {
 						       mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
 						       goto out;
 						   }
 						}
 					}
+					#if HAS_GDS_DESCRIPTOR_API
+						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
+						if (ret) {
+							mp_err_msg("gds_stream_post_descriptors failed: %s\n", strerror(ret));
+							goto out;
+						}
+					#endif			   
 			    }
 			    else {	
 			       gds_send_request_t gds_send_request_local[tot_local_reqs];
@@ -1675,12 +1758,21 @@ namespace TL
 						client->last_posted_trigger_id[verbs_type_to_flow(req->type)] = req->id;
 
 						mp_dbg_msg(oob_rank, "[%d] posting dword on stream:%p id:%d \n", oob_rank, stream, req->id);
+						#if HAS_GDS_DESCRIPTOR_API
+							descs[n_descs].tag = GDS_TAG_WRITE_VALUE32;
+							ret = gds_prepare_write_value32(&descs[n_descs].write32,
+															&client->last_trigger_id[mp_type_to_flow(req->type)],
+															req->id,
+															GDS_MEMORY_HOST);
+							++n_descs;
+						#else
+							/*delay posting until stream has reached this id*/
+							ret = gds_stream_post_poke_dword(stream,
+							       &client->last_trigger_id[verbs_type_to_flow(req->type)],
+							       req->id,
+							       GDS_MEMORY_HOST);
+						#endif
 
-						/*delay posting until stream has reached this id*/
-						ret = gds_stream_post_poke_dword(stream,
-						       &client->last_trigger_id[verbs_type_to_flow(req->type)],
-						       req->id,
-						       GDS_MEMORY_HOST);
 						if (ret) {
 						   mp_err_msg(oob_rank, "error while posting pokes %d/%s \n", ret, strerror(ret));
 						   // BUG: leaking req ??
@@ -1690,6 +1782,15 @@ namespace TL
 
 						verbs_client_track_posted_stream_req(client, req, TX_FLOW);
 					}
+
+					#if HAS_GDS_DESCRIPTOR_API
+						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
+						if (ret) {
+							mp_err_msg("gds_stream_post_descriptors failed: %s\n", strerror(ret));
+							goto out;
+						}
+					#endif  
+
 			    } else { 	
 					if (count <= tot_local_reqs) {
 					    gds_send_request = gds_send_request_local;
@@ -1719,8 +1820,6 @@ namespace TL
 					    free(gds_send_request);
 					}
 			    }
-
-			    mp_dbg_msg(oob_rank, " Leaving \n");
 			 
 			out:
 			    return ret;
@@ -1768,19 +1867,36 @@ namespace TL
 
 			int wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream)
 			{
-			    int ret = MP_SUCCESS;
-			    gds_wait_cond_flag_t cond_flags = GDS_WAIT_COND_GEQ;
+				int ret = MP_SUCCESS;
+				gds_wait_cond_flag_t cond_flags = GDS_WAIT_COND_GEQ;
+				size_t n_descs = 0;
+				gds_descriptor_t descs[1];
 
-			    mp_dbg_msg(oob_rank, "ptr=%p value=%d\n", ptr, value);
+				mp_dbg_msg(oob_rank, "ptr=%p value=%d\n", ptr, value);
 
-			    switch(flags) {
-			    case VERBS_WAIT_EQ:  cond_flags = GDS_WAIT_COND_GEQ; break;
-			    case VERBS_WAIT_GEQ: cond_flags = GDS_WAIT_COND_GEQ; break;
-			    case VERBS_WAIT_AND: cond_flags = GDS_WAIT_COND_GEQ; break;
-			    default: ret = EINVAL; goto out; break;
-			    }
+				switch(flags) {
+					case VERBS_WAIT_EQ:  cond_flags = GDS_WAIT_COND_GEQ; break;
+					case VERBS_WAIT_GEQ: cond_flags = GDS_WAIT_COND_GEQ; break;
+					case VERBS_WAIT_AND: cond_flags = GDS_WAIT_COND_GEQ; break;
+					default: ret = EINVAL; goto out; break;
+				}
 
-			    ret = gds_stream_post_poll_dword(stream, ptr, value, cond_flags, GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
+				#if HAS_GDS_DESCRIPTOR_API
+					descs[n_descs].tag = GDS_TAG_WAIT_VALUE32;
+					ret = gds_prepare_wait_value32(&descs[n_descs].wait32,
+					                               ptr,
+					                               value,
+					                               cond_flags,
+					                               GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
+					++n_descs;
+					if (ret) {
+						mp_err_msg("gds_prepare_wait_value32 failed: %s\n", strerror(ret));
+						goto out;
+					}
+					ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
+				#else
+			    	ret = gds_stream_post_poll_dword(stream, ptr, value, cond_flags, GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
+			    #endif
 			    if (ret) {
 			        mp_err_msg(oob_rank, "error %d while posting poll on ptr=%p value=%08x flags=%08x\n", ret, ptr, value, flags);
 			    }
@@ -1815,17 +1931,35 @@ namespace TL
 							client->last_posted_tracked_id[verbs_type_to_flow(req->type)] = req->id;
 							req->trigger = 1;
 
-							ret = gds_stream_post_poll_dword(stream,
-							    &client->last_tracked_id[verbs_type_to_flow(req->type)],
-							    req->id,
-							    GDS_WAIT_COND_GEQ,
-							    GDS_MEMORY_HOST);
+							#if HAS_GDS_DESCRIPTOR_API
+								descs[n_descs].tag = GDS_TAG_WAIT_VALUE32;
+								ret = gds_prepare_wait_value32(&descs[n_descs].wait32,
+								                               &client->last_tracked_id[mp_type_to_flow(req->type)],
+								                               req->id,
+								                               GDS_WAIT_COND_GEQ,
+								                               GDS_MEMORY_HOST);
+								++n_descs;        
+							#else
+								ret = gds_stream_post_poll_dword(stream,
+								    &client->last_tracked_id[verbs_type_to_flow(req->type)],
+								    req->id,
+								    GDS_WAIT_COND_GEQ,
+								    GDS_MEMORY_HOST);
+							#endif
+
 							if (ret) {
 							    mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
 							    goto out;
 							}
 						}
 					}
+					#if HAS_GDS_DESCRIPTOR_API
+						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
+						if (ret) {
+							mp_err_msg("gds_stream_post_descriptors failed: %s\n", strerror(ret));
+							goto out;
+						}
+					#endif
 			    } else {
 			    	int tot_local_reqs=8;
 			        gds_wait_request_t gds_wait_request_local[tot_local_reqs];
