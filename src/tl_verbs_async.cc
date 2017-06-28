@@ -1295,7 +1295,7 @@ namespace TL
 				gpu_id = par1;
 				if(gpu_id == MP_DEFAULT)
 				{
-					mp_warn_msg("GPU_ID = MP_DEFAULT -> No GPUDirect Async support\n");
+					mp_warn_msg(oob_rank, "GPU_ID = MP_DEFAULT -> No GPUDirect Async support\n");
 				}
 				else
 				{

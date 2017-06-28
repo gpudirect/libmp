@@ -33,6 +33,7 @@
 
 #define MP_SUCCESS 0
 #define MP_FAILURE 1
+#define MP_DEFAULT -1
 
 #define OOB_SUCCESS 0
 #define OOB_FAILURE	1
