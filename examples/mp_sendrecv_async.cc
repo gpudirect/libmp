@@ -182,7 +182,7 @@ int main (int argc, char *argv[])
 
     // CUDA init
     CUDA_CHECK(cudaSetDevice(device_id));
-    CUDA_CHECK(cudaFree(0));        
+    CUDA_CHECK(cudaFree(0));
     
     iter_count = ITER_COUNT_SMALL;
 

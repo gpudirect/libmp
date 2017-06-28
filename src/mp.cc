@@ -37,6 +37,7 @@ int mp_init(int argc, char *argv[], int par1)
 	mp_get_envars();
 
 	// ====== OOB INIT
+	//Always MPI_COMM_WORLD. Provide different communicator in input?
 	oob_comm = getBestOOB();
 	assert(oob_comm);
 	oob_type=OOB_PRIORITY_MPI;

@@ -1496,7 +1496,7 @@ int TL::Verbs::onesided_nb_get(void *dst, int size, mp_region_t *reg_t, int peer
 
   req->in.sr.next = NULL;
   req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-  req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+  req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_READ;
   req->in.sr.wr_id = (uintptr_t) req;
   req->in.sr.num_sge = 1;
   req->in.sr.sg_list = &req->sg_entry;

@@ -1252,7 +1252,7 @@ namespace TL
 
 				req->in.sr.next = NULL;
 				req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-				req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+				req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_READ;
 				req->in.sr.wr_id = (uintptr_t) req;
 				req->in.sr.num_sge = 1;
 				req->in.sr.sg_list = &req->sg_entry;
@@ -2254,7 +2254,7 @@ namespace TL
 			    gds_send_request_t gds_send_request_local[8];
 			    gds_send_request_t *gds_send_request = NULL;
 			    CHECK_GPU(gpu_id);
-			    
+
 			    mp_dbg_msg(oob_rank, "count=%d\n", count);
 
 			    if (count <= 8) {
