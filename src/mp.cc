@@ -56,16 +56,16 @@ int mp_init(int argc, char *argv[], int par1)
 #ifdef HAVE_GDSYNC
 	tl_comm = getTLObj(TL_INDEX_VERBS_ASYNC);
 	tl_type = TL_INDEX_VERBS_ASYNC;
-	mp_dbg_msg(oob_rank, "getTLObj(TL_INDEX_VERBS_ASYNC)\n");
+	mp_dbg_msg(oob_rank, "TL: VERBS ASYNC\n");
 #else
 	#ifdef HAVE_VERBS
 		tl_comm = getTLObj(TL_INDEX_VERBS);
 		tl_type = TL_INDEX_VERBS;
-		mp_dbg_msg(oob_rank, "getTLObj(TL_INDEX_VERBS)\n");
+		mp_dbg_msg(oob_rank, "TL: VERBS\n");
 	#else
 		tl_comm = getTLObj(TL_INDEX_PSM);
 		tl_type = TL_INDEX_PSM;
-		mp_dbg_msg(oob_rank, "getTLObj(TL_INDEX_PSM)\n");
+		mp_dbg_msg(oob_rank, "TL: PSM2\n");
 	#endif
 #endif
 
