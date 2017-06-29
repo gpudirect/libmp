@@ -619,7 +619,6 @@ int main (int argc, char *argv[])
         }
 
         #ifdef HAVE_CUDA
-        if(!my_rank) printf("Alloco buffers on use_gpu_buffers %d\n", use_gpu_buffers);
             if(use_gpu_buffers == 0)
             {
                 CUDA_CHECK(cudaMallocHost((void **)&sbuf_d, buf_size));
@@ -654,24 +653,19 @@ int main (int argc, char *argv[])
 
         // =================== WARMUP ===================
 
-        if(!my_rank) printf("warmup sr_exchange libmp sync\n");
         latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
         mp_barrier();
 
 #ifdef HAVE_GDSYNC
-        if(!my_rank) printf("warmup sr_exchange libmp async\n");
         latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
         mp_barrier();
 #endif
       
-        if(!my_rank) printf("warmup sr_exchange MPI\n");
         latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/);
         mp_barrier();
 
         // =================== Benchmarks ===================
         //LibMP Sync
-                if(!my_rank) printf("exec sr_exchange libmp sync\n");
-
         latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
         mp_barrier();
      
