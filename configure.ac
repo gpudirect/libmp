@@ -133,7 +133,7 @@ if test "$want_libgdsync" == "yes"; then
     fi
     AC_MSG_NOTICE([checking libgdsync])
 
-    AC_CHECK_LIB(gdsync, gds_query_param, [], AC_MSG_ERROR([gds_query_param not found. If using --with-libgdsync LibMP requires LibGDSync.]))
+    AC_CHECK_LIB(gdsync, gds_query_param, [], AC_MSG_ERROR([gds_query_param() not found. If using --with-libgdsync LibMP requires LibGDSync.]))
 fi
 
 dnl Checks for typedefs, structures, and compiler characteristics.

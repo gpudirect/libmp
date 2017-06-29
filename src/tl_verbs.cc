@@ -612,7 +612,6 @@ int TL::Verbs::createEndpoints() {
 		         qpinfo_all[peer].lid,
 		         qpinfo_all[peer].qpn,
 		         qpinfo_all[peer].psn);
-    printf(" create qpinfo_all=%p, qpinfo_all[%d]=%p\n", qpinfo_all, peer, &(qpinfo_all[peer]));
 	}
 
 	return MP_SUCCESS;

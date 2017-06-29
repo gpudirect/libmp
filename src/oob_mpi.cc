@@ -94,7 +94,6 @@ namespace OOB
 
 				if(sBuf == NULL)
 				{
-					//OpenMPI crash without sSize??
 					MPI_CHECK(MPI_Alltoall(
 							MPI_IN_PLACE, 	sSize, get_mpi_datatype(sType), 
 							rBuf, 			rSize, get_mpi_datatype(rType),
