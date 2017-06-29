@@ -643,7 +643,6 @@ int TL::Verbs::createEndpoints() {
 }
 
 int TL::Verbs::exchangeEndpoints() {
-    printf("exchange qpinfo_all=%p, qpinfo_all[0]=%p qpinfo_all[1]=%p\n", qpinfo_all, &(qpinfo_all[0]), &(qpinfo_all[1]));
 	int ret = oob_comm->alltoall(NULL, sizeof(qpinfo_t), MP_BYTE, qpinfo_all, sizeof(qpinfo_t), MP_BYTE);
 	return ret;
 }	
