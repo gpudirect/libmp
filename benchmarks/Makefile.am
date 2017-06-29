@@ -11,15 +11,15 @@ AM_LDFLAGS = -L$(top_srcdir)/lib $(top_builddir)/src/libmp.la
 # ==== Define Configure ====
 if HAVE_CUDA
 AM_CPPFLAGS += -I$(CUDA_PATH)/include
-AM_LDFLAGS += -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcuda -lcudart
+AM_LDFLAGS += -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcuda -lcudart 
 endif
 
 if HAVE_GDSYNC
-AM_LDFLAGS += -libverbs -lgdsync -lgdrapi
+AM_LDFLAGS += -lgdsync
 endif
 
 if HAVE_VERBS
-AM_LDFLAGS += -libverbs
+AM_LDFLAGS += -libverbs -lgdrapi
 endif
 
 if HAVE_MPI
@@ -52,4 +52,4 @@ SUFFIXES= .cu
 	$(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -c -o $@ $<
 
 .cu.lo:
-	$(LIBTOOL) --tag=CC --mode=compile $(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -o $@ -c $< $(NVCCLDFLAGS)
+	$(LIBTOOL) --tag=CC --mode=compile $(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -o $@ -c $< $(NVCCLDFLAGS) $(AM_LDFLAGS)

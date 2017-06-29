@@ -28,11 +28,14 @@
 
 #include "mp_common_benchmarks.hpp"
 #include <mpi.h>
-#if defined(HAVE_CUDA) || defined(HAVE_GDSYNC)
+#if defined(HAVE_CUDA) // || defined(HAVE_GDSYNC)
     #include "benchmarks_kernels.hpp"
     cudaStream_t stream;
     double clockrate=0;
     int gpu_num_sm;
+#else
+    #define PUSH_RANGE(name,cid)
+    #define POP_RANGE
 #endif
 
 #define MAX_SIZE 1*1024*1024 
@@ -118,7 +121,7 @@ void post_work_sync (int size, int batch_index, double kernel_size)
     if (!my_rank) { 
             MP_CHECK(mp_wait(&rreq[rreq_idx + j]));
 
-            #if defined(HAVE_CUDA) || defined(HAVE_GDSYNC)
+            #ifdef HAVE_CUDA
                 if (kernel_size > 0) {
                     if (use_calc_size > 0)
                         gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
@@ -134,7 +137,7 @@ void post_work_sync (int size, int batch_index, double kernel_size)
 
             MP_CHECK(mp_wait(&rreq[rreq_idx + j]));
 
-            #if defined(HAVE_CUDA) || defined(HAVE_GDSYNC)
+            #ifdef HAVE_CUDA
                 if (kernel_size > 0) {
                     if (use_calc_size > 0)
                         gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
@@ -283,7 +286,7 @@ double sr_exchange(int size, int iter_count, double kernel_size, int use_async)
     time_stop = MPI_Wtime();
     latency = (((time_stop - time_start)*1e6 + prepost_latency)/(iter_count));
 
-#if defined(HAVE_CUDA) || defined(HAVE_GDSYNC)
+#ifdef HAVE_CUDA
     CUDA_CHECK(cudaDeviceSynchronize());
 #endif
 
@@ -325,31 +328,37 @@ void post_work_mpi (int size, int batch_index, double kernel_size)
     int j;
     int rreq_idx = batch_to_rreq_idx (batch_index);
     int sreq_idx = batch_to_sreq_idx (batch_index);
+                if (!my_rank)printf("Before PUSH_RANGE\n");
 
     PUSH_RANGE("PingPong MPI", 1);
+               if (!my_rank) printf("Before for\n");
 
     for (j=0; j<steps_per_batch; j++) {
         if (!my_rank) { 
                 PUSH_RANGE("Wait", 2);
                 MP_CHECK(MPI_Wait(&rreq_mpi[rreq_idx + j], MPI_STATUS_IGNORE));
                 POP_RANGE;
-
+                #ifdef HAVE_CUDA
                 PUSH_RANGE("Launch & Sync", 3);
-                if (kernel_size > 0) {
-                    if (use_calc_size > 0)
-                       gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
-                    else
-                        gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
-                    CUDA_CHECK(cudaStreamSynchronize(stream));
-                }
+                //printf("Before kernel launc, kernel_size %f, gpu_num_sm: %d\n", kernel_size,gpu_num_sm);
+                    if (kernel_size > 0) {
+                        if (use_calc_size > 0)
+                           gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
+                        else
+                            gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
+                        CUDA_CHECK(cudaStreamSynchronize(stream));
+                    }
                 POP_RANGE;
+                #endif
+
                 PUSH_RANGE("Isend", 4);
-                MPI_Isend((void *)(uintptr_t)sbuf_d, size, MPI_CHAR, peer, peer, MPI_COMM_WORLD, &sreq_mpi[sreq_idx + j]);
+                MPI_Isend((void *)sbuf_d, size, MPI_CHAR, peer, peer, MPI_COMM_WORLD, &sreq_mpi[sreq_idx + j]);
                 POP_RANGE;
 
         } else {
             PUSH_RANGE("Isend", 4);
-            MPI_Isend((void *)(uintptr_t)sbuf_d, size, MPI_CHAR, peer, peer, MPI_COMM_WORLD, &sreq_mpi[sreq_idx + j]);
+            //Crash here if GPU buffers without LibGDSync... configuration error?
+            MPI_Isend((void *)sbuf_d, size, MPI_CHAR, peer, peer, MPI_COMM_WORLD, &sreq_mpi[sreq_idx + j]);
             POP_RANGE;
             
             PUSH_RANGE("Wait", 2);
@@ -357,13 +366,15 @@ void post_work_mpi (int size, int batch_index, double kernel_size)
             POP_RANGE;
             
             PUSH_RANGE("Launch & Sync", 3);
-            if (kernel_size > 0) {
-                if (use_calc_size > 0)
-                   gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
-                else
-                    gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
-                CUDA_CHECK(cudaStreamSynchronize(stream));
-            }
+            #ifdef HAVE_CUDA
+                if (kernel_size > 0) {
+                    if (use_calc_size > 0)
+                       gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
+                    else
+                        gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
+                    CUDA_CHECK(cudaStreamSynchronize(stream));
+                }
+            #endif
             POP_RANGE;
         }
     }
@@ -408,6 +419,7 @@ double sr_exchange_MPI (MPI_Comm comm, int size, int iter_count, double kernel_s
 
     wait_send_batch = wait_recv_batch = 0;
     prof_idx = 0;
+
     while (wait_send_batch < batch_count) 
     { 
 
@@ -425,7 +437,6 @@ double sr_exchange_MPI (MPI_Comm comm, int size, int iter_count, double kernel_s
         }
 
         if (!my_rank && prof_start) PROF(prof, prof_idx++);
-
 
         if (j < batch_count) { 
             post_work_mpi (size, j, kernel_size);
@@ -445,7 +456,9 @@ double sr_exchange_MPI (MPI_Comm comm, int size, int iter_count, double kernel_s
     time_stop = MPI_Wtime();
     latency = (((time_stop - time_start)*1e6 + prepost_latency)/(iter_count));
 
+    #ifdef HAVE_CUDA
     CUDA_CHECK(cudaDeviceSynchronize());
+    #endif
 
     return latency;
 }
@@ -516,15 +529,16 @@ int main (int argc, char *argv[])
 	   if (max_size > 4096) max_size = 4096;
     }
 
-    value = getenv("MP_GPU_BUFFERS");
+    value = getenv("MP_BENCH_GPU_BUFFERS");
     if (value != NULL) {
         use_gpu_buffers = atoi(value);
     }
 
-    printf("use_gpu_buffers=%d\n", use_gpu_buffers);
+    printf("Communication Buffers on GPU memory=%d\n", use_gpu_buffers);
 
     const char *tags = "wait_recv|wait_send|post_recv|post_work";
 
+    //NB. MPI as OOB assumed. MPI environment already initialized here
     ret = mp_init(argc, argv, device_id);
     if(ret) exit(EXIT_FAILURE);
     
@@ -569,6 +583,8 @@ int main (int argc, char *argv[])
     sreq_mpi = (MPI_Request *) calloc(steps_per_batch*batches_inflight, sizeof(MPI_Request));
     rreq_mpi = (MPI_Request *) calloc(steps_per_batch*(batches_inflight + 1), sizeof(MPI_Request));
    
+    #ifdef HAVE_GDSYNC
+
     if (!my_rank) {   
     	if (use_calc_size) { 
     		fprintf(stdout, "%10s \t %10s \t %10s \t %10s \t  %10s \t %10s \t %10s \t %10s\n", "Size", "CalcSize", "No-async", "No-async+Kern", "Async", "Async+Kern", "MPI", "MPI+Kern");
@@ -576,6 +592,18 @@ int main (int argc, char *argv[])
     		fprintf(stdout, "%10s \t %10s \t  %10s \t %10s \t %10s \t  %10s \t %10s \t %10s\n", "Size", "KernelTime", "No-async", "No-async+Kern", "Async", "Async+Kern", "MPI", "MPI+Kern");
     	}
     }
+
+    #else
+
+    if (!my_rank) {   
+        if (use_calc_size) { 
+            fprintf(stdout, "%10s \t %10s \t %10s \t %10s \t %10s \t %10s\n", "Size", "CalcSize", "No-async", "No-async+Kern", "MPI", "MPI+Kern");
+        } else {
+            fprintf(stdout, "%10s \t %10s \t %10s \t %10s \t %10s \t %10s\n", "Size", "KernelTime", "No-async", "No-async+Kern", "MPI", "MPI+Kern");
+        }
+    }
+
+    #endif
 
     if (size != 1) size = max_size = size;
     for (; size<=max_size; size*=2) 
@@ -594,27 +622,28 @@ int main (int argc, char *argv[])
             mp_abort();
         }
 
-#ifdef HAVE_CUDA
-        if(use_gpu_buffers == 0)
-        {
-            CUDA_CHECK(cudaMallocHost((void **)&sbuf_d, buf_size));
-            memset(sbuf_d, 0, buf_size);
+        #ifdef HAVE_CUDA
+        if(!my_rank) printf("Alloco buffers on use_gpu_buffers %d\n", use_gpu_buffers);
+            if(use_gpu_buffers == 0)
+            {
+                CUDA_CHECK(cudaMallocHost((void **)&sbuf_d, buf_size));
+                memset(sbuf_d, 0, buf_size);
 
-            CUDA_CHECK(cudaMallocHost((void **)&rbuf_d, buf_size));
-            memset(rbuf_d, 0, buf_size);   
-        }
-        else
-        {
-            CUDA_CHECK(cudaMalloc((void **)&sbuf_d, buf_size));
-            CUDA_CHECK(cudaMemset(sbuf_d, 0, buf_size)); 
+                CUDA_CHECK(cudaMallocHost((void **)&rbuf_d, buf_size));
+                memset(rbuf_d, 0, buf_size);   
+            }
+            else
+            {
+                CUDA_CHECK(cudaMalloc((void **)&sbuf_d, buf_size));
+                CUDA_CHECK(cudaMemset(sbuf_d, 0, buf_size)); 
 
-            CUDA_CHECK(cudaMalloc((void **)&rbuf_d, buf_size));
-            CUDA_CHECK(cudaMemset(rbuf_d, 0, buf_size)); 
-        }
-#else
-        sbuf_d = (void*) calloc(buf_size, sizeof(char));
-        rbuf_d = (void*) calloc(buf_size, sizeof(char));
-#endif
+                CUDA_CHECK(cudaMalloc((void **)&rbuf_d, buf_size));
+                CUDA_CHECK(cudaMemset(rbuf_d, 0, buf_size)); 
+            }
+        #else
+            sbuf_d = (void*) calloc(buf_size, sizeof(char));
+            rbuf_d = (void*) calloc(buf_size, sizeof(char));
+        #endif
 
         MP_CHECK(mp_register_region_buffer(sbuf_d, buf_size, &sreg[0]));
         MP_CHECK(mp_register_region_buffer(rbuf_d, buf_size, &rreg[0]));
@@ -624,23 +653,29 @@ int main (int argc, char *argv[])
 #if 0
         if (!my_rank) fprintf(stdout, "sleeping 10s\n");
         sleep(10);
-        MPI_Barrier(MPI_COMM_WORLD);
+        mp_barrier();
 #endif
 
         // =================== WARMUP ===================
-#ifdef HAVE_GDSYNC
-        latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
-        MPI_Barrier(MPI_COMM_WORLD);
-#endif
 
+        if(!my_rank) printf("warmup sr_exchange libmp sync\n");
         latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
         mp_barrier();
 
+#ifdef HAVE_GDSYNC
+        if(!my_rank) printf("warmup sr_exchange libmp async\n");
+        latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
+        mp_barrier();
+#endif
+      
+        if(!my_rank) printf("warmup sr_exchange MPI\n");
         latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/);
         mp_barrier();
 
         // =================== Benchmarks ===================
         //LibMP Sync
+                if(!my_rank) printf("exec sr_exchange libmp sync\n");
+
         latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
         mp_barrier();
      

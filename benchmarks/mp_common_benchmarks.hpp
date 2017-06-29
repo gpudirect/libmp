@@ -1,9 +1,9 @@
-#include <mp.hpp>
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdarg.h>
 #include "prof.h"
+#include <mp.hpp>
 
 #define dbg_msg(FMT, ARGS...)  __dbg_msg("[%d] [%d] DBG  %s() " FMT, getpid(),  my_rank, __FUNCTION__ , ## ARGS)
 
