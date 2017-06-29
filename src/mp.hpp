@@ -81,6 +81,14 @@ typedef enum mp_param {
 } mp_param_t;
 
 
+#ifndef PUT_FLAGS_H
+#define PUT_FLAGS_H
+enum mp_put_flags {
+    MP_PUT_INLINE  = 1<<0,
+    MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
+};
+#endif
+
 //===== mp.cc
 int mp_query_param(mp_param_t param, int *value);
 int mp_init(int argc, char *argv[], int par1);
@@ -129,4 +137,17 @@ int mp_wait_word_async(uint32_t *ptr, uint32_t value, int flags, cudaStream_t st
 int mp_wait_async(mp_request_t * mp_req, cudaStream_t stream);
 int mp_wait_all_async(int number, mp_request_t * mp_reqs, cudaStream_t stream);
 int mp_progress_requests(int number, mp_request_t * mp_reqs);
+
+struct mp_comm_descriptors_queue;
+typedef struct mp_comm_descriptors_queue *mp_comm_descriptors_queue_t;
+
+int mp_comm_descriptors_queue_alloc(mp_comm_descriptors_queue_t *dq);
+int mp_comm_descriptors_queue_free(mp_comm_descriptors_queue_t *dq);
+int mp_comm_descriptors_queue_add_send(mp_comm_descriptors_queue_t *dq, mp_request_t *req);
+int mp_comm_descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *dq, mp_request_t *req);
+int mp_comm_descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *dq, mp_request_t *req);
+int mp_comm_descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *dq, uint32_t *ptr, uint32_t value, int flags);
+int mp_comm_descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *dq, uint32_t *ptr, uint32_t value);
+int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *dq, int flags);
+
 #endif

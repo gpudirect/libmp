@@ -43,7 +43,7 @@
 int peers_num, my_rank, peer;
 int use_gpu_buffers=0;
 
-int put_exchange_on_stream (int size, int iter_count, int window_size, int validate)
+int put_exchange_async (int size, int iter_count, int window_size, int validate)
 {
 	int i, j;
 	size_t buf_size; 
@@ -89,7 +89,7 @@ int put_exchange_on_stream (int size, int iter_count, int window_size, int valid
 	}
 
 	MP_CHECK(mp_register_region_buffer(commBuf, buf_size, &reg[0]));
-	MP_CHECK(mp_register_region_buffer(commBuf, 4096, &signal_reg[0]));
+	MP_CHECK(mp_register_region_buffer(signal, 4096, &signal_reg[0]));
 
 	MP_CHECK(mp_window_create(commBuf, buf_size, &win));
 
@@ -122,14 +122,18 @@ int put_exchange_on_stream (int size, int iter_count, int window_size, int valid
 
 			for(j=0; j < window_size; j++)	
 			{
-				dbg_msg("[%d] wait req[%d]\n", my_rank, j);
+				dbg_msg("[%d] wait iput async req[%d]\n", my_rank, j);
 				MP_CHECK(mp_wait(&req[j])); 
+				dbg_msg("[%d] wait iput async req[%d] done\n", my_rank, j);
 			}
 			dbg_msg("[%d] wait signal_sreq\n", my_rank);
 			MP_CHECK(mp_wait(&signal_sreq[0]));
+			dbg_msg("[%d] wait signal_sreq done\n", my_rank);
 
 			if (i < (iter_count-1)) {
+				dbg_msg("[%d] mp_irecv signal_rreq\n", my_rank);
 				MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg[0], &signal_rreq[0]));
+				dbg_msg("[%d] mp_wait_async signal_rreq\n", my_rank);
 				MP_CHECK(mp_wait_async(&signal_rreq[0], stream));
 			}
 		} else {  
@@ -150,13 +154,13 @@ int put_exchange_on_stream (int size, int iter_count, int window_size, int valid
 				char expected = (char) (i+1)%CHAR_MAX;
 				for (j=0; j<(window_size*size); j++) { 
 					if (value[j] != ((i+1)%CHAR_MAX)) { 
-						fprintf(stderr, "validation check failed iter: %d index: %d expected: %d actual: %d \n", 
-								i, j, expected, value[j]);
-						exit(-1);
+						fprintf(stderr, "validation check failed iter: %d index: %d expected: %d actual: %d \n", i, j, expected, value[j]);
+						exit(EXIT_FAILURE);
 					}
 				} 
 			}
 			
+			dbg_msg("[%d] received signal_rreq\n", my_rank);
 			if (i > 0)
 				MP_CHECK(mp_wait(&signal_sreq[0]));
 			if (i < (iter_count-1))
@@ -186,8 +190,7 @@ int put_exchange_on_stream (int size, int iter_count, int window_size, int valid
 	return 0;
 }
 
-#if 0
-int put_desc_exchange_on_stream (int size, int iter_count, int window_size, int validate)
+int put_desc_exchange_async (int size, int iter_count, int window_size, int validate)
 {
 	int i, j;
 	size_t buf_size; 
@@ -196,15 +199,20 @@ int put_desc_exchange_on_stream (int size, int iter_count, int window_size, int 
 	void *buf = NULL, *commBuf = NULL, *signal = NULL;
 
 	/*mp specific objects*/
-	mp_request_t *req = NULL;
-	mp_request_t signal_sreq, signal_rreq;
-	mp_region_t reg, signal_reg; 
+	mp_request_t *req;
+	mp_request_t * signal_sreq, * signal_rreq;
+	mp_region_t * reg, * signal_reg; 
 	mp_window_t win; 
 
 	buf_size = size*window_size;
 
 	/*allocating requests*/
-	req = (mp_request_t *) malloc(window_size*sizeof(mp_request_t));
+	req = mp_create_request(window_size);
+	signal_sreq = mp_create_request(1);
+	signal_rreq = mp_create_request(1);
+
+	reg = mp_create_regions(1);
+	signal_reg = mp_create_regions(1);
  
 	/*create cuda stream*/
 	cudaStream_t stream;
@@ -227,11 +235,11 @@ int put_desc_exchange_on_stream (int size, int iter_count, int window_size, int 
 		memset(commBuf, 0, buf_size);
 	}
 
-	mp_desc_queue_t dq = NULL;
-	MP_CHECK(mp_desc_queue_alloc(&dq));
+	mp_comm_descriptors_queue_t dq = NULL;
+	MP_CHECK(mp_comm_descriptors_queue_alloc(&dq));
 
-	MP_CHECK(mp_register(commBuf, buf_size, &reg));
-	MP_CHECK(mp_register(signal, 4096, &signal_reg));
+	MP_CHECK(mp_register_region_buffer(commBuf, buf_size, &reg[0]));
+	MP_CHECK(mp_register_region_buffer(signal, 4096, &signal_reg[0]));
 
 	MP_CHECK(mp_window_create(commBuf, buf_size, &win));
 
@@ -252,37 +260,47 @@ int put_desc_exchange_on_stream (int size, int iter_count, int window_size, int 
 			for(j=0; j < window_size; j++)	
 			{
 				dbg_msg("mp_put_prepare j=%d\n", j);
-				MP_CHECK(mp_put_prepare ((void *)((uintptr_t)commBuf + j*size), size, &reg, peer, j*size, &win, &req[j], 0));
-				MP_CHECK(mp_desc_queue_add_send(&dq, &req[j]));
+				MP_CHECK(mp_put_prepare ((void *)((uintptr_t)commBuf + j*size), size, &reg[0], peer, j*size, &win, &req[j], 0));
+				MP_CHECK(mp_comm_descriptors_queue_add_send(&dq, &req[j]));
 			}
 
 			if (i > 0) 
-				MP_CHECK(mp_wait(&signal_rreq)); 
+				MP_CHECK(mp_wait(&signal_rreq[0])); 
 
-			MP_CHECK(mp_desc_queue_add_wait_send(&dq, &req[window_size - 1]));
-			MP_CHECK(mp_send_prepare(signal, sizeof(int), peer, &signal_reg, &signal_sreq));
-			MP_CHECK(mp_desc_queue_add_send(&dq, &signal_sreq));
-			MP_CHECK(mp_desc_queue_add_wait_send(&dq, &signal_sreq));
-			MP_CHECK(mp_desc_queue_post_on_stream(stream, &dq, 0));
+			MP_CHECK(mp_comm_descriptors_queue_add_wait_send(&dq, &req[window_size - 1]));
+			MP_CHECK(mp_send_prepare(signal, sizeof(int), peer, &signal_reg[0], &signal_sreq[0]));
+			dbg_msg("mp_send_prepare\n");
+
+			MP_CHECK(mp_comm_descriptors_queue_add_send(&dq, &signal_sreq[0]));
+			dbg_msg("mp_comm_descriptors_queue_add_send\n");
+
+			MP_CHECK(mp_comm_descriptors_queue_add_wait_send(&dq, &signal_sreq[0]));
+			dbg_msg("mp_comm_descriptors_queue_add_wait_send\n");
+
+			MP_CHECK(mp_comm_descriptors_queue_post_async(stream, &dq, 0));
+			dbg_msg("mp_comm_descriptors_queue_post_async\n");
 
 			for(j=0; j < window_size; j++)	
 			{
 				dbg_msg("wait req[%d]\n", j);
 				MP_CHECK(mp_wait(&req[j])); 
+				dbg_msg("wait req[%d] done\n", j);
 			}
-			dbg_msg("wait signal_sreq\n");
-			MP_CHECK(mp_wait(&signal_sreq));
+
+			dbg_msg("wait signal_sreq[0]\n");
+			MP_CHECK(mp_wait(&signal_sreq[0]));
+			dbg_msg("wait signal_sreq[0] done\n");
 
 			if (i < (iter_count-1)) {
-				MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg, &signal_rreq));
-				MP_CHECK(mp_wait_on_stream(&signal_rreq, stream));
+				MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg[0], &signal_rreq[0]));
+				MP_CHECK(mp_wait_async(&signal_rreq[0], stream));
 			}
 		} else {  
-			MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg, &signal_rreq));
-			MP_CHECK(mp_wait_on_stream(&signal_rreq, stream));
+			MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg[0], &signal_rreq[0]));
+			MP_CHECK(mp_wait_async(&signal_rreq[0], stream));
 			dbg_msg("wait signal_rreq\n");
-			MP_CHECK(mp_wait(&signal_rreq));
-
+			MP_CHECK(mp_wait(&signal_rreq[0]));
+			dbg_msg("wait signal_rreq done\n");
 			if (validate) { 
 				dbg_msg("validating RX data, issuing cudaMemcpyAsync\n");
 				if(use_gpu_buffers == 1)
@@ -291,24 +309,26 @@ int put_desc_exchange_on_stream (int size, int iter_count, int window_size, int 
 					memcpy(buf, commBuf, buf_size);
 
 				CUDA_CHECK(cudaStreamSynchronize(stream));	
-				char *value = buf; 
+				char *value = (char*)buf; 
 				char expected = (char) (i+1)%CHAR_MAX;
 				for (j=0; j<(window_size*size); j++) { 
 					if (value[j] != ((i+1)%CHAR_MAX)) { 
 						fprintf(stderr, "validation check failed iter: %d index: %d expected: %d actual: %d \n", 
 								i, j, expected, value[j]);
-						exit(-1);
+						exit(EXIT_FAILURE);
 					}
 				} 
 			}
 			
 			if (i > 0) {
-				dbg_msg("waiting for signal_sreq\n");
-				MP_CHECK(mp_wait(&signal_sreq));
+				dbg_msg("mp_wait for signal_sreq[0] %d \n", i);
+				MP_CHECK(mp_wait(&signal_sreq[0]));
+				dbg_msg("mp_wait for signal_sreq[0] %d done \n", i);
 			}
 			if (i < (iter_count-1)) {
-				dbg_msg("mp_isend_on_stream for signal_sreq\n");
-				MP_CHECK(mp_isend_on_stream(signal, sizeof(int), peer, &signal_reg, &signal_sreq, stream));
+				dbg_msg("mp_isend_async for signal_sreq[0] %d \n", i);
+				MP_CHECK(mp_isend_async(signal, sizeof(int), peer, &signal_reg[0], &signal_sreq[0], stream));
+				dbg_msg("mp_isend_async for signal_sreq[0] %d done \n", i);
 			}
 		}
 	} 
@@ -319,9 +339,9 @@ int put_desc_exchange_on_stream (int size, int iter_count, int window_size, int 
 	mp_barrier();
 
 	MP_CHECK(mp_window_destroy(&win));
-	mp_deregister(&reg);
-
-	MP_CHECK(mp_desc_queue_free(&dq));
+	MP_CHECK(mp_unregister_regions(1, reg));
+	MP_CHECK(mp_unregister_regions(1, signal_reg));
+	MP_CHECK(mp_comm_descriptors_queue_free(&dq));
 
 	CUDA_CHECK(cudaStreamDestroy(stream));
 
@@ -336,7 +356,7 @@ int put_desc_exchange_on_stream (int size, int iter_count, int window_size, int 
 	return 0;
 }
 
-int put_desc_nowait_exchange_on_stream (int size, int iter_count, int window_size, int validate)
+int put_desc_nowait_exchange_async (int size, int iter_count, int window_size, int validate)
 {
 	int i, j;
 	size_t buf_size; 
@@ -345,15 +365,20 @@ int put_desc_nowait_exchange_on_stream (int size, int iter_count, int window_siz
 	void *buf = NULL, *commBuf = NULL, *signal = NULL;
 
 	/*mp specific objects*/
-	mp_request_t *req = NULL;
-	mp_request_t signal_sreq, signal_rreq;
-	mp_region_t reg, signal_reg; 
+	mp_request_t *req;
+	mp_request_t * signal_sreq, * signal_rreq;
+	mp_region_t * reg, * signal_reg; 
 	mp_window_t win; 
 
 	buf_size = size*window_size;
 
 	/*allocating requests*/
-	req = (mp_request_t *) malloc(window_size*sizeof(mp_request_t));
+	req = mp_create_request(window_size);
+	signal_sreq = mp_create_request(1);
+	signal_rreq = mp_create_request(1);
+
+	reg = mp_create_regions(1);
+	signal_reg = mp_create_regions(1);
  
 	/*create cuda stream*/
 	cudaStream_t stream;
@@ -376,11 +401,11 @@ int put_desc_nowait_exchange_on_stream (int size, int iter_count, int window_siz
 		memset(commBuf, 0, buf_size);
 	}
 
-	mp_desc_queue_t dq = NULL;
-	MP_CHECK(mp_desc_queue_alloc(&dq));
+	mp_comm_descriptors_queue_t dq = NULL;
+	MP_CHECK(mp_comm_descriptors_queue_alloc(&dq));
 
-	MP_CHECK(mp_register(commBuf, buf_size, &reg));
-	MP_CHECK(mp_register(signal, 4096, &signal_reg));
+	MP_CHECK(mp_register_region_buffer(commBuf, buf_size, &reg[0]));
+	MP_CHECK(mp_register_region_buffer(signal, 4096, &signal_reg[0]));
 
 	MP_CHECK(mp_window_create(commBuf, buf_size, &win));
 
@@ -401,36 +426,36 @@ int put_desc_nowait_exchange_on_stream (int size, int iter_count, int window_siz
 			for(j=0; j < window_size; j++)	
 			{
 				dbg_msg("mp_put_prepare j=%d\n", j);
-				MP_CHECK(mp_put_prepare ((void *)((uintptr_t)commBuf + j*size), size, &reg, peer, j*size, &win, &req[j], MP_PUT_NOWAIT));
-				MP_CHECK(mp_desc_queue_add_send(&dq, &req[j]));
+				MP_CHECK(mp_put_prepare ((void *)((uintptr_t)commBuf + j*size), size, &reg[0], peer, j*size, &win, &req[j], MP_PUT_NOWAIT));
+				MP_CHECK(mp_comm_descriptors_queue_add_send(&dq, &req[j]));
 			}
 
 			if (i > 0) 
-				MP_CHECK(mp_wait(&signal_rreq)); 
+				MP_CHECK(mp_wait(&signal_rreq[0])); 
 
-			//MP_CHECK(mp_desc_queue_add_wait_send(&dq, &req[window_size - 1]));
-			MP_CHECK(mp_send_prepare(signal, sizeof(int), peer, &signal_reg, &signal_sreq));
-			MP_CHECK(mp_desc_queue_add_send(&dq, &signal_sreq));
-			MP_CHECK(mp_desc_queue_add_wait_send(&dq, &signal_sreq));
-			MP_CHECK(mp_desc_queue_post_on_stream(stream, &dq, 0));
+			//MP_CHECK(mp_comm_descriptors_queue_add_wait_send(&dq, &req[window_size - 1]));
+			MP_CHECK(mp_send_prepare(signal, sizeof(int), peer, &signal_reg[0], &signal_sreq[0]));
+			MP_CHECK(mp_comm_descriptors_queue_add_send(&dq, &signal_sreq[0]));
+			MP_CHECK(mp_comm_descriptors_queue_add_wait_send(&dq, &signal_sreq[0]));
+			MP_CHECK(mp_comm_descriptors_queue_post_async(stream, &dq, 0));
 
 			for(j=0; j < window_size; j++)	
 			{
 				//dbg_msg("wait req[%d]\n", j);
 				//MP_CHECK(mp_wait(&req[j])); 
 			}
-			dbg_msg("wait signal_sreq\n");
-			MP_CHECK(mp_wait(&signal_sreq));
+			dbg_msg("wait signal_sreq[0]\n");
+			MP_CHECK(mp_wait(&signal_sreq[0]));
 
 			if (i < (iter_count-1)) {
-				MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg, &signal_rreq));
-				MP_CHECK(mp_wait_on_stream(&signal_rreq, stream));
+				MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg[0], &signal_rreq[0]));
+				MP_CHECK(mp_wait_async(&signal_rreq[0], stream));
 			}
 		} else {  
-			MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg, &signal_rreq));
-			MP_CHECK(mp_wait_on_stream(&signal_rreq, stream));
-			dbg_msg("wait signal_rreq\n");
-			MP_CHECK(mp_wait(&signal_rreq));
+			MP_CHECK(mp_irecv(signal, sizeof(int), peer, &signal_reg[0], &signal_rreq[0]));
+			MP_CHECK(mp_wait_async(&signal_rreq[0], stream));
+			dbg_msg("wait signal_rreq[0]\n");
+			MP_CHECK(mp_wait(&signal_rreq[0]));
 
 			if (validate) { 
 				dbg_msg("validating RX data, issuing cudaMemcpyAsync\n");
@@ -440,24 +465,23 @@ int put_desc_nowait_exchange_on_stream (int size, int iter_count, int window_siz
 					memcpy(buf, commBuf, buf_size);
 
 				CUDA_CHECK(cudaStreamSynchronize(stream));	
-				char *value = buf; 
+				char *value = (char*)buf; 
 				char expected = (char) (i+1)%CHAR_MAX;
 				for (j=0; j<(window_size*size); j++) { 
 					if (value[j] != ((i+1)%CHAR_MAX)) { 
-						fprintf(stderr, "validation check failed iter: %d index: %d expected: %d actual: %d \n", 
-								i, j, expected, value[j]);
-						exit(-1);
+						fprintf(stderr, "validation check failed iter: %d index: %d expected: %d actual: %d \n",  i, j, expected, value[j]);
+						exit(EXIT_FAILURE);
 					}
 				} 
 			}
 			
 			if (i > 0) {
-				dbg_msg("waiting for signal_sreq\n");
-				MP_CHECK(mp_wait(&signal_sreq));
+				dbg_msg("waiting for signal_sreq[0]\n");
+				MP_CHECK(mp_wait(&signal_sreq[0]));
 			}
 			if (i < (iter_count-1)) {
-				dbg_msg("mp_isend_on_stream for signal_sreq\n");
-				MP_CHECK(mp_isend_on_stream(signal, sizeof(int), peer, &signal_reg, &signal_sreq, stream));
+				dbg_msg("mp_isend_on_stream for signal_sreq[0]\n");
+				MP_CHECK(mp_isend_async(signal, sizeof(int), peer, &signal_reg[0], &signal_sreq[0], stream));
 			}
 		}
 	} 
@@ -468,9 +492,9 @@ int put_desc_nowait_exchange_on_stream (int size, int iter_count, int window_siz
 	mp_barrier();
 
 	MP_CHECK(mp_window_destroy(&win));
-	mp_deregister(&reg);
-
-	MP_CHECK(mp_desc_queue_free(&dq));
+	MP_CHECK(mp_unregister_regions(1, reg));
+	MP_CHECK(mp_unregister_regions(1, signal_reg));
+	MP_CHECK(mp_comm_descriptors_queue_free(&dq));
 
 	CUDA_CHECK(cudaStreamDestroy(stream));
 
@@ -484,7 +508,6 @@ int put_desc_nowait_exchange_on_stream (int size, int iter_count, int window_siz
 
 	return 0;
 }
-#endif
 
 int main (int argc, char *argv[])
 {
@@ -532,28 +555,26 @@ int main (int argc, char *argv[])
 		//sleep(1);
 		mp_barrier();
 
-		put_exchange_on_stream(size, iter_count, window_size, validate);
+		put_exchange_async(size, iter_count, window_size, validate);
 
 		mp_barrier();
 		if (!my_rank) fprintf(stdout, "test:%-20s message size:%-10d validation passed\n", "Put-on-stream", size);
-#if 0
 		//sleep(1);
 		mp_barrier();
 		
-		put_desc_exchange_on_stream(size, iter_count, window_size, validate);
+		put_desc_exchange_async(size, iter_count, window_size, validate);
 
 		mp_barrier();
 		if (!my_rank) fprintf(stdout, "test:%-20s message size:%-10d validation passed\n", "Put-desc-on-stream", size);
 		//sleep(1);
 		mp_barrier();
 
-		put_desc_nowait_exchange_on_stream(size, iter_count, window_size, validate);
+		put_desc_nowait_exchange_async(size, iter_count, window_size, validate);
 
 		mp_barrier();
 		if (!my_rank) fprintf(stdout, "test:%-20s message size:%-10d validation passed\n", "Put-desc-nowait-on-stream", size);
 		//sleep(1);
 		mp_barrier();
-#endif
 	}
 
 

@@ -3,6 +3,7 @@
 #include <gdsync.h>
 #include <gdsync/tools.h>
 #include <gdsync/core.h>
+#include <vector>
 
 #define CHECK_GPU(gid) {						\
 	if(gid <= MP_DEFAULT) return MP_FAILURE;	\
@@ -42,6 +43,61 @@ struct verbs_client_async : verbs_client {
     verbs_request_async_t waited_stream_req[N_FLOWS]; //tail
 };
 typedef struct verbs_client_async * verbs_client_async_t;
+
+struct verbs_comm_desc_queue : mp_comm_descriptors_queue {
+	std::vector<gds_descriptor_t> descs;
+
+	verbs_comm_desc_queue(size_t reserved_space = 128) {
+	    descs.reserve(reserved_space);
+	}
+
+	size_t num_descs() {
+	    size_t n_descs;
+	    try {
+	        n_descs = descs.size();
+	    } catch(...) {
+	        fprintf(stderr, "got C++ excepton in desc queue num_descs\n");
+	        exit(EXIT_FAILURE);
+	    }
+	    return n_descs;
+	}
+	    
+	gds_descriptor_t *head() {
+	    gds_descriptor_t *ptr;
+	    if (descs.size() < 1) {
+	        fprintf(stderr, "desc_queue is empty\n");
+	        return NULL;
+	    }
+	    try {
+	        ptr = &descs.at(0);
+	    } catch(...) {
+	        fprintf(stderr, "got C++ excepton in desc queue head\n");
+	        exit(EXIT_FAILURE);
+	    }
+	    return ptr;
+	}
+
+	void add(gds_descriptor_t &desc) {
+	    //fprintf(stderr, "adding entry %lu\n", descs.size());
+	    try {
+	        descs.push_back(desc);
+	    } catch(...) {
+	        fprintf(stderr, "got C++ excepton in desc queue add\n");
+	        exit(EXIT_FAILURE);
+	    }
+	}
+
+	void flush() {
+	    try {
+	        descs.clear();
+	    } catch(...) {
+	        fprintf(stderr, "got C++ excepton in desc queue flush\n");
+	        exit(EXIT_FAILURE);
+	    }
+	}
+};
+
+typedef struct verbs_comm_desc_queue * verbs_comm_desc_queue_t;
 
 #if (GDS_API_MAJOR_VERSION==2 && GDS_API_MINOR_VERSION>=2) || (GDS_API_MAJOR_VERSION>2)
 #define HAS_GDS_DESCRIPTOR_API 1
@@ -979,9 +1035,9 @@ namespace TL
 
 				*mp_req = (mp_request_t) req;
 
-			out:
-				if (ret && req) verbs_release_request((verbs_request_async_t) req);
-			    return ret;
+				out:
+					if (ret && req) verbs_release_request((verbs_request_async_t) req);
+				    return ret;
 			}
 
 			int pt2pt_nb_sendv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req)
@@ -1119,8 +1175,8 @@ namespace TL
 			        }
 			    }
 
-			out:
-			    return ret;
+				out:
+				    return ret;
 			}
 
 			int onesided_window_create(void *addr, size_t size, mp_window_t *window_t)
@@ -1281,7 +1337,7 @@ namespace TL
 						                                GDS_MEMORY_HOST);
 						++n_descs;
 						if (ret) {
-						    mp_err_msg("gds_stream_queue_send failed: %s \n", strerror(ret));
+						    mp_err_msg(oob_rank, "gds_stream_queue_send failed: %s \n", strerror(ret));
 						    // BUG: leaking req ??
 						    goto out;
 						}
@@ -1418,9 +1474,9 @@ namespace TL
 
 				*mp_req = (mp_request_t) req; 
 
-			out:
-				if (ret && req) verbs_release_request((verbs_request_async_t) req);
-			    return ret; 
+				out:
+					if (ret && req) verbs_release_request((verbs_request_async_t) req);
+				    return ret; 
 			}
 
 			//mp_send_prepare
@@ -1435,10 +1491,10 @@ namespace TL
 			    req = verbs_new_request(client, MP_SEND, MP_PREPARED); //, stream);
 			    assert(req);
 
-			    mp_dbg_msg(oob_rank, "Preparing send message, req->id=%d \n", req->id);
+				ret = verbs_fill_send_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client->ah, client->qpn);
+				if (ret) goto out;
 
-				req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
-				assert(req);
+			    mp_dbg_msg(oob_rank, "Preparing send message, req->id=%d \n", req->id);
 
 			    if (!use_event_sync) {
 			        if (verbs_enable_ud) {
@@ -1463,8 +1519,8 @@ namespace TL
 			    }
 
 				*mp_req = (mp_request_t) req; 
-			out:
-			    return ret;
+				out:
+				    return ret;
 			}
 
 			//mp_send_post_on_stream
@@ -1554,7 +1610,7 @@ namespace TL
 					#if HAS_GDS_DESCRIPTOR_API
 						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
 						if (ret) {
-							mp_err_msg("gds_stream_post_descriptors failed: %s\n", strerror(ret));
+							mp_err_msg(oob_rank, "gds_stream_post_descriptors failed: %s\n", strerror(ret));
 							goto out;
 						}
 					#endif			   
@@ -1600,8 +1656,8 @@ namespace TL
 			           free(gds_wait_request);
 			       }
 			    }
-			out:
-			    return ret;
+				out:
+				    return ret;
 			}
 
 			//mp_isend_post_on_stream
@@ -1663,7 +1719,7 @@ namespace TL
 					#if HAS_GDS_DESCRIPTOR_API
 						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
 						if (ret) {
-							mp_err_msg("gds_stream_post_descriptors failed: %s\n", strerror(ret));
+							mp_err_msg(oob_rank, "gds_stream_post_descriptors failed: %s\n", strerror(ret));
 							goto out;
 						}
 					#endif  
@@ -1698,8 +1754,8 @@ namespace TL
 					}
 			    }
 			 
-			out:
-			    return ret;
+				out:
+				    return ret;
 			}
 
 			//useful only with gds??
@@ -1768,7 +1824,7 @@ namespace TL
 					                               GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
 					++n_descs;
 					if (ret) {
-						mp_err_msg("gds_prepare_wait_value32 failed: %s\n", strerror(ret));
+						mp_err_msg(oob_rank, "gds_prepare_wait_value32 failed: %s\n", strerror(ret));
 						goto out;
 					}
 					ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
@@ -1778,8 +1834,8 @@ namespace TL
 			    if (ret) {
 			        mp_err_msg(oob_rank, "error %d while posting poll on ptr=%p value=%08x flags=%08x\n", ret, ptr, value, flags);
 			    }
-			out:
-			    return ret;
+				out:
+				    return ret;
 			}
 
 			int wait_async(mp_request_t *mp_req, asyncStream stream)
@@ -1835,7 +1891,7 @@ namespace TL
 					#if HAS_GDS_DESCRIPTOR_API
 						ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
 						if (ret) {
-							mp_err_msg("gds_stream_post_descriptors failed: %s\n", strerror(ret));
+							mp_err_msg(oob_rank, "gds_stream_post_descriptors failed: %s\n", strerror(ret));
 							goto out;
 						}
 					#endif
@@ -1882,8 +1938,8 @@ namespace TL
 			        }
 			    }
 
-			out:
-			    return ret;
+				out:
+				    return ret;
 			}
 
 			int onesided_nb_put_async(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ,
@@ -2044,8 +2100,8 @@ namespace TL
 			    if (count > 8) {
 			        free(gds_send_request);
 			    }
-			out:
-			    return ret;
+				out:
+				    return ret;
 			}
 
 			int onesided_nb_get_async(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ,
@@ -2093,6 +2149,159 @@ namespace TL
 					return ret;
 			}
 			//=========================================================================================================================
+			//================================== ASYNC GDS DESCRIPTOR =================================================
+			int descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq)
+			{
+			    int ret = ENOMEM;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = new struct verbs_comm_desc_queue;
+			    if (dq) {
+			        mp_dbg_msg(oob_rank, "dq=%p n_descs=%zu\n", dq, dq->num_descs());
+			        ret = 0;
+			        *pdq = (mp_comm_descriptors_queue_t) dq;
+			    }
+
+			    return ret;
+			}
+
+			int descriptors_queue_free(mp_comm_descriptors_queue_t *pdq)
+			{
+			    int ret = 0;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = (verbs_comm_desc_queue_t) *pdq;
+			    assert(dq);
+
+			    if (dq->num_descs()) {
+			        mp_err_msg(oob_rank, "destroying dq=%p which is not empty (%zd descs)\n", dq, dq->num_descs());
+			    }
+
+			    delete dq;
+			    *pdq = NULL;
+			    return ret;
+			}
+
+			int descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)
+			{
+			    int ret = 0;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = (verbs_comm_desc_queue_t) *pdq;
+			    assert(dq);
+
+			    assert(mp_req);
+			    verbs_request_async_t req = (verbs_request_async_t)*mp_req;
+			    assert(req);
+			    assert(verbs_req_type_tx(req->type));
+			    assert(req->status == MP_PREPARED);
+
+			    gds_descriptor_t desc;
+			    desc.tag = GDS_TAG_SEND;
+			    desc.send = &req->gds_send_info;
+			    dq->add(desc);
+		        mp_dbg_msg(oob_rank, "dq=%p n_descs=%zu\n", dq, dq->num_descs());
+
+			    req->status = MP_PENDING_NOWAIT;
+			    return ret;
+			}
+
+			int descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)
+			{
+			    int ret = 0;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = (verbs_comm_desc_queue_t) *pdq;
+			    assert(dq);
+
+			    assert(mp_req);
+			    verbs_request_async_t req = (verbs_request_async_t) *mp_req;
+			    assert(req);
+			    assert(verbs_req_type_tx(req->type));
+			    assert(verbs_req_can_be_waited(req));
+			    assert(req->status == MP_PENDING_NOWAIT || req->status == MP_COMPLETE);
+
+			    gds_descriptor_t desc;
+			    desc.tag = GDS_TAG_WAIT;
+			    desc.wait = &req->gds_wait_info;
+			    dq->add(desc);
+
+			    // BUG: we cannot set the stream
+			    //req->stream = stream;
+			    req->status = MP_PENDING;
+
+			    return ret;
+			}
+
+			int descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)
+			{
+			    int ret = 0;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = (verbs_comm_desc_queue_t) *pdq;
+			    assert(dq);
+
+			    assert(mp_req);
+			    verbs_request_async_t req = (verbs_request_async_t) *mp_req;
+			    assert(req);
+			    assert(verbs_req_type_rx(req->type));
+			    assert(req->status == MP_PENDING_NOWAIT || req->status == MP_COMPLETE);
+
+			    gds_descriptor_t desc;
+			    desc.tag = GDS_TAG_WAIT;
+			    desc.wait = &req->gds_wait_info;
+			    dq->add(desc);
+
+			    // BUG: we cannot set the stream
+			    //req->stream = stream;
+			    req->status = MP_PENDING;
+
+			    return ret;
+			}
+
+			int descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags)
+			{
+			    int ret = 0;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = (verbs_comm_desc_queue_t) *pdq;
+			    assert(dq);
+			    gds_wait_cond_flag_t cond_flags = static_cast<gds_wait_cond_flag_t>(flags);
+			    gds_descriptor_t desc;
+
+			    desc.tag = GDS_TAG_WAIT_VALUE32;
+			    desc.wait32.ptr = ptr;
+			    desc.wait32.value = value;
+			    assert(flags >= (int)GDS_WAIT_COND_GEQ && flags <= (int)GDS_WAIT_COND_NOR);
+			    desc.wait32.cond_flags = cond_flags;
+			    desc.wait32.flags = GDS_MEMORY_HOST;
+			    dq->add(desc);
+			    return ret;
+			}
+
+			int descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value)
+			{
+			    int ret = 0;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = (verbs_comm_desc_queue_t) *pdq;
+			    assert(dq);
+
+			    gds_descriptor_t desc;
+			    desc.tag = GDS_TAG_WRITE_VALUE32;
+			    desc.write32.ptr = ptr;
+			    desc.write32.value = value;
+			    desc.write32.flags = GDS_MEMORY_HOST;
+			    dq->add(desc);
+			    return ret;
+			}
+
+			int descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *pdq, int flags)
+			{
+			    int ret = 0;
+			    assert(pdq);
+			    verbs_comm_desc_queue_t dq = (verbs_comm_desc_queue_t) *pdq;
+			    assert(dq);
+			    mp_dbg_msg(oob_rank, "dq=%p n_descs=%zu\n", dq, dq->num_descs());
+			    if (dq->num_descs()) {
+			        ret = gds_stream_post_descriptors(stream, dq->num_descs(), dq->head(), 0);
+			        dq->flush();
+			    }
+			    return ret;
+			}
 	};
 }
 

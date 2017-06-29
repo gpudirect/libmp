@@ -274,6 +274,14 @@ namespace TL
 			int onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream);
 			//useful only with gds??
 			int progress_requests (int count, mp_request_t * mp_req);
+			int descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq);
+			int descriptors_queue_free(mp_comm_descriptors_queue_t *pdq);
+			int descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req);
+			int descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req);
+			int descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req);
+			int descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags);
+			int descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value);
+			int descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags);
 			//================================================================
 	};
 }

@@ -1597,7 +1597,16 @@ int TL::Verbs::onesided_nb_get_async(void *buf, int size, mp_region_t *mp_reg, i
 int TL::Verbs::onesided_put_prepare (void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) { return MP_FAILURE; }
 int TL::Verbs::onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::progress_requests (int count, mp_request_t *req_) { return MP_FAILURE; }
+int TL::Verbs::progress_requests (int count, mp_request_t *mp_req) { return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq){ return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_free(mp_comm_descriptors_queue_t *pdq){ return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags){ return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value){ return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags){ return MP_FAILURE; }
+
 //================================================================
 
 static TL::Communicator *create_verbs() { return new TL::Verbs(); }

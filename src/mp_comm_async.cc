@@ -4,7 +4,6 @@
 #include "mp.hpp"
 #include "mp_common.hpp"
 
-
 // SA Model: GPU Synchronous, CPU Asynchronous
 
 //============================== PT2PT ==============================
@@ -224,4 +223,110 @@ int mp_progress_requests(int number, mp_request_t * mp_reqs) {
 	}	
 	
 	return tl_comm->progress_requests(number, mp_reqs);	
+}
+
+// ============================= DESC QUEUE CREATION - GDS ONLY!
+int mp_comm_descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!pdq)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_alloc(pdq);
+}
+
+int mp_comm_descriptors_queue_free(mp_comm_descriptors_queue_t *pdq)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!pdq)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_free(pdq);
+}
+
+int mp_comm_descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_request_t * mp_req)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!pdq || !mp_req)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_add_send(pdq, mp_req);
+}
+
+int mp_comm_descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!pdq || !mp_req)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_add_wait_send(pdq, mp_req);
+}
+
+int mp_comm_descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!pdq || !mp_req)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_add_wait_recv(pdq, mp_req);
+}
+
+int mp_comm_descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!pdq || !ptr)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_add_wait_value32(pdq, ptr, value, flags);
+}
+
+int mp_comm_descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!pdq || !ptr)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_add_write_value32(pdq, ptr, value);
+}
+
+int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *pdq, int flags)
+{
+    MP_CHECK_TL_OBJ();
+
+	if(!pdq)
+	{
+		mp_err_msg(oob_rank, "Input request NULL\n");
+		return MP_FAILURE;
+	}
+
+	return tl_comm->descriptors_queue_post_async(stream, pdq, flags);
+
 }

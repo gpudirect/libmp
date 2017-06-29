@@ -63,6 +63,15 @@ namespace TL
 			virtual int onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream)=0;
 			//useful only with gds??
 			virtual int progress_requests (int count, mp_request_t *req_)=0;
+			//Communication description
+			virtual int descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq)=0;
+			virtual int descriptors_queue_free(mp_comm_descriptors_queue_t *pdq)=0;
+			virtual int descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)=0;
+			virtual int descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)=0;
+			virtual int descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req)=0;
+			virtual int descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags)=0;
+			virtual int descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value)=0;
+			virtual int descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags)=0;
 			//================================================================
 	    };
 }

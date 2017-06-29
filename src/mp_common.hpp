@@ -77,10 +77,13 @@ typedef enum mp_flow {
     N_FLOWS
 } mp_flow_t;
 
+#ifndef PUT_FLAGS_H
+#define PUT_FLAGS_H
 enum mp_put_flags {
     MP_PUT_INLINE  = 1<<0,
     MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
 };
+#endif
 
 struct mp_request{};
 struct mp_region {};
@@ -89,6 +92,10 @@ struct mp_window {};
 typedef struct mp_request * mp_request_t;
 typedef struct mp_region * mp_region_t;
 typedef struct mp_window * mp_window_t;
+
+struct mp_comm_descriptors_queue{};
+typedef struct mp_comm_descriptors_queue *mp_comm_descriptors_queue_t;
+
 
 #ifndef ACCESS_ONCE
 #define ACCESS_ONCE(V)                          \
