@@ -556,7 +556,7 @@ int TL::Verbs::createEndpoints() {
             goto err_free_tx_cq;
         }
 
-		// ================= QP creation =================
+		    // ================= QP creation =================
         ib_qp_init_attr.send_cq = send_cq;
         ib_qp_init_attr.recv_cq = recv_cq;
         ib_qp_init_attr.pd = ib_ctx->pd;
@@ -564,13 +564,7 @@ int TL::Verbs::createEndpoints() {
         //todo: No need of IBV_QP_INIT_ATTR_PEER_DIRECT (IBV_EXP_QP_INIT_ATTR_PEER_DIRECT)
         //ib_qp_init_attr.comp_mask |= IBV_QP_INIT_ATTR_PEER_DIRECT;
         ib_qp_init_attr.peer_direct_attrs = NULL; //peer_attr;
-/*
-		clients[i].qp = (struct ibv_qp*)calloc(1, sizeof(struct ibv_qp));
-        if (!clients[i].qp) {
-                mp_err_msg(oob_rank, "cannot allocate memory\n");
-                return MP_FAILURE;
-        }
-*/
+ 
         clients[i].qp = ibv_exp_create_qp(ib_ctx->context, &ib_qp_init_attr);
         if (!clients[i].qp)  {
                 ret = EINVAL;
@@ -578,11 +572,11 @@ int TL::Verbs::createEndpoints() {
                 goto err_free_rx_cq;
 		}
 
-		//======== QP CREATED
-        clients[i].send_cq = clients[i].qp->send_cq;
-        clients[i].send_cq_curr_offset = 0;
-        clients[i].recv_cq = clients[i].qp->recv_cq;
-        clients[i].recv_cq_curr_offset = 0;
+    //======== QP CREATED
+    clients[i].send_cq = clients[i].qp->send_cq;
+    clients[i].send_cq_curr_offset = 0;
+    clients[i].recv_cq = clients[i].qp->recv_cq;
+    clients[i].recv_cq_curr_offset = 0;
 
 		//clients[i].send_cq = &clients[i].qp->send_cq;
 		//clients[i].recv_cq = &clients[i].qp->recv_cq;
@@ -618,6 +612,7 @@ int TL::Verbs::createEndpoints() {
 		         qpinfo_all[peer].lid,
 		         qpinfo_all[peer].qpn,
 		         qpinfo_all[peer].psn);
+    printf(" create qpinfo_all=%p, qpinfo_all[%d]=%p\n", qpinfo_all, peer, &(qpinfo_all[peer]));
 	}
 
 	return MP_SUCCESS;
@@ -648,7 +643,8 @@ int TL::Verbs::createEndpoints() {
 }
 
 int TL::Verbs::exchangeEndpoints() {
-	int ret = oob_comm->alltoall(NULL, 0, MP_CHAR, qpinfo_all, sizeof(qpinfo_t), MP_CHAR);
+    printf("exchange qpinfo_all=%p, qpinfo_all[0]=%p qpinfo_all[1]=%p\n", qpinfo_all, &(qpinfo_all[0]), &(qpinfo_all[1]));
+	int ret = oob_comm->alltoall(NULL, sizeof(qpinfo_t), MP_BYTE, qpinfo_all, sizeof(qpinfo_t), MP_BYTE);
 	return ret;
 }	
 

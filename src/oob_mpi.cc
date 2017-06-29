@@ -54,23 +54,23 @@ namespace OOB
 	    	~OOB_MPI() {}
 
 			int init(int argc, char *argv[]) {
-				int ret = MPI_Init(&argc,&argv);
+				MPI_CHECK(MPI_Init(&argc,&argv));
 				initialized=1;
 				comm=MPI_COMM_WORLD;
 
-				return ret;
+				return MP_SUCCESS;
 			}
 
 			int getSize() {
 				if(numRanks == -1)
-					MPI_Comm_size(comm, &numRanks);
+					MPI_CHECK(MPI_Comm_size(comm, &numRanks));
 
 				return numRanks;
 			}
 
 			int getMyId() {
 				if(myRank == -1)
-					MPI_Comm_rank(comm, &myRank);
+					MPI_CHECK(MPI_Comm_rank(comm, &myRank));
 
 				return myRank;
 			} 
@@ -87,18 +87,25 @@ namespace OOB
 				return MPI_Abort(comm, errCode);
 			}
 
-			int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType) {
+			int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)
+			{
+				assert(rBuf);
+				assert(rSize);
 
 				if(sBuf == NULL)
 				{
+					//OpenMPI crash without sSize??
 					MPI_CHECK(MPI_Alltoall(
-							MPI_IN_PLACE, 0, 0, 
-							rBuf, rSize, get_mpi_datatype(rType),
+							MPI_IN_PLACE, 	sSize, get_mpi_datatype(sType), 
+							rBuf, 			rSize, get_mpi_datatype(rType),
 							comm)
 					);
 				}
 				else
 				{
+					assert(sBuf);
+					assert(sSize);
+
 					MPI_CHECK(MPI_Alltoall(
 							sBuf, sSize, get_mpi_datatype(sType), 
 							rBuf, rSize, get_mpi_datatype(rType),

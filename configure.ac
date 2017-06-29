@@ -89,10 +89,12 @@ fi
 AC_ARG_WITH([mpi], AC_HELP_STRING([--with-mpi], [ Set path to mpi installation ]))
 if test "x$with_mpi" == "xyes"; then
     # assuming system location
+    want_mpi=yes
     mpi_home=/usr
     MPICC=$with_home/bin/mpicc
     MPICXX=$with_home/bin/mpic++
 elif test "x$with_mpi" != "x" && test -d $with_mpi; then
+        want_mpi=yes
         mpi_home=$with_mpi
         MPICC=${mpi_home}/bin/mpicc
         MPICXX=${mpi_home}/bin/mpic++
@@ -106,6 +108,7 @@ elif test "x$with_mpi" != "x" && test -d $with_mpi; then
         MPI_CFLAGS="$MPI_CFLAGS -I$MPI_HOME/include"
         MPI_LDFLAGS="$MPI_LDFLAGS -L$MPI_HOME/lib"
 else
+    want_mpi=no
     AC_MSG_NOTICE([MPI not enabled or MPI dir does not exist.])
 fi
 

@@ -11,21 +11,22 @@ AM_LDFLAGS = -L$(top_srcdir)/lib $(top_builddir)/src/libmp.la
 # ==== Define Configure ====
 if HAVE_CUDA
 AM_CPPFLAGS += -I$(CUDA_PATH)/include
-AM_LDFLAGS += -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcuda -lcudart 
-endif
-
-if HAVE_GDSYNC
-AM_LDFLAGS += -lgdsync
+AM_LDFLAGS += -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcuda -lcudart
 endif
 
 if HAVE_VERBS
-AM_LDFLAGS += -libverbs -lgdrapi
+AM_LDFLAGS += -libverbs
 endif
 
 if HAVE_MPI
 AM_CPPFLAGS += -I$(MPI_PATH)/include
 AM_LDFLAGS += -L$(MPI_PATH)/lib -lmpi
 endif
+
+if HAVE_GDSYNC
+AM_LDFLAGS += -lgdsync -lgdrapi
+endif
+
 
 # ==== BIN ====
 bin_PROGRAMS = mp_pingpong_kernel_stream_latency_mpi

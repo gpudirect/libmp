@@ -14,7 +14,7 @@ extra_params=
 lrank=$MV2_COMM_WORLD_LOCAL_RANK
 mpi_type=1
 if [[ -z "$lrank" ]]; then
-    lrank=$MV2_COMM_WORLD_LOCAL_RANK
+    lrank=$OMPI_COMM_WORLD_LOCAL_RANK
     mpi_type=2
 fi
 PATH=$PATH:$PWD

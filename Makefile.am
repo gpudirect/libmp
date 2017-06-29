@@ -1,22 +1,16 @@
 CUDA_PATH = @CUDA_PATH@
 MPI_PATH = @MPI_PATH@
 
-
 AM_CPPFLAGS  = -I$(srcdir)
 AM_CPPFLAGS += -I$(srcdir)/include
 AM_CPPFLAGS += -I$(srcdir)/src
 AM_CPPFLAGS += -D__STDC_FORMAT_MACROS
-AM_LDFLAGS =
-SRC_LIST = src/mp.cc src/mp_comm.cc src/oob.cc src/oob_mpi.cc src/tl.cc src/tl_verbs.cc
+AM_LDFLAGS = -L$(top_srcdir)/lib
 
+# ==== Define Configure ====
 if HAVE_CUDA
 AM_CPPFLAGS += -I$(CUDA_PATH)/include
 AM_LDFLAGS += -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib -lcuda -lcudart
-endif
-
-if HAVE_GDSYNC
-AM_LDFLAGS += -libverbs -lgdsync -lgdrapi
-SRC_LIST += src/mp_comm_async.cc src/tl_verbs_async.cc
 endif
 
 if HAVE_VERBS
@@ -28,8 +22,24 @@ AM_CPPFLAGS += -I$(MPI_PATH)/include
 AM_LDFLAGS += -L$(MPI_PATH)/lib -lmpi
 endif
 
+if HAVE_GDSYNC
+AM_LDFLAGS += -lgdsync -lgdrapi
+endif
+
 ACLOCAL_AMFLAGS = -Iconfig
 AM_CFLAGS = -g -Wall
+
+SRC_LIST = src/mp.cc src/mp_comm.cc 
+
+if HAVE_GDSYNC
+SRC_LIST += src/mp_comm_async.cc
+endif
+
+SRC_LIST += src/oob.cc src/oob_mpi.cc src/tl.cc src/tl_verbs.cc
+
+if HAVE_GDSYNC
+SRC_LIST += src/tl_verbs_async.cc
+endif
 
 lib_LTLIBRARIES = src/libmp.la
 
