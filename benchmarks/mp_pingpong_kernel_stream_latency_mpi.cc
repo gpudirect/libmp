@@ -328,10 +328,8 @@ void post_work_mpi (int size, int batch_index, double kernel_size)
     int j;
     int rreq_idx = batch_to_rreq_idx (batch_index);
     int sreq_idx = batch_to_sreq_idx (batch_index);
-                if (!my_rank)printf("Before PUSH_RANGE\n");
 
     PUSH_RANGE("PingPong MPI", 1);
-               if (!my_rank) printf("Before for\n");
 
     for (j=0; j<steps_per_batch; j++) {
         if (!my_rank) { 
@@ -340,7 +338,6 @@ void post_work_mpi (int size, int batch_index, double kernel_size)
                 POP_RANGE;
                 #ifdef HAVE_CUDA
                 PUSH_RANGE("Launch & Sync", 3);
-                //printf("Before kernel launc, kernel_size %f, gpu_num_sm: %d\n", kernel_size,gpu_num_sm);
                     if (kernel_size > 0) {
                         if (use_calc_size > 0)
                            gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
@@ -357,7 +354,6 @@ void post_work_mpi (int size, int batch_index, double kernel_size)
 
         } else {
             PUSH_RANGE("Isend", 4);
-            //Crash here if GPU buffers without LibGDSync... configuration error?
             MPI_Isend((void *)sbuf_d, size, MPI_CHAR, peer, peer, MPI_COMM_WORLD, &sreq_mpi[sreq_idx + j]);
             POP_RANGE;
             
