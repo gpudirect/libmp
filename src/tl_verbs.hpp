@@ -49,10 +49,6 @@ struct verbs_client {
     struct ibv_cq *recv_cq;
     uint32_t recv_cq_curr_offset;
     
-//    struct verbs_qp *qp;
-//    struct verbs_cq *send_cq;
-//    struct verbs_cq *recv_cq;
-
     struct ibv_mr *region_mr;
     //UD info
     struct ibv_ah *ah;
@@ -164,7 +160,6 @@ namespace TL
 			void *shm_mapptr;
 			char ud_padding[UD_ADDITION];
 #endif
-
 			/*to enable opaque requests*/
 			void verbs_allocate_requests();
 			verbs_request_t verbs_get_request();
@@ -182,6 +177,21 @@ namespace TL
 			int verbs_update_qp_rts(verbs_client_t client, int index, struct ibv_qp * qp);
 			int verbs_update_qp_rtr(verbs_client_t client, int index, struct ibv_qp * qp);
 			exchange_win_info * verbs_window_create(void *addr, size_t size, verbs_window_t *window_t);
+			//Common fill requests
+			int verbs_fill_send_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_exp_send_wr * sr, struct ibv_sge * sg_entry, 
+                                      struct ibv_ah *ah, uint32_t qpn);
+
+			int verbs_fill_recv_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_recv_wr * rr, struct ibv_sge * sg_entry, struct ibv_sge ud_sg_entry[2]);
+			
+			int verbs_fill_put_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_exp_send_wr * sr, struct ibv_sge * sg_entry, 
+                                      int client_id, verbs_window_t window, size_t displ, int * req_flags, int flags);
+
+			int verbs_fill_get_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_exp_send_wr * sr, struct ibv_sge * sg_entry, 
+                                      int client_id, verbs_window_t window, size_t displ);
 
 		public:
 			~Verbs() {}

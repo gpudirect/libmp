@@ -1043,6 +1043,36 @@ mp_request_t * TL::Verbs::create_requests(int number) {
 	return (mp_request_t *) req;
 }
 
+int TL::Verbs::verbs_fill_recv_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_recv_wr * rr, struct ibv_sge * sg_entry, struct ibv_sge ud_sg_entry[2])
+{
+  int ret = MP_SUCCESS;
+
+    rr->next = NULL;
+    rr->wr_id = req_id;
+
+    if (verbs_enable_ud) { 
+      verbs_region_t ud_reg = (verbs_region_t ) ud_padding_reg;
+
+      rr->num_sge = 2;
+      rr->sg_list = (ud_sg_entry);
+      ud_sg_entry[0].length = UD_ADDITION;
+      ud_sg_entry[0].lkey = ud_reg->key;
+      ud_sg_entry[0].addr = (uintptr_t)(ud_padding);
+      ud_sg_entry[1].length = size;
+      ud_sg_entry[1].lkey = reg->key;
+      ud_sg_entry[1].addr = (uintptr_t)(buf);  
+    } else { 
+      rr->num_sge = 1;
+      rr->sg_list = sg_entry;
+      sg_entry->length = size;
+      sg_entry->lkey = reg->key;
+      sg_entry->addr = (uintptr_t)(buf);
+    }
+    return ret;
+}
+
+
 int TL::Verbs::pt2pt_nb_recv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 	int ret = 0;
 	verbs_request_t req = NULL;
@@ -1056,41 +1086,24 @@ int TL::Verbs::pt2pt_nb_recv(void * buf, size_t size, int peer, mp_region_t * mp
 
 	mp_dbg_msg(oob_rank, "peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
 
-#ifdef HAVE_IPC
-	if (client->can_use_ipc)
-			track_ipc_stream_rreq(peer, req);
-#else
-	req->in.rr.next = NULL;
-	req->in.rr.wr_id = (uintptr_t) req;
 
-	if (verbs_enable_ud) { 
-	  verbs_region_t ud_reg = (verbs_region_t ) ud_padding_reg;
-
-	  req->in.rr.num_sge = 2;
-	  req->in.rr.sg_list = req->ud_sg_entry;
-	  req->ud_sg_entry[0].length = UD_ADDITION;
-	  req->ud_sg_entry[0].lkey = ud_reg->key;
-	  req->ud_sg_entry[0].addr = (uintptr_t)(ud_padding);
-	  req->ud_sg_entry[1].length = size;
-	  req->ud_sg_entry[1].lkey = reg->key;
-	  req->ud_sg_entry[1].addr = (uintptr_t)(buf);	
-	} else { 
-	  req->in.rr.num_sge = 1;
-	  req->in.rr.sg_list = &req->sg_entry;
-	  req->sg_entry.length = size;
-	  req->sg_entry.lkey = reg->key;
-	  req->sg_entry.addr = (uintptr_t)(buf);
-	}
-	//progress (remove) some request on the RX flow if is not possible to queue a recv request
-	ret = verbs_post_recv(client, req);
-	if (ret) {
-		mp_err_msg(oob_rank, "Posting recv failed: %s \n", strerror(errno));
-		goto out;
-	}
-#endif
+  #ifdef HAVE_IPC
+      if ((*client)->can_use_ipc)
+          track_ipc_stream_rreq(peer, (*req));
+  #else
+    ret = verbs_fill_recv_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.rr), &(req->sg_entry), req->ud_sg_entry);
+    if (ret) goto out;
+  	//progress (remove) some request on the RX flow if is not possible to queue a recv request
+  	ret = verbs_post_recv(client, req);
+  	if (ret) {
+  		mp_err_msg(oob_rank, "Posting recv failed: %s \n", strerror(errno));
+  		goto out;
+  	}
+  #endif
 	*mp_req = (mp_request_t) req; 
-out:
-	return ret;
+  out:
+    if (ret && req) verbs_release_request((verbs_request_t) req);
+  	return ret;
 }
 
 int TL::Verbs::pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
@@ -1130,8 +1143,34 @@ int TL::Verbs::pt2pt_nb_recvv(struct iovec *v, int nvecs, int peer, mp_region_t 
   }
 
   *mp_req = (mp_request_t) req; 
-out:
-  return ret;
+  out:
+    return ret;
+}
+
+int TL::Verbs::verbs_fill_send_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_exp_send_wr * sr, struct ibv_sge * sg_entry, 
+                                      struct ibv_ah *ah, uint32_t qpn)
+{
+  int ret = MP_SUCCESS;
+
+    sr->next = NULL;
+    sr->exp_send_flags = IBV_EXP_SEND_SIGNALED;
+    sr->exp_opcode = IBV_EXP_WR_SEND;
+    sr->wr_id = req_id; //(uintptr_t) (*req);
+    sr->num_sge = 1;
+    sr->sg_list = sg_entry;
+
+    if (verbs_enable_ud) {
+        sr->wr.ud.ah = ah;
+        sr->wr.ud.remote_qpn = qpn; 
+        sr->wr.ud.remote_qkey = 0;
+    }
+
+    sg_entry->length = size;
+    sg_entry->lkey = reg->key;
+    sg_entry->addr = (uintptr_t)(buf);
+
+    return ret;
 }
 
 int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
@@ -1146,70 +1185,57 @@ int TL::Verbs::pt2pt_nb_send(void * buf, size_t size, int peer, mp_region_t * mp
 
 	mp_dbg_msg(oob_rank, "peer=%d req=%p buf=%p size=%zd req id=%d reg=%p key=%x\n", peer, req, buf, size, req->id, reg, reg->key);
 
-#ifdef HAVE_IPC
-	if (client->can_use_ipc)
-	{
-		ipc_handle_cache_entry_t *entry = NULL;
-		smp_buffer_t *smp_buffer = NULL;
+  #ifdef HAVE_IPC
+    if (*client->can_use_ipc)
+    {
+      ipc_handle_cache_entry_t *entry = NULL;
+      smp_buffer_t *smp_buffer = NULL;
 
-		//try to find in local handle cache
-		ipc_handle_cache_find (buf, size, &entry, oob_rank);
-		if (!entry) { 
-			entry = malloc(sizeof(ipc_handle_cache_entry_t));
-			if (!entry) { 
-				mp_err_msg(oob_rank, "cache entry allocation failed \n");	
-				ret = MP_FAILURE;
-				goto out;
-			}
+      //try to find in local handle cache
+      ipc_handle_cache_find (buf, size, &entry, oob_rank);
+      if (!entry) { 
+        entry = malloc(sizeof(ipc_handle_cache_entry_t));
+        if (!entry) { 
+          mp_err_msg(oob_rank, "cache entry allocation failed \n"); 
+          ret = MP_FAILURE;
+          goto out;
+        }
 
-			CU_CHECK(cuMemGetAddressRange((CUdeviceptr *)&entry->base, &entry->size, (CUdeviceptr) buf));
-			CU_CHECK(cuIpcGetMemHandle (&entry->handle, (CUdeviceptr)entry->base));
+        CU_CHECK(cuMemGetAddressRange((CUdeviceptr *)&entry->base, &entry->size, (CUdeviceptr) buf));
+        CU_CHECK(cuIpcGetMemHandle (&entry->handle, (CUdeviceptr)entry->base));
 
-			ipc_handle_cache_insert(entry, oob_rank);
-		}
+        ipc_handle_cache_insert(entry, oob_rank);
+      }
 
-		assert(entry != NULL);
-		smp_buffer = client->smp.remote_buffer + client->smp.remote_head;
-		assert(smp_buffer->free == 1);	
+      assert(entry != NULL);
+      smp_buffer = client->smp.remote_buffer + client->smp.remote_head;
+      assert(smp_buffer->free == 1);  
 
-		memcpy((void *)&smp_buffer->handle, (void *)&entry->handle, sizeof(CUipcMemHandle));  
-		smp_buffer->base_addr = entry->base;
-		smp_buffer->base_size = entry->size;
-		smp_buffer->addr = buf;
-		smp_buffer->size = size;
-		smp_buffer->offset = (uintptr_t)buf - (uintptr_t)entry->base;
-		smp_buffer->sreq = req; 
-		smp_buffer->free = 0; 
-		smp_buffer->busy = 1;
-		client->smp.remote_head = (client->smp.remote_head + 1)%smp_depth;	 
-	}
-#else
-	req->in.sr.next = NULL;
-	req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-	req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
-	req->in.sr.wr_id = (uintptr_t) req;
-	req->in.sr.num_sge = 1;
-	req->in.sr.sg_list = &req->sg_entry;
+      memcpy((void *)&smp_buffer->handle, (void *)&entry->handle, sizeof(CUipcMemHandle));  
+      smp_buffer->base_addr = entry->base;
+      smp_buffer->base_size = entry->size;
+      smp_buffer->addr = buf;
+      smp_buffer->size = size;
+      smp_buffer->offset = (uintptr_t)buf - (uintptr_t)entry->base;
+      smp_buffer->sreq = req; 
+      smp_buffer->free = 0; 
+      smp_buffer->busy = 1;
+      (*client)->smp.remote_head = ((*client)->smp.remote_head + 1)%smp_depth;   
+    }
+  #else
+    ret = verbs_fill_send_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client->ah, client->qpn);
+    if (ret) goto out;
 
-	if (verbs_enable_ud) {
-	    req->in.sr.wr.ud.ah = client->ah;
-	    req->in.sr.wr.ud.remote_qpn = client->qpn; 
-	    req->in.sr.wr.ud.remote_qkey = 0;
-	}
-
-	req->sg_entry.length = size;
-	req->sg_entry.lkey = reg->key;
-	req->sg_entry.addr = (uintptr_t)(buf);
-	// progress (remove) some request on the TX flow if is not possible to queue a send request
-	ret = verbs_post_send(client, req);
-	if (ret) {
-		mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
-		goto out;
-	}	    
-#endif
+    ret = verbs_post_send(client, req);
+    if (ret) {
+    	mp_err_msg(oob_rank, "posting send failed: %s \n", strerror(errno));
+    	goto out;
+    }
+  #endif
 	*mp_req = (mp_request_t) req;
 
-out:
+  out:
+    if (ret && req) verbs_release_request((verbs_request_t) req);
     return ret;
 }
 
@@ -1281,7 +1307,7 @@ int TL::Verbs::wait_word(uint32_t *ptr, uint32_t value, int flags)
             cnt = 0;
         }
     }
-out:
+  out:
     return ret;
 }
 
@@ -1424,44 +1450,59 @@ int TL::Verbs::onesided_window_destroy(mp_window_t *window_t)
   return result;
 }
 
-int TL::Verbs::onesided_nb_put (void *src, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) 
+int TL::Verbs::verbs_fill_put_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_exp_send_wr * sr, struct ibv_sge * sg_entry, 
+                                      int client_id, verbs_window_t window, size_t displ, int * req_flags, int flags)
+{
+  int ret = MP_SUCCESS;
+
+  *req_flags = flags;
+  sr->next = NULL;
+  
+  if (flags & MP_PUT_NOWAIT)
+    sr->exp_send_flags = 0;
+  else
+    sr->exp_send_flags = IBV_EXP_SEND_SIGNALED;
+
+  if (flags & MP_PUT_INLINE)
+    sr->exp_send_flags |= IBV_EXP_SEND_INLINE;
+  
+  sr->exp_opcode = IBV_EXP_WR_RDMA_WRITE;
+  sr->wr_id = req_id;
+  sr->num_sge = 1;
+  sr->sg_list = sg_entry;
+
+  sg_entry->length = size;
+  sg_entry->lkey = reg->key;
+  sg_entry->addr = (uintptr_t)buf;
+
+  sr->wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
+  sr->wr.rdma.rkey = window->rkey[client_id];
+
+  return ret;
+}
+
+int TL::Verbs::onesided_nb_put (void *buf, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags) 
 {
 	int ret = 0;
 	verbs_request_t req;
-	verbs_region_t reg = (verbs_region_t) *reg_t;
+	verbs_region_t reg = (verbs_region_t) *mp_reg;
 	verbs_window_t window = (verbs_window_t) *window_t;
 	int client_id = client_index[peer];
 	verbs_client_t client = &clients[client_id];
 
-	if (verbs_enable_ud) { 
-		mp_err_msg(oob_rank, "put/get not supported with UD \n");
-		ret = MP_FAILURE;
-		goto out;
-	}
-	assert(displ < window->rsize[client_id]);
+  if (verbs_enable_ud) { 
+    mp_err_msg(oob_rank, "put/get not supported with UD \n");
+    ret = MP_FAILURE;
+    goto out;
+  }
 
+	assert(displ < window->rsize[client_id]);
 	req = verbs_new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
 	assert(req);
 
-	req->flags = flags;
-	req->in.sr.next = NULL;
-	if (flags & MP_PUT_NOWAIT)
-	  req->in.sr.exp_send_flags = 0;
-	else
-	  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-	if (flags & MP_PUT_INLINE)
-	  req->in.sr.exp_send_flags |= IBV_EXP_SEND_INLINE;
-	req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_WRITE;
-	req->in.sr.wr_id = (uintptr_t) req;
-	req->in.sr.num_sge = 1;
-	req->in.sr.sg_list = &req->sg_entry;
-
-	req->sg_entry.length = size;
-	req->sg_entry.lkey = reg->key;
-	req->sg_entry.addr = (uintptr_t)src;
-
-	req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
-	req->in.sr.wr.rdma.rkey = window->rkey[client_id];
+  ret = verbs_fill_put_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client_id, window, displ, &(req->flags), flags);
+  if(ret) goto out;
 
 	ret = verbs_post_send(client, req);
 	if (ret) {
@@ -1469,13 +1510,42 @@ int TL::Verbs::onesided_nb_put (void *src, int size, mp_region_t *reg_t, int pee
 		goto out;
 	}
 
-	*req_t = req;
+	*mp_req = req;
 
-out:
-	return ret;
+  out:
+    if (ret && req) verbs_release_request((verbs_request_t) req);
+  	return ret;
 }
 
-int TL::Verbs::onesided_nb_get(void *dst, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t) 
+
+
+
+int TL::Verbs::verbs_fill_get_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
+                                      struct ibv_exp_send_wr * sr, struct ibv_sge * sg_entry, 
+                                      int client_id, verbs_window_t window, size_t displ)
+{
+  int ret = MP_SUCCESS;
+
+  sr->next = NULL;
+  sr->exp_send_flags = IBV_EXP_SEND_SIGNALED;
+  sr->exp_opcode = IBV_EXP_WR_RDMA_READ;
+  sr->wr_id = req_id;
+  sr->num_sge = 1;
+  sr->sg_list = sg_entry;
+
+  sg_entry->length = size;
+  sg_entry->lkey = reg->key;
+  sg_entry->addr = (uintptr_t)buf;
+
+  sr->wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
+  sr->wr.rdma.rkey = window->rkey[client_id];
+
+
+  return ret;
+}
+
+
+int TL::Verbs::onesided_nb_get(void *buf, int size, mp_region_t *reg_t, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req) 
 {
   int ret = 0;
   verbs_request_t req;
@@ -1491,22 +1561,11 @@ int TL::Verbs::onesided_nb_get(void *dst, int size, mp_region_t *reg_t, int peer
   }
 
   assert(displ < window->rsize[client_id]);
-
   req = verbs_new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
+  assert(req);
 
-  req->in.sr.next = NULL;
-  req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
-  req->in.sr.exp_opcode = IBV_EXP_WR_RDMA_READ;
-  req->in.sr.wr_id = (uintptr_t) req;
-  req->in.sr.num_sge = 1;
-  req->in.sr.sg_list = &req->sg_entry;
-
-  req->sg_entry.length = size;
-  req->sg_entry.lkey = reg->key;
-  req->sg_entry.addr = (uintptr_t)dst;
-
-  req->in.sr.wr.rdma.remote_addr = ((uint64_t)window->base_ptr[client_id]) + displ;
-  req->in.sr.wr.rdma.rkey = window->rkey[client_id];
+  ret = verbs_fill_get_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client_id, window, displ);
+  if(ret) goto out;
 
   ret = verbs_post_send(client, req);
   if (ret) {
@@ -1514,10 +1573,11 @@ int TL::Verbs::onesided_nb_get(void *dst, int size, mp_region_t *reg_t, int peer
   	goto out;
   }
 
-  *req_t = req;
+  *mp_req = req;
 
   out:
-  return ret;
+    if (ret && req) verbs_release_request((verbs_request_t) req);
+    return ret;
 }
 
 //============== GPUDirect Async - Verbs_GDS class ==============
@@ -1533,7 +1593,7 @@ int TL::Verbs::wait_async (mp_request_t *req_t, asyncStream stream) { return MP_
 int TL::Verbs::wait_all_async(int count, mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::onesided_nb_put_async(void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_nb_get_async(void *dst, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
+int TL::Verbs::onesided_nb_get_async(void *buf, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::onesided_put_prepare (void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) { return MP_FAILURE; }
 int TL::Verbs::onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
 int TL::Verbs::onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
