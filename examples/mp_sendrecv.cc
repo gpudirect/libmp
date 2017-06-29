@@ -159,7 +159,7 @@ int main (int argc, char *argv[])
     }
 
     //GPUDirect RDMA
-    envVar = getenv("MP_GPU_BUFFERS"); 
+    envVar = getenv("MP_BENCH_GPU_BUFFERS"); 
     if (envVar != NULL) {
         use_gpu_buffers = atoi(envVar);
         if(use_gpu_buffers == 1)

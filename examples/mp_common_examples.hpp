@@ -11,7 +11,7 @@ static int __dbg_msg(const char *fmt, ...)
     static int enable_debug_prints = -1;
     int ret = 0;
     if (-1 == enable_debug_prints) {
-        const char *value = getenv("MP_ENABLE_APP_DEBUG");
+        const char *value = getenv("MP_BENCH_ENABLE_DEBUG");
         if (value != NULL)
             enable_debug_prints = atoi(value);
         else

@@ -44,4 +44,4 @@ src_libmp_la_CFLAGS = $(AM_CFLAGS)
 src_libmp_la_SOURCES = $(SRC_LIST)
 src_libmp_la_LDFLAGS = -version-info 3:0:0
 
-SUBDIRS = . examples
+SUBDIRS = . examples benchmarks
