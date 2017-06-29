@@ -131,8 +131,6 @@ if test "$want_libgdsync" == "yes"; then
     if test "$want_libibverbs" == "no"; then
         AC_MSG_ERROR([You cannot have LibGDSync without IB Verbs.])
     fi
-    AC_MSG_NOTICE([checking libgdsync])
-
     
     AC_CHECK_LIB(gdrapi, gdr_open, [], AC_MSG_ERROR([gdr_open() not found. If using --with-libgdsync LibMP requires GDRCopy.]))
     AC_CHECK_LIB(gdsync, gds_query_param, [], AC_MSG_ERROR([gds_query_param() not found. If using --with-libgdsync LibMP requires LibGDSync.]))
