@@ -77,11 +77,18 @@ typedef enum mp_flow {
     N_FLOWS
 } mp_flow_t;
 
-#ifndef PUT_FLAGS_H
-#define PUT_FLAGS_H
+#ifndef MP_FLAGS_H
+#define MP_FLAGS_H
 enum mp_put_flags {
     MP_PUT_INLINE  = 1<<0,
     MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
+};
+
+
+enum mp_wait_flags {
+    MP_WAIT_GEQ = 0,
+    MP_WAIT_EQ,
+    MP_WAIT_AND
 };
 #endif
 
@@ -156,6 +163,8 @@ static inline us_t mp_get_cycles()
 #define mb()    asm volatile("mfence":::"memory")
 #define rmb()   asm volatile("lfence":::"memory")
 #define wmb()   asm volatile("sfence" ::: "memory")
+#define iomb() mb()
+
 static inline void arch_cpu_relax(void)
 {
         asm volatile("pause\n": : :"memory");
@@ -183,6 +192,10 @@ static void rmb(void)
 #error "platform not supported"
 #endif
 
+#define PAGE_BITS 12
+#define PAGE_SIZE (1ULL<<PAGE_BITS)
+#define PAGE_OFF  (PAGE_SIZE-1)
+#define PAGE_MASK (~(PAGE_OFF))
 
 
 #if defined(HAVE_CUDA) || defined(HAVE_GDS)
