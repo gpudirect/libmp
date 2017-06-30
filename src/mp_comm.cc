@@ -186,12 +186,12 @@ int mp_prepare_acks()
 	local_ack_table_reg = mp_create_regions(1);
 	assert(local_ack_table_reg);
 	mp_dbg_msg(oob_rank, "registering local_ack_table size=%d\n", ack_table_size);
-	MP_CHECK(mp_register_region_buffer(local_ack_table, ack_table_size, local_ack_table_reg));
+	MP_CHECK(mp_register_region_buffer(local_ack_table, ack_table_size, &local_ack_table_reg[0]));
 
 	remote_ack_values_reg = mp_create_regions(1);
 	assert(remote_ack_values_reg);
 	mp_dbg_msg(oob_rank, "registering remote_ack_table\n");
-	MP_CHECK(mp_register_region_buffer(remote_ack_values, ack_table_size, &remote_ack_values_reg));
+	MP_CHECK(mp_register_region_buffer(remote_ack_values, ack_table_size, &remote_ack_values_reg[0]));
 
 	mp_dbg_msg(oob_rank, "creating local_ack_table window\n");
 	MP_CHECK(mp_window_create(local_ack_table, ack_table_size, &local_ack_table_win));
