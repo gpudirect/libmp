@@ -184,10 +184,12 @@ int mp_prepare_acks()
 	iomb();
 
 	local_ack_table_reg = mp_create_regions(1);
+	assert(local_ack_table_reg);
 	mp_dbg_msg(oob_rank, "registering local_ack_table size=%d\n", ack_table_size);
 	MP_CHECK(mp_register(local_ack_table, ack_table_size, local_ack_table_reg));
 
 	remote_ack_values_reg = mp_create_regions(1);
+	assert(remote_ack_values_reg);
 	mp_dbg_msg(oob_rank, "registering remote_ack_table\n");
 	MP_CHECK(mp_register(remote_ack_values, ack_table_size, &remote_ack_values_reg));
 
@@ -225,7 +227,7 @@ int mp_wait_ack(int src_rank)
 	MP_CHECK_COMM_OBJ();
 	assert(src_rank < oob_size);
 
-		mb_dbg_msg(oob_rank, "src_rank=%d payload=%x\n", src_rank, local_ack_values[src_rank]);
+	mp_dbg_msg(oob_rank, "src_rank=%d payload=%x\n", src_rank, local_ack_values[src_rank]);
 	MP_CHECK(mp_wait_word(&(local_ack_table[rank]), local_ack_values[rank], MP_WAIT_GEQ));
 	local_ack_values[rank]++;
 #if 0
