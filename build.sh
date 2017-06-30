@@ -8,7 +8,7 @@
 
 cd build
 
-export PREFIX=$HOME/libmp
+#export PREFIX=$HOME/libmp
 
 if [ ! -e Makefile ]; then
     echo "configuring..."
