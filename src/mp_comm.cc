@@ -176,7 +176,7 @@ int mp_prepare_acks()
 	posix_memalign((void **)&remote_ack_values, PAGE_SIZE, ack_table_size);
 	assert(remote_ack_values);
 
-	for (i=0; i<num_ranks; ++i) {
+	for (int i=0; i<oob_size; ++i) {
 	    local_ack_table[i] = 0;  // remotely written table
 	    local_ack_values[i] = 1; // locally expected value
 	    remote_ack_values[i] = 1; // value to be sent remotely
@@ -186,12 +186,12 @@ int mp_prepare_acks()
 	local_ack_table_reg = mp_create_regions(1);
 	assert(local_ack_table_reg);
 	mp_dbg_msg(oob_rank, "registering local_ack_table size=%d\n", ack_table_size);
-	MP_CHECK(mp_register(local_ack_table, ack_table_size, local_ack_table_reg));
+	MP_CHECK(mp_register_region_buffer(local_ack_table, ack_table_size, local_ack_table_reg));
 
 	remote_ack_values_reg = mp_create_regions(1);
 	assert(remote_ack_values_reg);
 	mp_dbg_msg(oob_rank, "registering remote_ack_table\n");
-	MP_CHECK(mp_register(remote_ack_values, ack_table_size, &remote_ack_values_reg));
+	MP_CHECK(mp_register_region_buffer(remote_ack_values, ack_table_size, &remote_ack_values_reg));
 
 	mp_dbg_msg(oob_rank, "creating local_ack_table window\n");
 	MP_CHECK(mp_window_create(local_ack_table, ack_table_size, &local_ack_table_win));
@@ -213,7 +213,7 @@ int mp_send_ack(int dst_rank)
 	int remote_offset = oob_rank * sizeof(uint32_t);
 	mp_dbg_msg(oob_rank, "dest_rank=%d payload=%x offset=%d\n", dst_rank, remote_ack_values[dst_rank], remote_offset);
 
-	MP_CHECK(mp_iput(&remote_ack_values[dst_rank], sizeof(uint32_t), &remote_ack_values_reg, dst_rank, remote_offset, 
+	MP_CHECK(mp_iput(&remote_ack_values[dst_rank], sizeof(uint32_t), &remote_ack_values_reg[0], dst_rank, remote_offset, 
 						&local_ack_table_win, &ack_request[0], MP_PUT_INLINE | MP_PUT_NOWAIT));
 
 	//atomic_inc
@@ -228,8 +228,8 @@ int mp_wait_ack(int src_rank)
 	assert(src_rank < oob_size);
 
 	mp_dbg_msg(oob_rank, "src_rank=%d payload=%x\n", src_rank, local_ack_values[src_rank]);
-	MP_CHECK(mp_wait_word(&(local_ack_table[rank]), local_ack_values[rank], MP_WAIT_GEQ));
-	local_ack_values[rank]++;
+	MP_CHECK(mp_wait_word(&(local_ack_table[src_rank]), local_ack_values[src_rank], MP_WAIT_GEQ));
+	local_ack_values[src_rank]++;
 #if 0
     while (ACCESS_ONCE(local_ack_table[rank]) < local_ack_values[rank]) {
         rmb();

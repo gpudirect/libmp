@@ -44,6 +44,10 @@
 #define MP_MAX_PROGRESS_FLOW_TRY 100
 #define MP_PROGRESS_ERROR_CHECK_TMOUT_US ((us_t)60*1000*1000)
 
+#ifndef MAX
+#define MAX(A,B) ((A)>(B)?(A):(B))
+#endif
+
 typedef enum {
     MP_CHAR=0,
     MP_BYTE,
