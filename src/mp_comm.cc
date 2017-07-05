@@ -230,17 +230,29 @@ int mp_wait_ack(int src_rank)
 	mp_dbg_msg(oob_rank, "src_rank=%d payload=%x\n", src_rank, local_ack_values[src_rank]);
 	MP_CHECK(mp_wait_word(&(local_ack_table[src_rank]), local_ack_values[src_rank], MP_WAIT_GEQ));
 	local_ack_values[src_rank]++;
-#if 0
-    while (ACCESS_ONCE(local_ack_table[rank]) < local_ack_values[rank]) {
-        rmb();
-        arch_cpu_relax();
-        ++cnt;
-        if (cnt > 10000) {
-            comm_progress();
-            cnt = 0;
-        }
-    }
-    local_ack_values[rank]++;
-#endif
+	#if 0
+	    while (ACCESS_ONCE(local_ack_table[rank]) < local_ack_values[rank]) {
+	        rmb();
+	        arch_cpu_relax();
+	        ++cnt;
+	        if (cnt > 10000) {
+	            comm_progress();
+	            cnt = 0;
+	        }
+	    }
+	    local_ack_values[rank]++;
+	#endif
     return MP_SUCCESS;
+}
+
+int mp_cleanup_acks()
+{
+
+	MP_CHECK(mp_unregister_regions(1, local_ack_table_reg));
+	MP_CHECK(mp_unregister_regions(1, remote_ack_values_reg));
+	MP_CHECK(mp_window_destroy(&local_ack_table_win));
+	free(local_ack_table);
+	free(remote_ack_values);
+
+	return MP_SUCCESS;
 }

@@ -113,6 +113,11 @@ void mp_barrier();
 void mp_abort();
 double mp_time();
 
+int mp_prepare_acks();
+int mp_send_ack(int dst_rank);
+int mp_wait_ack(int src_rank);
+int mp_cleanup_acks();
+
 //===== mp_comm.cc
 int mp_irecv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
 int mp_isend(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
