@@ -111,6 +111,7 @@ int mp_window_create(void *addr, size_t size, mp_window_t *window_t);
 int mp_window_destroy(mp_window_t *window_t);
 void mp_barrier();
 void mp_abort();
+double mp_time();
 
 //===== mp_comm.cc
 int mp_irecv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);

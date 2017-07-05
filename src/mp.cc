@@ -252,3 +252,9 @@ int mp_query_param(mp_param_t param, int *value)
 	};
 	return ret;
 }
+
+double mp_time()
+{
+	MP_CHECK_OOB_OBJ();
+	return oob_comm->time();
+}

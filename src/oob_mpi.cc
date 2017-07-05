@@ -87,6 +87,10 @@ namespace OOB
 				return MPI_Abort(comm, errCode);
 			}
 
+			double time() {
+				return MPI_Wtime();
+			}
+
 			int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)
 			{
 				assert(rBuf);
