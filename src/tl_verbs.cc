@@ -1570,32 +1570,34 @@ int TL::Verbs::onesided_nb_get(void *buf, int size, mp_region_t *reg_t, int peer
     return ret;
 }
 
-//============== GPUDirect Async - Verbs_GDS class ==============
+//============== GPUDirect Async - Verbs_Async child class ==============
 int TL::Verbs::setup_sublayer(int par1) { return MP_SUCCESS; }
-int TL::Verbs::pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_send_prepare(void *buf, int size, int peer, mp_region_t *reg_t, mp_request_t *req_t) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_b_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::wait_async (mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::wait_all_async(int count, mp_request_t *req_t, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_nb_put_async(void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_nb_get_async(void *buf, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_put_prepare (void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) { return MP_FAILURE; }
-int TL::Verbs::onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream) { return MP_FAILURE; }
-int TL::Verbs::progress_requests (int count, mp_request_t *mp_req) { return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq){ return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_free(mp_comm_descriptors_queue_t *pdq){ return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags){ return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value){ return MP_FAILURE; }
-int TL::Verbs::descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags){ return MP_FAILURE; }
+int TL::Verbs::pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_nb_sendv_async(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_send_prepare(void *buf, int size, int peer, mp_region_t *reg_t, mp_request_t *req_t) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t *mp_req) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_b_send_post_async(mp_request_t *req_t, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_b_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_nb_send_post_async(mp_request_t *req_t, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::pt2pt_nb_send_post_all_async(int count, mp_request_t *req_t, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::wait_async (mp_request_t *req_t, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::wait_all_async(int count, mp_request_t *req_t, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::wait_word_async(uint32_t *ptr, uint32_t value, int flags, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::onesided_nb_put_async(void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::onesided_nb_get_async(void *buf, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::onesided_put_prepare (void *src, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *req_t, int flags) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::onesided_nb_put_post_async(mp_request_t *mp_req, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::onesided_nb_put_post_all_async (int count, mp_request_t *mp_req, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::progress_requests (int count, mp_request_t *mp_req) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_free(mp_comm_descriptors_queue_t *pdq){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp_request_t *mp_req){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 
 //================================================================
 

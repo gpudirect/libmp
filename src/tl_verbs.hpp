@@ -258,8 +258,10 @@ namespace TL
 			//============== GPUDirect Async - Verbs_Async class ==============
 			int setup_sublayer(int par1);
 			int pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream);
+			int pt2pt_nb_sendv_async (struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream stream);
 			int pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream);
 			int pt2pt_send_prepare(void *buf, int size, int peer, mp_region_t *reg_t, mp_request_t *mp_req);
+			int pt2pt_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t *mp_req);
 			int pt2pt_b_send_post_async(mp_request_t * mp_req, asyncStream stream);
 			int pt2pt_b_send_post_all_async(int count, mp_request_t * mp_req, asyncStream stream);
 			int pt2pt_nb_send_post_async(mp_request_t * mp_req, asyncStream stream);

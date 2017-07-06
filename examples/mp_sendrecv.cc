@@ -203,5 +203,5 @@ int main (int argc, char *argv[])
     mp_barrier();
     mp_finalize();
     
-    return 0;
+    return EXIT_SUCCESS;
 }

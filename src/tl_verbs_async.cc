@@ -1019,7 +1019,7 @@ namespace TL
 						smp_buffer->busy = 1;
 						(*client)->smp.remote_head = ((*client)->smp.remote_head + 1)%smp_depth;   
 				    }
-				  #else
+				#else
 					ret = verbs_fill_send_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client->ah, client->qpn);
 					if (ret) goto out;
 
@@ -1360,10 +1360,10 @@ namespace TL
 					ret = verbs_fill_send_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client->ah, client->qpn);
 					if (ret) goto out;
 
-			        ret = verbs_post_send(client, req, stream, 1, 2, 0);
-			        if (ret) {
-			            mp_err_msg(oob_rank, "verbs_post_send failed: %s \n", strerror(ret));
-			            goto out;
+					ret = verbs_post_send(client, req, stream, 1, 2, 0);
+					if (ret) {
+						mp_err_msg(oob_rank, "verbs_post_send failed: %s \n", strerror(ret));
+						goto out;
 					}
 			    }
 
@@ -1371,7 +1371,67 @@ namespace TL
 
 				out:
 					if (ret && req) verbs_release_request((verbs_request_async_t) req);
-				    return ret;
+					return ret;
+			}
+
+			//mp_isendv_on_stream
+			int pt2pt_nb_sendv_async (struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream stream)
+			{
+				int ret = 0;
+			    verbs_request_async_t req;
+			    verbs_region_t reg = (verbs_region_t )*mp_reg;
+			    verbs_client_async_t client = &clients_async[client_index[peer]];
+			  	CHECK_GPU(gpu_id);
+
+				if (use_event_sync) {
+				mp_dbg_msg(oob_rank, "Not Implemented for use_event_sync\n");
+				ret = MP_FAILURE;
+				goto out;
+				}
+
+				if (nvecs > ib_max_sge) {
+					mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
+					ret = MP_FAILURE;
+					goto out;
+				}
+
+				assert(reg);
+				req = verbs_new_request(client, MP_SEND, MP_PENDING_NOWAIT);
+				assert(req);
+				req->sgv = (struct ibv_sge *) calloc(nvecs, sizeof(struct ibv_sge));
+				assert(req->sgv);
+
+
+				for (int i=0; i < nvecs; ++i) {
+					req->sgv[i].length = v[i].iov_len;
+					req->sgv[i].lkey = reg->key;
+					req->sgv[i].addr = (uint64_t)(v[i].iov_base);
+				}
+
+				if (verbs_enable_ud) {
+					req->in.sr.wr.ud.ah = client->ah;
+					req->in.sr.wr.ud.remote_qpn = client->qpn;
+					req->in.sr.wr.ud.remote_qkey = 0;
+				}
+
+				req->in.sr.next = NULL;
+				req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = nvecs;
+				req->in.sr.sg_list = req->sgv;
+
+				ret = verbs_post_send(client, req, stream, 1, 2, 0);
+				if (ret) {
+					mp_err_msg(oob_rank, "verbs_post_send failed: %s \n", strerror(ret));
+					goto out;
+				}
+
+				*mp_req = (mp_request_t) req; 
+
+				out:
+					if (ret && req) verbs_release_request((verbs_request_async_t) req);
+					return ret;
 			}
 
 			//mp_send_on_stream
@@ -1476,7 +1536,7 @@ namespace TL
 
 				out:
 					if (ret && req) verbs_release_request((verbs_request_async_t) req);
-				    return ret; 
+					return ret; 
 			}
 
 			//mp_send_prepare
@@ -1503,25 +1563,96 @@ namespace TL
 			        
 			        ret = gds_prepare_send(client->gqp, &req->in.sr,
 			                               &req->out.bad_sr, &req->gds_send_info);
-			        //ret = mp_prepare_send(client, req);
+
 			        if (ret) {
-			            mp_err_msg(oob_rank, "mp_prepare_send failed: %s \n", strerror(ret));
-			            if (req) verbs_release_request((verbs_request_async_t) req);
+			            mp_err_msg(oob_rank, "gds_prepare_send failed: %s \n", strerror(ret));
 			            goto out;
 			        }
 
 			        ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
 			        if (ret) {
 			            mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
-			            // BUG: leaking req ??
 			            goto out;
 			        }
 			    }
 
 				*mp_req = (mp_request_t) req; 
+
 				out:
-				    return ret;
+					if (ret && req) verbs_release_request((verbs_request_async_t) req);
+					return ret; 
+
 			}
+
+			//mp_sendv_prepare
+			int pt2pt_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t *mp_req)
+			{
+				int ret = 0;
+			    verbs_request_async_t req;
+			    verbs_region_t reg = (verbs_region_t )*mp_reg;
+			    verbs_client_async_t client = &clients_async[client_index[peer]];
+			  	CHECK_GPU(gpu_id);
+
+				if (use_event_sync) {
+				mp_dbg_msg(oob_rank, "Not Implemented for use_event_sync\n");
+				ret = MP_FAILURE;
+				goto out;
+				}
+
+				if (nvecs > ib_max_sge) {
+					mp_err_msg(oob_rank, "exceeding max supported vector size: %d \n", ib_max_sge);
+					ret = MP_FAILURE;
+					goto out;
+				}
+
+				assert(reg);
+				req = verbs_new_request(client, MP_SEND, MP_PREPARED);
+				assert(req);
+				req->sgv = (struct ibv_sge *) calloc(nvecs, sizeof(struct ibv_sge));
+				assert(req->sgv);
+
+
+				for (int i=0; i < nvecs; ++i) {
+					req->sgv[i].length = v[i].iov_len;
+					req->sgv[i].lkey = reg->key;
+					req->sgv[i].addr = (uint64_t)(v[i].iov_base);
+				}
+
+				if (verbs_enable_ud) {
+					req->in.sr.wr.ud.ah = client->ah;
+					req->in.sr.wr.ud.remote_qpn = client->qpn;
+					req->in.sr.wr.ud.remote_qkey = 0;
+				}
+
+				req->in.sr.next = NULL;
+				req->in.sr.exp_send_flags = IBV_EXP_SEND_SIGNALED;
+				req->in.sr.exp_opcode = IBV_EXP_WR_SEND;
+				req->in.sr.wr_id = (uintptr_t) req;
+				req->in.sr.num_sge = nvecs;
+				req->in.sr.sg_list = req->sgv;
+
+				ret = gds_prepare_send(client->gqp, &req->in.sr, &req->out.bad_sr, &req->gds_send_info);
+				//ret = mp_prepare_send(client, req);
+				if (ret) {
+		            mp_err_msg(oob_rank, "gds_prepare_send failed: %s \n", strerror(ret));
+					goto out;
+				}
+
+				ret = gds_prepare_wait_cq(client->send_gcq, &req->gds_wait_info, 0);
+				if (ret) {
+			        mp_err_msg(oob_rank, "gds_prepare_wait_cq failed: %s \n", strerror(ret));
+					goto out;
+				}
+
+				
+				*mp_req = (mp_request_t) req; 
+
+				out:
+					if (ret && req) verbs_release_request((verbs_request_async_t) req);
+					return ret; 
+
+			}
+
 
 			//mp_send_post_on_stream
 			int pt2pt_b_send_post_async(mp_request_t *mp_req, asyncStream stream)
@@ -2149,6 +2280,7 @@ namespace TL
 					return ret;
 			}
 			//=========================================================================================================================
+
 			//================================== ASYNC GDS DESCRIPTOR =================================================
 			int descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq)
 			{
@@ -2317,8 +2449,4 @@ static class update_tl_list_async {
 
 #if 0
 static int mp_prepare_send(verbs_client_async_t client, verbs_request_async_t req)
-int (void *buf, int size, int peer, mp_region_t * mp_reg, mp_request_t *req_t)
-int mp_isendv_on_stream (struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg,
-                         mp_request_t *req_t, asyncStream stream)
-int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t *req_t)
 #endif

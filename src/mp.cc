@@ -197,6 +197,7 @@ void mp_abort() {
 	MP_CHECK_OOB_OBJ();
 
 	oob_comm->abort(-1);
+	mp_finalize();
 }
 
 //=============== INFO ===============
