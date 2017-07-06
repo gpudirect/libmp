@@ -101,7 +101,6 @@ int mp_init(int argc, char *argv[], int par1);
 void mp_finalize();
 void mp_get_envars();
 mp_request_t * mp_create_request(int number);
-int mp_free_requests(int number, mp_request_t * mp_reqs);
 mp_region_t * mp_create_regions(int number);
 int mp_free_regions(int number, mp_region_t * mp_reg);
 int mp_unregister_regions(int number, mp_region_t * mp_regs);
@@ -113,10 +112,10 @@ void mp_barrier();
 void mp_abort();
 double mp_time();
 
-int mp_prepare_acks();
-int mp_send_ack(int dst_rank);
-int mp_wait_ack(int src_rank);
-int mp_cleanup_acks();
+int mp_prepare_acks_rdma();
+int mp_send_ack_rdma(int dst_rank);
+int mp_wait_ack_rdma(int src_rank);
+int mp_cleanup_acks_rdma();
 
 //===== mp_comm.cc
 int mp_irecv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);

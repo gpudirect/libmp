@@ -73,10 +73,15 @@ int mp_isendv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_req
 //=============== ONE-SIDED ===============
 //Non-Blocking
 int mp_iput(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags) {
+	int ret=MP_SUCCESS;
+
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -90,7 +95,14 @@ int mp_iput(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, m
 		return MP_FAILURE;
 	}
 
-	return tl_comm->onesided_nb_put(buf, size, mp_reg, peer, displ, mp_win, mp_req, flags); 
+	ret = tl_comm->onesided_nb_put(buf, size, mp_reg, peer, displ, mp_win, mp_req, flags);
+	if(ret)
+	{
+		mp_err_msg(oob_rank, "onesided_nb_put error %s\n", strerror(errno));
+		return MP_FAILURE;
+	}
+
+	return ret;
 }
 
 int mp_iget(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req) {
@@ -159,7 +171,7 @@ static uint32_t   	* local_ack_values;
 static uint32_t   	* remote_ack_values;
 static mp_region_t  * remote_ack_values_reg;
 
-int mp_prepare_acks()
+int mp_prepare_acks_rdma()
 {
 	MP_CHECK_COMM_OBJ();
 	assert(oob_size);
@@ -185,48 +197,53 @@ int mp_prepare_acks()
 
 	local_ack_table_reg = mp_create_regions(1);
 	assert(local_ack_table_reg);
-	mp_dbg_msg(oob_rank, "registering local_ack_table size=%d\n", ack_table_size);
 	MP_CHECK(mp_register_region_buffer(local_ack_table, ack_table_size, &local_ack_table_reg[0]));
+	mp_dbg_msg(oob_rank, "registering local_ack_table size=%d\n", ack_table_size);
 
 	remote_ack_values_reg = mp_create_regions(1);
 	assert(remote_ack_values_reg);
-	mp_dbg_msg(oob_rank, "registering remote_ack_table\n");
 	MP_CHECK(mp_register_region_buffer(remote_ack_values, ack_table_size, &remote_ack_values_reg[0]));
+	mp_dbg_msg(oob_rank, "registering remote_ack_table\n");
 
-	mp_dbg_msg(oob_rank, "creating local_ack_table window\n");
 	MP_CHECK(mp_window_create(local_ack_table, ack_table_size, &local_ack_table_win));
+	mp_dbg_msg(oob_rank, "creating local_ack_table window\n");
 
 	return MP_SUCCESS;
 }
 
-int mp_send_ack(int dst_rank)
+int mp_send_ack_rdma(int dst_rank)
 {
-	int ret = 0;
 	mp_request_t * ack_request;
 
 	MP_CHECK_COMM_OBJ();
 	assert(dst_rank < oob_size);
-
+	assert(dst_rank != oob_rank);
+	assert(local_ack_table_win);
 	ack_request = mp_create_request(1);
 	assert(ack_request);
 
 	int remote_offset = oob_rank * sizeof(uint32_t);
-	mp_dbg_msg(oob_rank, "dest_rank=%d payload=%x offset=%d\n", dst_rank, remote_ack_values[dst_rank], remote_offset);
+	mp_dbg_msg(oob_rank, "dest_rank=%d payload=%x remote_offset=%d\n", dst_rank, remote_ack_values[dst_rank], remote_offset);
 
 	MP_CHECK(mp_iput(&remote_ack_values[dst_rank], sizeof(uint32_t), &remote_ack_values_reg[0], dst_rank, remote_offset, 
-						&local_ack_table_win, &ack_request[0], MP_PUT_INLINE | MP_PUT_NOWAIT));
-
+						&local_ack_table_win, &ack_request[0], MP_PUT_INLINE)); 
+	
+	//MP_PUT_NOWAIT will full the Send Queue! Why?
+	MP_CHECK(mp_wait(&ack_request[0]));
 	//atomic_inc
 	__sync_fetch_and_add(&remote_ack_values[dst_rank], 1);
 	//++ACCESS_ONCE(*ptr);
 	iomb();
+	free(ack_request);
+
+	return MP_SUCCESS;
 }
 
-int mp_wait_ack(int src_rank)
+int mp_wait_ack_rdma(int src_rank)
 {
 	MP_CHECK_COMM_OBJ();
 	assert(src_rank < oob_size);
-
+	assert(src_rank != oob_rank);
 	mp_dbg_msg(oob_rank, "src_rank=%d payload=%x\n", src_rank, local_ack_values[src_rank]);
 	MP_CHECK(mp_wait_word(&(local_ack_table[src_rank]), local_ack_values[src_rank], MP_WAIT_GEQ));
 	local_ack_values[src_rank]++;
@@ -245,9 +262,8 @@ int mp_wait_ack(int src_rank)
     return MP_SUCCESS;
 }
 
-int mp_cleanup_acks()
+int mp_cleanup_acks_rdma()
 {
-
 	MP_CHECK(mp_unregister_regions(1, local_ack_table_reg));
 	MP_CHECK(mp_unregister_regions(1, remote_ack_values_reg));
 	MP_CHECK(mp_window_destroy(&local_ack_table_win));

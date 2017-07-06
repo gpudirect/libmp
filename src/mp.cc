@@ -107,18 +107,6 @@ mp_request_t * mp_create_request(int number) {
 	return tl_comm->create_requests(number);
 }
 
-int mp_free_requests(int number, mp_request_t * mp_req) {
-	assert(mp_req);
-
-	for(int i=0; i<number; i++)
-	{
-		if(mp_req[i]) free(mp_req[i]);
-	}
-
-	return MP_SUCCESS;
-}
-
-
 mp_region_t * mp_create_regions(int number) {
 	MP_CHECK_TL_OBJ();
 	return tl_comm->create_regions(number);

@@ -133,8 +133,6 @@ int TL::Verbs::verbs_post_recv(verbs_client_t client, verbs_request_t req)
 {
     int progress_retry=0, ret=0, ret_progress=0;
 
-    mp_dbg_msg(oob_rank, "\n");
-
     if(!client || !req)
         return MP_FAILURE;
     do
@@ -166,42 +164,36 @@ int TL::Verbs::verbs_post_recv(verbs_client_t client, verbs_request_t req)
 
 int TL::Verbs::verbs_post_send(verbs_client_t client, verbs_request_t req)
 {
-    int progress_retry=0, ret=0, ret_progress=0;
+    int progress_retry=0, ret=MP_SUCCESS, ret_progress=0;
 
     if(!client || !req)
-        return MP_FAILURE;
+    {
+      mp_err_msg(oob_rank, "client: %d, req: %d\n", (client) ? 1 : 0, (req) ? 1 : 0);
+      return MP_FAILURE;
+    }
+
     do
     {
     	ret = ibv_exp_post_send(client->qp, &req->in.sr, &req->out.bad_sr);
-        if (ret) {
-            if (ret == ENOMEM) {
-                // out of space error can happen too often to report
-                //dgb
-                mp_dbg_msg(oob_rank, "ENOMEM error %d in ibv_exp_post_send\n", ret);
-            } else {
-                mp_err_msg(oob_rank, "error %d in ibv_exp_post_send\n", ret);
-            }
-            goto out;
-        }
-
-        if(ret == ENOMEM)
+      if(ret == ENOMEM)
+      {
+        if(qp_query == 0)
         {
-        	if(qp_query == 0)
-            {
-                verbs_query_print_qp(client->qp, req);
-                qp_query=1;
-            }
-
-            ret_progress = verbs_progress_single_flow(TX_FLOW);
-            if(ret_progress != MP_SUCCESS)
-            {
-                mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
-                break;
-            }
-            mp_warn_msg(oob_rank, "TX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
-            progress_retry++;
+            verbs_query_print_qp(client->qp, req);
+            qp_query=1;
         }
+
+        ret_progress = verbs_progress_single_flow(TX_FLOW);
+        if(ret_progress != MP_SUCCESS)
+        {
+            mp_err_msg(oob_rank, "verbs_progress_single_flow failed. Error: %d\n", ret_progress);
+            break;
+        }
+        mp_warn_msg(oob_rank, "TX_FLOW was full. verbs_progress_single_flow called %d times (ret=%d)\n", (progress_retry+1), ret);
+        progress_retry++;
+      }
     } while(ret == ENOMEM && progress_retry <= MP_MAX_PROGRESS_FLOW_TRY);
+
 out:
     qp_query=0;
     return ret;
@@ -309,7 +301,7 @@ int TL::Verbs::verbs_progress_request(verbs_request_t req)
 		    mp_err_msg(oob_rank, "invalid status %d for req:%p \n", req->status, req);
 		    break;
 	}
-	return 0;
+	return MP_SUCCESS;
 }
 
 int TL::Verbs::cleanup_request(verbs_request_t req)
@@ -319,7 +311,7 @@ int TL::Verbs::cleanup_request(verbs_request_t req)
         req->sgv = NULL;
     }
 
-    return 0;
+    return MP_SUCCESS;
 }
 
 void TL::Verbs::verbs_env_vars() {
@@ -1316,56 +1308,57 @@ int TL::Verbs::wait(mp_request_t *req)
 
 int TL::Verbs::wait_all(int count, mp_request_t *req_)
 {
-    int complete = 0, ret = 0;
-    /*poll until completion*/
-    while (complete < count) {
-        verbs_request_t req = (verbs_request_t) req_[complete];
-		if (!verbs_req_can_be_waited(req))
-		{
-		    mp_dbg_msg(oob_rank, "cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
-		    ret = EINVAL;
-		    goto out;
-		}
-		if (req->status == MP_PENDING_NOWAIT) {
-		    mp_dbg_msg(oob_rank, "PENDING_NOWAIT->PENDING req:%p status:%d id=%d peer=%d type=%d\n", req, req->status, req->id, req->peer, req->type);
-		    req->status = MP_PENDING;
-		}
-
-        complete++;
-    }
-    
-    complete=0;
-
-    while (complete < count) {
-        verbs_request_t req = (verbs_request_t) req_[complete];
-        
-        while (req->status != MP_COMPLETE) {
-            ret = verbs_progress_single_flow (TX_FLOW);
-            if (ret) {
-                goto out;
-            }
-            ret = verbs_progress_single_flow (RX_FLOW);
-            if (ret) {
-                goto out;
-            }
-        }
-        
-        complete++;
-    }
-
-    if(!ret)
+  int complete = 0, ret = 0;
+  /*poll until completion*/
+  while (complete < count)
+  {
+    verbs_request_t req = (verbs_request_t) req_[complete];
+    if (!verbs_req_can_be_waited(req))
     {
-        complete=0;
-        while (complete < count) {
-        	verbs_request_t req = (verbs_request_t) req_[complete];
-            if (req->status == MP_COMPLETE)
-                verbs_release_request((verbs_request_t) req);
-            else
-                ret = MP_FAILURE;
-
-            complete++;
-        }
+      mp_dbg_msg(oob_rank, "cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
+      ret = EINVAL;
+      goto out;
     }
+    if (req->status == MP_PENDING_NOWAIT) {
+      mp_dbg_msg(oob_rank, "PENDING_NOWAIT->PENDING req:%p status:%d id=%d peer=%d type=%d\n", req, req->status, req->id, req->peer, req->type);
+      req->status = MP_PENDING;
+    }
+
+    complete++;
+  }
+
+  complete=0;
+
+  while (complete < count) {
+      verbs_request_t req = (verbs_request_t) req_[complete];
+      
+      while (req->status != MP_COMPLETE) {
+          ret = verbs_progress_single_flow (TX_FLOW);
+          if (ret) {
+              goto out;
+          }
+          ret = verbs_progress_single_flow (RX_FLOW);
+          if (ret) {
+              goto out;
+          }
+      }
+      
+      complete++;
+  }
+
+  if(!ret)
+  {
+    complete=0;
+    while (complete < count) {
+      verbs_request_t req = (verbs_request_t) req_[complete];
+      if (req->status == MP_COMPLETE)
+          verbs_release_request((verbs_request_t) req);
+      else
+          ret = MP_FAILURE;
+
+      complete++;
+    }
+  }
 
 out:
     return ret;
@@ -1424,6 +1417,7 @@ int TL::Verbs::onesided_window_create(void *addr, size_t size, mp_window_t *wind
   }
   *window_t = (mp_window_t) window;
   free(exchange_win);
+  //Required ??
   oob_comm->barrier();
 
   return MP_SUCCESS;
@@ -1478,7 +1472,7 @@ int TL::Verbs::verbs_fill_put_request(void * buf, size_t size, int peer, verbs_r
 
 int TL::Verbs::onesided_nb_put (void *buf, int size, mp_region_t *mp_reg, int peer, size_t displ, mp_window_t *window_t, mp_request_t *mp_req, int flags) 
 {
-	int ret = 0;
+	int ret = MP_SUCCESS;
 	verbs_request_t req;
 	verbs_region_t reg = (verbs_region_t) *mp_reg;
 	verbs_window_t window = (verbs_window_t) *window_t;
@@ -1496,7 +1490,11 @@ int TL::Verbs::onesided_nb_put (void *buf, int size, mp_region_t *mp_reg, int pe
 	assert(req);
 
   ret = verbs_fill_put_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client_id, window, displ, &(req->flags), flags);
-  if(ret) goto out;
+  if(ret)
+  {
+    mp_err_msg(oob_rank, "verbs_fill_put_request error: %s \n", strerror(errno));
+    goto out;
+  }
 
 	ret = verbs_post_send(client, req);
 	if (ret) {
@@ -1510,8 +1508,6 @@ int TL::Verbs::onesided_nb_put (void *buf, int size, mp_region_t *mp_reg, int pe
     if (ret && req) verbs_release_request((verbs_request_t) req);
   	return ret;
 }
-
-
 
 
 int TL::Verbs::verbs_fill_get_request(void * buf, size_t size, int peer, verbs_region_t reg, uintptr_t req_id, 
