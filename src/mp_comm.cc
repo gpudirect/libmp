@@ -161,7 +161,13 @@ int mp_wait_all(int number, mp_request_t * mp_reqs) {
 	return tl_comm->wait_all(number, mp_reqs);
 }
 
-// ============================= SYNC ACK FACILITY =============================
+
+
+// ========================================================== SYNC ACK FACILITY ==========================================================
+static int ack_rdma=0;
+static int ack_pt2pt=0;
+
+// ---------------------------------------------------------- RDMA ----------------------------------------------------------
 // tables are indexed by rank, not peer
 static uint32_t   	* local_ack_table;
 static mp_region_t  * local_ack_table_reg;
@@ -208,12 +214,15 @@ int mp_prepare_acks_rdma()
 	MP_CHECK(mp_window_create(local_ack_table, ack_table_size, &local_ack_table_win));
 	mp_dbg_msg(oob_rank, "creating local_ack_table window\n");
 
+	ack_rdma=1;
+
 	return MP_SUCCESS;
 }
 
 int mp_send_ack_rdma(int dst_rank)
 {
 	mp_request_t * ack_request;
+	assert(ack_rdma);
 
 	MP_CHECK_COMM_OBJ();
 	assert(dst_rank < oob_size);
@@ -241,6 +250,7 @@ int mp_send_ack_rdma(int dst_rank)
 
 int mp_wait_ack_rdma(int src_rank)
 {
+	assert(ack_rdma);
 	MP_CHECK_COMM_OBJ();
 	assert(src_rank < oob_size);
 	assert(src_rank != oob_rank);
@@ -264,11 +274,47 @@ int mp_wait_ack_rdma(int src_rank)
 
 int mp_cleanup_acks_rdma()
 {
-	MP_CHECK(mp_unregister_regions(1, local_ack_table_reg));
-	MP_CHECK(mp_unregister_regions(1, remote_ack_values_reg));
-	MP_CHECK(mp_window_destroy(&local_ack_table_win));
-	free(local_ack_table);
-	free(remote_ack_values);
+	assert(ack_rdma);
 
+	if(local_ack_table_reg)
+		MP_CHECK(mp_unregister_regions(1, local_ack_table_reg));
+	
+	if(remote_ack_values_reg)
+		MP_CHECK(mp_unregister_regions(1, remote_ack_values_reg));
+	
+	if(local_ack_table_win)
+		MP_CHECK(mp_window_destroy(&local_ack_table_win));
+	
+	if(local_ack_table)
+		free(local_ack_table);
+
+	if(remote_ack_values)
+		free(remote_ack_values);
+
+	return MP_SUCCESS;
+}
+
+// ---------------------------------------------------------- PT2PT ----------------------------------------------------------
+mp_region_t * s_regs, * r_regs;
+mp_request_t * s_reqs, * r_reqs;
+
+int mp_prepare_acks_pt2pt()
+{
+	return MP_SUCCESS;
+}
+
+int mp_send_ack_pt2pt(int dst_rank)
+{
+
+	return MP_SUCCESS;
+}
+
+int mp_wait_ack_pt2pt(int src_rank)
+{
+    return MP_SUCCESS;
+}
+
+int mp_cleanup_acks_pt2pt()
+{
 	return MP_SUCCESS;
 }
