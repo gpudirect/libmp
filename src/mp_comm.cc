@@ -10,7 +10,10 @@ int mp_irecv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -25,8 +28,11 @@ int mp_irecvv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_req
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg || !v || nvecs <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d v: %d, nvecs: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0, (v) ? 1 : 0, nvecs);
 		return MP_FAILURE;
-
+	}
+	
 	if(peer > oob_size)
 	{
 		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
@@ -41,7 +47,10 @@ int mp_isend(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg || !buf || size <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d buf: %d, size: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0, (buf) ? 1 : 0, size);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -56,7 +65,10 @@ int mp_isendv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_req
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg || !v || nvecs <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d v: %d, nvecs: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0, (v) ? 1 : 0, nvecs);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -109,7 +121,10 @@ int mp_iget(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, m
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{

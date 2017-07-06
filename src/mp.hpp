@@ -105,7 +105,7 @@ mp_region_t * mp_create_regions(int number);
 int mp_free_regions(int number, mp_region_t * mp_reg);
 int mp_unregister_regions(int number, mp_region_t * mp_regs);
 int mp_register_region_buffer(void * addr, size_t length, mp_region_t * mp_reg);
-int mp_create_register_regions(int number, mp_region_t * mp_regs, void ** addr, size_t length);
+int mp_create_register_regions(int number, mp_region_t ** mp_regs, void * addr, size_t length);
 int mp_window_create(void *addr, size_t size, mp_window_t *window_t);
 int mp_window_destroy(mp_window_t *window_t);
 void mp_barrier();

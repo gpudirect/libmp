@@ -153,14 +153,14 @@ int mp_register_region_buffer(void * addr, size_t length, mp_region_t * mp_reg) 
 	return tl_comm->register_region_buffer(addr, length, mp_reg);
 }
 
-int mp_create_register_regions(int number, mp_region_t * mp_regs, void ** addr, size_t length) {
-	mp_regs = mp_create_regions(number);
-	if(!mp_regs)
+int mp_create_register_regions(int number, mp_region_t ** mp_regs, void * addr, size_t length) {
+	*mp_regs = mp_create_regions(number);
+	if(!*mp_regs)
 	{
 		mp_err_msg(oob_rank, "Regions not allocated\n");
 		return MP_FAILURE;
 	}
-	return mp_register_region_buffer(*addr, length, mp_regs);
+	return mp_register_region_buffer(addr, length, *mp_regs);
 }
 
 int mp_window_create(void *addr, size_t size, mp_window_t *window_t) {
