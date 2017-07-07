@@ -2,6 +2,8 @@
 #include "tl_verbs_common.hpp"
 //#include "tl_verbs_types.hpp"
 #include <typeinfo>
+#include <iostream>
+#include <inttypes.h>
 
 struct verbs_request : mp_request {
   int peer;
@@ -284,6 +286,9 @@ namespace TL
 			int descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags);
 			int descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value);
 			int descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags);
+			int descriptors_kernel_async(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value);
+			int descriptors_kernel_send_async(mp_kernel_send_desc_t sinfo, mp_request_t *mp_req);
+			int descriptors_kernel_wait_async(mp_kernel_wait_desc_t winfo, mp_request_t *req_t);
 			//================================================================
 	};
 }

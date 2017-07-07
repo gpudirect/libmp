@@ -1,7 +1,4 @@
-#include "tl.hpp"
 #include "tl_verbs.hpp"
-#include <iostream>
-#include <inttypes.h>
 
 void  TL::Verbs::verbs_allocate_requests() {
   int i;
@@ -13,7 +10,7 @@ void  TL::Verbs::verbs_allocate_requests() {
   mem_region = (mem_region_t *) calloc (1, sizeof (mem_region_t));
   if (mem_region == NULL) {
     mp_err_msg(oob_rank, "memory allocation for mem_region failed \n");
-    exit(-1);
+    exit(EXIT_FAILURE);
   }
   if (mem_region_list == NULL) {
     mem_region_list = mem_region;
@@ -25,7 +22,7 @@ void  TL::Verbs::verbs_allocate_requests() {
   mem_region->region = (verbs_request_t ) calloc (verbs_request_limit, sizeof(struct verbs_request));
   if (mem_region == NULL) {
     mp_err_msg(oob_rank, "memory allocation for request_region failed \n");
-    exit(-1);
+    exit(EXIT_FAILURE);
   }
 
   mp_requests = (verbs_request_t ) mem_region->region;
@@ -265,7 +262,7 @@ int TL::Verbs::verbs_progress_single_flow(mp_flow_t flow)
                     if (req->status == MP_PENDING_NOWAIT) {
                     } else if (req->status != MP_PENDING) {
                         mp_err_msg(oob_rank, "status not pending, value: %d \n", req->status);
-                        exit(-1);
+                        exit(EXIT_FAILURE);
                     }
 
                     ACCESS_ONCE(client->last_done_id) = req->id;
@@ -1598,6 +1595,9 @@ int TL::Verbs::descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq,
 int TL::Verbs::descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 int TL::Verbs::descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 int TL::Verbs::descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_kernel_async(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_kernel_send_async(mp_kernel_send_desc_t sinfo, mp_request_t *mp_req){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_kernel_wait_async(mp_kernel_wait_desc_t winfo, mp_request_t *req_t){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 
 //================================================================
 

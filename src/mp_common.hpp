@@ -99,13 +99,17 @@ enum mp_wait_flags {
 struct mp_request{};
 struct mp_region {};
 struct mp_window {};
+struct mp_comm_descriptors_queue{};
+struct mp_kernel_wait_desc{};
+struct mp_kernel_send_desc{};
 
 typedef struct mp_request * mp_request_t;
 typedef struct mp_region * mp_region_t;
 typedef struct mp_window * mp_window_t;
-
-struct mp_comm_descriptors_queue{};
 typedef struct mp_comm_descriptors_queue *mp_comm_descriptors_queue_t;
+typedef struct mp_kernel_send_desc * mp_kernel_send_desc_t;
+typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
+
 
 
 #ifndef ACCESS_ONCE
@@ -202,7 +206,7 @@ static void rmb(void)
 #define PAGE_MASK (~(PAGE_OFF))
 
 
-#if defined(HAVE_CUDA) || defined(HAVE_GDS)
+#if defined(HAVE_CUDA)
 #include <cuda.h>
 #include <cuda_runtime.h>
 
@@ -231,8 +235,22 @@ do {                                                    \
 
 //#include <cudaProfiler.h>
 typedef cudaStream_t asyncStream;
+#define CUDA_DEVICE_INT __device__ int
+
+#if defined(HAVE_GDSYNC)
+    #include <gdsync/device.cuh>
+    #define KERNEL_DESCRIPTOR_SEM gdsync::isem32_t
 #else
+    #define KERNEL_DESCRIPTOR_SEM void
+#endif
+
+#else
+
 typedef int asyncStream;
+#define CUDA_DEVICE_INT int
+#define KERNEL_DESCRIPTOR_SEM void
+
+
 #endif
 
 #endif

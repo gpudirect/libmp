@@ -24,10 +24,14 @@
 struct mp_request;
 struct mp_region;
 struct mp_window;
+struct mp_kernel_wait_desc;
+struct mp_kernel_send_desc;
 
 typedef struct mp_request * mp_request_t;
 typedef struct mp_region * mp_region_t;
 typedef struct mp_window * mp_window_t;
+typedef struct mp_kernel_send_desc * mp_kernel_send_desc_t;
+typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 
 #define MP_SUCCESS 0
 #define MP_FAILURE 1
