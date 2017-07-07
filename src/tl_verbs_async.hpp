@@ -5,7 +5,6 @@
 #include <gdsync/core.h>
 #include <gdsync/device.cuh>
 #include <gdsync/mlx5.h>
-
 #include <vector>
 
 #define CHECK_GPU(gid) {						\
@@ -229,8 +228,8 @@ namespace TL
 			int descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *pdq, int flags);
 
 			//================================== ASYNC KERNEL DESCRIPTOR =================================================
-			int descriptors_kernel_async(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value);
-			int descriptors_kernel_send_async(mp_kernel_send_desc_t sinfo, mp_request_t *mp_req);
-			int descriptors_kernel_wait_async(mp_kernel_wait_desc_t winfo, mp_request_t *req_t);
+			int descriptors_kernel(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value);
+			int descriptors_kernel_send(mp_kernel_send_desc_t * sinfo, mp_request_t *mp_req);
+			int descriptors_kernel_wait(mp_kernel_wait_desc_t * winfo, mp_request_t *req_t);
 	};
 }

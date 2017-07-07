@@ -1595,10 +1595,9 @@ int TL::Verbs::descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq,
 int TL::Verbs::descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 int TL::Verbs::descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 int TL::Verbs::descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
-int TL::Verbs::descriptors_kernel_async(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
-int TL::Verbs::descriptors_kernel_send_async(mp_kernel_send_desc_t sinfo, mp_request_t *mp_req){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
-int TL::Verbs::descriptors_kernel_wait_async(mp_kernel_wait_desc_t winfo, mp_request_t *req_t){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
-
+int TL::Verbs::descriptors_kernel(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_kernel_send(mp_kernel_send_desc_t * sinfo, mp_request_t *mp_req){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
+int TL::Verbs::descriptors_kernel_wait(mp_kernel_wait_desc_t * winfo, mp_request_t *req_t){ fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 //================================================================
 
 static TL::Communicator *create_verbs() { return new TL::Verbs(); }

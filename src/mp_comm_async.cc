@@ -12,7 +12,10 @@ int mp_send_prepare(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -47,7 +50,10 @@ int mp_isend_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req)
+	{
+		mp_err_msg(oob_rank, "request: %d\n", (mp_req) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	return tl_comm->pt2pt_nb_send_post_async(mp_req, stream);
 }
@@ -56,7 +62,10 @@ int mp_isend_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stre
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || number <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, number: %d\n", (mp_req) ? 1 : 0, number);
 		return MP_FAILURE;
+	}
 
 	return tl_comm->pt2pt_nb_send_post_all_async(number, mp_req, stream);
 }
@@ -65,7 +74,10 @@ int mp_isend_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_r
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -100,7 +112,10 @@ int mp_send_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req)
+	{
+		mp_err_msg(oob_rank, "request: %d\n", (mp_req) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	return tl_comm->pt2pt_b_send_post_async(mp_req, stream);
 }
@@ -109,8 +124,11 @@ int mp_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t strea
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || number <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, number: %d\n", (mp_req) ? 1 : 0, number);
 		return MP_FAILURE;
-
+	}
+	
 	return tl_comm->pt2pt_b_send_post_all_async(number, mp_req, stream);
 }
 
@@ -118,7 +136,10 @@ int mp_send_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_re
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -135,7 +156,10 @@ int mp_put_prepare(void *buf, int size, mp_region_t * mp_reg, int peer, size_t d
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -156,7 +180,10 @@ int mp_iput_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req)
+	{
+		mp_err_msg(oob_rank, "request: %d\n", (mp_req) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	return tl_comm->onesided_nb_put_post_async(mp_req, stream); 
 }
@@ -165,7 +192,10 @@ int mp_iput_post_all_async(int number, mp_request_t * mp_req, cudaStream_t strea
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || number <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, number: %d\n", (mp_req) ? 1 : 0, number);
 		return MP_FAILURE;
+	}
 
 	return tl_comm->onesided_nb_put_post_all_async(number, mp_req, stream); 
 }
@@ -174,7 +204,10 @@ int mp_iput_async(void *buf, int size, mp_region_t * mp_reg, int peer, size_t di
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -195,7 +228,10 @@ int mp_iget_async(void *buf, int size, mp_region_t * mp_reg, int peer, size_t di
 	MP_CHECK_COMM_OBJ();
 
 	if(!mp_req || !mp_reg)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
 		return MP_FAILURE;
+	}
 
 	if(peer > oob_size)
 	{
@@ -208,11 +244,13 @@ int mp_iget_async(void *buf, int size, mp_region_t * mp_reg, int peer, size_t di
 
 //============================== WAIT ==============================
 int mp_wait_word_async(uint32_t *ptr, uint32_t value, int flags, cudaStream_t stream) {
+
 	if(!ptr)
 	{
-		mp_err_msg(oob_rank, "Input ptr NULL\n");
+		mp_err_msg(oob_rank, "ptr: %d\n", (ptr) ? 1 : 0);
 		return MP_FAILURE;
 	}
+
 
 	return tl_comm->wait_word_async(ptr, value, flags, stream);
 }
@@ -220,7 +258,7 @@ int mp_wait_word_async(uint32_t *ptr, uint32_t value, int flags, cudaStream_t st
 int mp_wait_async(mp_request_t * mp_req, cudaStream_t stream) {
 	if(!mp_req)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "mp_req: %d\n", (mp_req) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -232,9 +270,10 @@ int mp_wait_all_async(int number, mp_request_t * mp_reqs, cudaStream_t stream) {
 
 	if(!mp_reqs)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "mp_reqs: %d\n", (mp_reqs) ? 1 : 0);
 		return MP_FAILURE;
 	}
+
 
 	if(number <= 0)
 	{
@@ -250,7 +289,7 @@ int mp_progress_requests(int number, mp_request_t * mp_reqs) {
 
 	if(!mp_reqs)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "mp_reqs: %d\n", (mp_reqs) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -270,7 +309,7 @@ int mp_comm_descriptors_queue_alloc(mp_comm_descriptors_queue_t *pdq)
 
 	if(!pdq)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "descr queue: %d\n", (pdq) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -283,7 +322,7 @@ int mp_comm_descriptors_queue_free(mp_comm_descriptors_queue_t *pdq)
 
 	if(!pdq)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "descr queue: %d\n", (pdq) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -296,7 +335,7 @@ int mp_comm_descriptors_queue_add_send(mp_comm_descriptors_queue_t *pdq, mp_requ
 
 	if(!pdq || !mp_req)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "pdq: %d, request: %d\n", (pdq) ? 1 : 0, (mp_req) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -309,7 +348,7 @@ int mp_comm_descriptors_queue_add_wait_send(mp_comm_descriptors_queue_t *pdq, mp
 
 	if(!pdq || !mp_req)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "pdq: %d, request: %d\n", (pdq) ? 1 : 0, (mp_req) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -322,7 +361,7 @@ int mp_comm_descriptors_queue_add_wait_recv(mp_comm_descriptors_queue_t *pdq, mp
 
 	if(!pdq || !mp_req)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "pdq: %d, request: %d\n", (pdq) ? 1 : 0, (mp_req) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -335,7 +374,7 @@ int mp_comm_descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq,
 
 	if(!pdq || !ptr)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "pdq: %d, ptr: %d\n", (pdq) ? 1 : 0, (ptr) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -348,7 +387,7 @@ int mp_comm_descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq
 
 	if(!pdq || !ptr)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "pdq: %d, ptr: %d\n", (pdq) ? 1 : 0, (ptr) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
@@ -361,10 +400,37 @@ int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptor
 
 	if(!pdq)
 	{
-		mp_err_msg(oob_rank, "Input request NULL\n");
+		mp_err_msg(oob_rank, "descr queue: %d\n", (pdq) ? 1 : 0);
 		return MP_FAILURE;
 	}
 
 	return tl_comm->descriptors_queue_post_async(stream, pdq, flags);
 
+}
+
+//================================== ASYNC KERNEL DESCRIPTOR =================================================
+int mp_kernel_descriptors_send(mp_kernel_send_desc_t * info, mp_request_t *mp_req)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!info || !mp_req)
+	{
+		mp_err_msg(oob_rank, "info: %d, request: %d\n", (info) ? 1 : 0, (mp_req) ? 1 : 0);
+		return MP_FAILURE;
+	}
+	
+	return tl_comm->descriptors_kernel_send(info, mp_req);
+}
+
+int mp_kernel_descriptors_wait(mp_kernel_wait_desc_t * info, mp_request_t *mp_req)
+{
+	MP_CHECK_TL_OBJ();
+
+	if(!info || !mp_req)
+	{
+		mp_err_msg(oob_rank, "info: %d, request: %d\n", (info) ? 1 : 0, (mp_req) ? 1 : 0);
+		return MP_FAILURE;
+	}
+	
+	return tl_comm->descriptors_kernel_wait(info, mp_req);
 }

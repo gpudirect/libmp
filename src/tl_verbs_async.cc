@@ -2306,7 +2306,8 @@ int TL::Verbs_Async::descriptors_queue_post_async(cudaStream_t stream, mp_comm_d
     return ret;
 }			
 
-int TL::Verbs_Async::descriptors_kernel_async(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value)
+//================================== ASYNC KERNEL DESCRIPTOR =================================================
+int TL::Verbs_Async::descriptors_kernel(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value)
 {
     int ret = 0;
     struct gds_mlx5_dword_wait_info mlx5_i;
@@ -2325,10 +2326,10 @@ int TL::Verbs_Async::descriptors_kernel_async(KERNEL_DESCRIPTOR_SEM *psem, uint3
     	return ret;
 }
 
-int TL::Verbs_Async::descriptors_kernel_send_async(mp_kernel_send_desc_t sinfo, mp_request_t *mp_req)
+int TL::Verbs_Async::descriptors_kernel_send(mp_kernel_send_desc_t * sinfo, mp_request_t *mp_req)
 {
 	verbs_request_async_t req = (verbs_request_async_t)(*mp_req);
-	verbs_kernel_send_desc_t desc = (verbs_kernel_send_desc_t) sinfo;
+	verbs_kernel_send_desc_t desc = (verbs_kernel_send_desc_t) (*sinfo);
 
 	int retcode;
 	int ret = 0; 
@@ -2362,12 +2363,12 @@ int TL::Verbs_Async::descriptors_kernel_send_async(mp_kernel_send_desc_t sinfo, 
 		return ret;
 }
 
-int TL::Verbs_Async::descriptors_kernel_wait_async(mp_kernel_wait_desc_t winfo, mp_request_t *mp_req)
+int TL::Verbs_Async::descriptors_kernel_wait(mp_kernel_wait_desc_t * winfo, mp_request_t *mp_req)
 {
 	int retcode;
 	int ret = 0;
 	verbs_request_async_t req = (verbs_request_async_t)(*mp_req);
-	verbs_kernel_wait_desc_t desc = (verbs_kernel_wait_desc_t) winfo;
+	verbs_kernel_wait_desc_t desc = (verbs_kernel_wait_desc_t) (*winfo);
 
     //verbs_client_async_t client = &clients_async[client_index[peer]];
 
@@ -2396,6 +2397,29 @@ int TL::Verbs_Async::descriptors_kernel_wait_async(mp_kernel_wait_desc_t winfo, 
 	out:
 		return ret;
 }
+
+#if 0
+//================================== ASYNC KERNEL COMMUNICATION CALLS - DEVICE FUNCTIONS =================================================
+CUDA_DEVICE_INT inline TL::Verbs_Async::kernel_send(mp_kernel_send_desc_t * info)
+{
+	verbs_kernel_send_desc_t desc = (verbs_kernel_send_desc_t) (*info);
+	gdsync::device::release(desc.dbrec);
+	__threadfence_system();
+	gdsync::device::release(desc.db);            
+}
+
+CUDA_DEVICE_INT inline TL::Verbs_Async::kernel_wait(mp_kernel_wait_desc_t * info)
+{
+	verbs_kernel_wait_desc_t desc = (verbs_kernel_wait_desc_t) (*info);
+    return gdsync::device::wait(desc.sema, desc.sema_cond);
+}
+
+CUDA_DEVICE_INT inline TL::Verbs_Async::kernel_release(mp_kernel_wait_desc_t * info)
+{
+	verbs_kernel_wait_desc_t desc = (verbs_kernel_wait_desc_t) (*info);
+    return gdsync::device::release(desc.flag);
+}
+#endif
 
 static TL::Communicator *create_async() { return new TL::Verbs_Async(); }
 

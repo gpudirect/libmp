@@ -110,8 +110,6 @@ typedef struct mp_comm_descriptors_queue *mp_comm_descriptors_queue_t;
 typedef struct mp_kernel_send_desc * mp_kernel_send_desc_t;
 typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 
-
-
 #ifndef ACCESS_ONCE
 #define ACCESS_ONCE(V)                          \
     (*(volatile typeof (V) *)&(V))

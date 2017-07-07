@@ -172,4 +172,8 @@ int mp_comm_descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *dq, 
 int mp_comm_descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *dq, uint32_t *ptr, uint32_t value);
 int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *dq, int flags);
 
+//================================== ASYNC KERNEL DESCRIPTOR =================================================
+int mp_kernel_descriptors_send(mp_kernel_send_desc_t * info, mp_request_t *mp_req);
+int mp_kernel_descriptors_wait(mp_kernel_wait_desc_t * info, mp_request_t *mp_req);
+
 #endif
