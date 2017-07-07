@@ -23,6 +23,25 @@ int mp_send_prepare(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_
 	return tl_comm->pt2pt_send_prepare(buf, size, peer, mp_reg, mp_req);
 }
 
+int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
+	MP_CHECK_COMM_OBJ();
+
+	if(!mp_req || !mp_reg || !v || nvecs <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d v: %d, nvecs: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0, (v) ? 1 : 0, nvecs);
+		return MP_FAILURE;
+	}
+
+	if(peer > oob_size)
+	{
+		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
+		return MP_FAILURE;
+	}
+
+	return tl_comm->pt2pt_sendv_prepare(v, nvecs, peer, mp_reg, mp_req);
+}
+
+
 //---------------- Non-Blocking ---------------- 
 int mp_isend_post_async(mp_request_t * mp_req, cudaStream_t stream) {
 	MP_CHECK_COMM_OBJ();
@@ -56,6 +75,25 @@ int mp_isend_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_r
 
 	return tl_comm->pt2pt_nb_send_async(buf, size, peer, mp_reg, mp_req, stream);
 }
+
+int mp_isendv_async(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, cudaStream_t stream) {
+	MP_CHECK_COMM_OBJ();
+	
+	if(!mp_req || !mp_reg || !v || nvecs <= 0)
+	{
+		mp_err_msg(oob_rank, "request: %d, region: %d v: %d, nvecs: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0, (v) ? 1 : 0, nvecs);
+		return MP_FAILURE;
+	}
+
+	if(peer > oob_size)
+	{
+		mp_err_msg(oob_rank, "Communication peer: %d, Tot num of peers: %d\n", peer, oob_size);
+		return MP_FAILURE;
+	}
+
+	return tl_comm->pt2pt_nb_sendv_async(v, nvecs, peer, mp_reg, mp_req, stream);
+}
+
 
 //---------------- Blocking ---------------- 
 int mp_send_post_async(mp_request_t * mp_req, cudaStream_t stream) {

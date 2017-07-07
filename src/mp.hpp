@@ -120,6 +120,7 @@ int mp_cleanup_acks_rdma();
 //===== mp_comm.cc
 int mp_irecv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
 int mp_isend(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
+int mp_isendv(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
 
 int mp_iput(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req, int flags);
 int mp_iget(void *buf, int size, mp_region_t * mp_reg, int peer, size_t displ, mp_window_t * mp_win, mp_request_t * mp_req);
@@ -134,9 +135,12 @@ int mp_wait_all(int number, mp_request_t * mp_reqs);
 
 //===== mp_comm_async.cc
 int mp_send_prepare(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
+int mp_sendv_prepare(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
+
 int mp_isend_post_async(mp_request_t * mp_req, cudaStream_t stream);
 int mp_isend_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
 int mp_isend_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, cudaStream_t stream);
+int mp_isendv_async(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, cudaStream_t stream);
 int mp_send_post_async(mp_request_t * mp_req, cudaStream_t stream);
 int mp_send_post_all_async(int number, mp_request_t * mp_req, cudaStream_t stream);
 int mp_send_async(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, cudaStream_t stream);
