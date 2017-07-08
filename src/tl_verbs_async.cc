@@ -1162,9 +1162,9 @@ int TL::Verbs_Async::setup_sublayer(int par1)
 	
 	//TODO: additional checks
 	gpu_id = par1;
-	if(gpu_id == MP_DEFAULT)
+	if(gpu_id == MP_NONE)
 	{
-		mp_warn_msg(oob_rank, "GPU_ID = MP_DEFAULT -> No GPUDirect Async support\n");
+		mp_warn_msg(oob_rank, "GPU_ID = MP_NONE -> No GPUDirect Async support\n");
 	}
 	else
 	{

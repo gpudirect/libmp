@@ -520,9 +520,7 @@ int main (int argc, char *argv[])
     if (envVar != NULL) {
         device_id = atoi(envVar);
     }
-    else
-        device_id = 0;
-
+   
     //GPUDirect RDMA
     envVar = getenv("MP_BENCH_GPU_BUFFERS"); 
     if (envVar != NULL) {

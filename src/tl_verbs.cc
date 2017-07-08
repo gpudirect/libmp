@@ -1568,7 +1568,28 @@ int TL::Verbs::onesided_nb_get(void *buf, int size, mp_region_t *reg_t, int peer
 }
 
 //============== GPUDirect Async - Verbs_Async child class ==============
-int TL::Verbs::setup_sublayer(int par1) { return MP_SUCCESS; }
+int TL::Verbs::setup_sublayer(int par1)
+{
+
+#if defined(HAVE_CUDA)
+  //TODO: additional checks
+  int gpu_id = par1;
+  if(gpu_id == MP_NONE)
+  {
+    mp_warn_msg(oob_rank, "GPU_ID = MP_NONE\n");
+  }
+  else
+  {
+    CUDA_CHECK(cudaSetDevice(gpu_id));
+    mp_dbg_msg(oob_rank, "Using gpu_id %d\n", gpu_id);
+    //Init context
+    cudaFree(0);
+  }
+#endif
+
+  return MP_SUCCESS;
+}
+
 int TL::Verbs::pt2pt_nb_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 int TL::Verbs::pt2pt_nb_sendv_async(struct iovec *v, int nvecs, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }
 int TL::Verbs::pt2pt_b_send_async(void * rBuf, size_t size, int client_id, mp_region_t * mp_reg, mp_request_t * mp_req, asyncStream async_stream) { fprintf(stderr, "Need to use Verbs_Async child class\n"); return MP_FAILURE; }

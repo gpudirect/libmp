@@ -241,7 +241,7 @@ int main (int argc, char *argv[])
 {
 	int iter_count, window_size, size, ret;
 	int validate = 1;
-    int device_id=MP_DEFAULT;
+    int device_id=MP_NONE;
 
 	//GPUDirect Async
     char * envVar = getenv("MP_USE_GPU");
@@ -265,7 +265,7 @@ int main (int argc, char *argv[])
     peer = !my_rank;
 
 	// CUDA init
-	if(device_id > MP_DEFAULT)
+	if(device_id > MP_NONE)
 	{
 		CUDA_CHECK(cudaSetDevice(device_id));
 		CUDA_CHECK(cudaFree(0));	
