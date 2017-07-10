@@ -31,6 +31,12 @@ void mp_get_envars()
 		mp_warn_is_enabled = 0;
 }
 
+int mp_network_device_info()
+{
+	MP_CHECK_TL_OBJ();
+	return tl_comm->deviceInfo();
+}
+
 int mp_init(int argc, char *argv[], int par1)
 {
 	int ret=MP_SUCCESS;
@@ -80,8 +86,12 @@ int mp_init(int argc, char *argv[], int par1)
 	mp_dbg_msg(oob_rank, "setupNetworkDevices\n");
 	MP_CHECK(tl_comm->createEndpoints());
 	mp_dbg_msg(oob_rank, "createEndpoints\n");
-	MP_CHECK(tl_comm->exchangeEndpoints());
-	mp_dbg_msg(oob_rank, "exchangeEndpoints\n");
+	if(oob_size >1)
+	{
+		MP_CHECK(tl_comm->exchangeEndpoints());
+		mp_dbg_msg(oob_rank, "exchangeEndpoints\n");
+	}
+	
 	MP_CHECK(tl_comm->updateEndpoints());
 	mp_dbg_msg(oob_rank, "updateEndpoints\n");
 	tl_comm->cleanupInit();
@@ -197,7 +207,8 @@ void mp_abort() {
 	MP_CHECK_OOB_OBJ();
 
 	oob_comm->abort(-1);
-	mp_finalize();
+printf("abort dopo\n");
+//	tl_comm->finalize();
 }
 
 //=============== INFO ===============

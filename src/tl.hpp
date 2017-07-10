@@ -19,6 +19,8 @@ namespace TL
 			virtual int updateEndpoints()=0;
 			virtual void cleanupInit()=0;
 			virtual int finalize()=0;
+			virtual int deviceInfo()=0;
+
 			// ===== COMMUNICATION
 			virtual int register_region_buffer(void * addr, size_t length, mp_region_t * mp_reg)=0;
 			virtual int unregister_region(mp_region_t *reg_)=0;

@@ -231,11 +231,12 @@ int TL::Verbs_Async::verbs_progress_single_flow(mp_flow_t flow)
                 verbs_request_async_t req = (verbs_request_async_t ) wc_curr->wr_id;
 
                 if (wc_curr->status != IBV_WC_SUCCESS) {
-                    mp_err_msg(oob_rank, "ERROR!!! completion error, status:'%s' client:%d rank:%d req:%p flow:%s\n",
+                    mp_err_msg(oob_rank, "Completion error, status:'%s' client:%d rank:%d req:%p flow:%s\n",
                                ibv_wc_status_str(wc_curr->status),
                                i, client->oob_rank,
                                req, flow_str);
-                    exit(EXIT_FAILURE);
+                    return MP_FAILURE;
+                    //exit(EXIT_FAILURE);
                     //continue;
                 }
 
@@ -248,7 +249,7 @@ int TL::Verbs_Async::verbs_progress_single_flow(mp_flow_t flow)
                     if (req->status == MP_PENDING_NOWAIT) {
                     } else if (req->status != MP_PENDING) {
                         mp_err_msg(oob_rank, "status not pending, value: %d \n", req->status);
-                        exit(-1);
+                        return MP_FAILURE;
                     }
 
                     ACCESS_ONCE(client->last_done_id) = req->id;
@@ -272,7 +273,9 @@ int TL::Verbs_Async::verbs_post_recv(verbs_client_async_t client, verbs_request_
         return MP_FAILURE;
     do
     {
+    	mp_dbg_msg(oob_rank, "verbs_fill_recv_request done, before gds_post_recv\n");
     	ret = gds_post_recv(client->gqp, &req->in.rr, &req->out.bad_rr);
+    	mp_dbg_msg(oob_rank, "verbs_fill_recv_request done, after gds_post_recv\n");
         if(ret == ENOMEM)
         {
         	if(qp_query == 0)
@@ -768,7 +771,6 @@ int TL::Verbs_Async::pt2pt_nb_recv(void * buf, size_t size, int peer, mp_region_
 	verbs_client_async_t client = &clients_async[client_index[peer]];
 
 	assert(reg);
-	mp_dbg_msg(oob_rank, "start async\n");
 	req = verbs_new_request(client, MP_RECV, MP_PENDING_NOWAIT);
 	assert(req);
 
@@ -1164,7 +1166,8 @@ int TL::Verbs_Async::setup_sublayer(int par1)
 	gpu_id = par1;
 	if(gpu_id == MP_NONE)
 	{
-		mp_warn_msg(oob_rank, "GPU_ID = MP_NONE -> No GPUDirect Async support\n");
+		mp_err_msg(oob_rank, "GPU_ID = MP_NONE -> No GPUDirect Async support\n");
+		return MP_FAILURE;
 	}
 	else
 	{

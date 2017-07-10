@@ -232,6 +232,7 @@ namespace TL
 			int updateEndpoints();
 			void cleanupInit();
 			int finalize();
+			int deviceInfo();
 			// ===== COMMUNICATION
 			int register_region_buffer(void * addr, size_t length, mp_region_t * mp_reg);
 			int unregister_region(mp_region_t *reg_);

@@ -122,7 +122,7 @@ typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 
 #define mp_dbg_msg(RANK, FMT, ARGS...)  do {                                  \
     if (mp_dbg_is_enabled)  {                                            \
-        fprintf(stderr, "[%d] [%d] MP DBG  %s() "                       \
+        fprintf(stderr, "[MP DBG] (%d-%d) %s() "                       \
                 FMT, getpid(),  RANK, __FUNCTION__ , ## ARGS); \
         fflush(stderr);                                                 \
     }                                                                   \
@@ -130,7 +130,7 @@ typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 
 #define mp_warn_msg(RANK, FMT, ARGS...) do {                                  \
         if (mp_warn_is_enabled) {                                        \
-            fprintf(stderr, "[%d] [%d] MP WARN %s() "                   \
+            fprintf(stderr, "[MP WARN] (%d-%d) %s() "                   \
                     FMT, getpid(), RANK, __FUNCTION__ , ## ARGS); \
             fflush(stderr);                                             \
         }                                                               \
@@ -139,13 +139,13 @@ typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 
 
 #define mp_info_msg(RANK, FMT, ARGS...) do {                                  \
-        fprintf(stderr, "[%d] [%d] MP INFO %s() "                       \
+        fprintf(stderr, "[MP INFO] (%d-%d) %s() "                       \
                 FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
         fflush(stderr);                                                 \
     } while(0)
 
 #define mp_err_msg(RANK, FMT, ARGS...)  do {                                  \
-        fprintf(stderr, "[%d] [%d] MP ERR  %s() "                       \
+        fprintf(stderr, "[MP ERROR] (%d-%d) %s() "                       \
                 FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
         fflush(stderr);                                                 \
     } while(0)

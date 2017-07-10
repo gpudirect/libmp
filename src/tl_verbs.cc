@@ -245,11 +245,13 @@ int TL::Verbs::verbs_progress_single_flow(mp_flow_t flow)
                 verbs_request_t req = (verbs_request_t ) wc_curr->wr_id;
 
                 if (wc_curr->status != IBV_WC_SUCCESS) {
-                    mp_err_msg(oob_rank, "ERROR!!! completion error, status:'%s' client:%d rank:%d req:%p flow:%s\n",
+                    mp_err_msg(oob_rank, "Completion error, status:'%s' client:%d rank:%d req:%p flow:%s\n",
                                ibv_wc_status_str(wc_curr->status),
                                i, client->oob_rank,
                                req, flow_str);
-                    exit(EXIT_FAILURE);
+                    
+                    return MP_FAILURE;
+                    //exit(EXIT_FAILURE);
                     //continue;
                 }
 
@@ -262,7 +264,8 @@ int TL::Verbs::verbs_progress_single_flow(mp_flow_t flow)
                     if (req->status == MP_PENDING_NOWAIT) {
                     } else if (req->status != MP_PENDING) {
                         mp_err_msg(oob_rank, "status not pending, value: %d \n", req->status);
-                        exit(EXIT_FAILURE);
+                        return MP_FAILURE;
+//                        exit(EXIT_FAILURE);
                     }
 
                     ACCESS_ONCE(client->last_done_id) = req->id;
@@ -926,6 +929,22 @@ int TL::Verbs::finalize() {
 	free(clients);
 
 	return retcode;			
+}
+
+int TL::Verbs::deviceInfo() {
+  struct ibv_device_attr dev_attr;
+
+  /*get device attributes and check relevant leimits*/
+  if (ibv_query_device(ib_ctx->context, &dev_attr)) {
+    mp_err_msg(oob_rank, "query_device failed \n");    
+    return MP_FAILURE;  
+  }
+
+  fprintf(stdout, "FW Version: %s\n",dev_attr.fw_ver);
+  fprintf(stdout, "Max Memory Region Size: 0x%" PRIx64 " (%" PRIu64 ") bytes\n", dev_attr.max_mr_size, dev_attr.max_mr_size);
+  fprintf(stdout, "Max Memory Region Number: %d\n", dev_attr.max_mr);
+
+  return MP_SUCCESS;  
 }
 
 // ===== COMMUNICATION

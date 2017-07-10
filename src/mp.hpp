@@ -102,6 +102,7 @@ enum mp_wait_flags {
 
 //===== mp.cc
 int mp_query_param(mp_param_t param, int *value);
+int mp_network_device_info();
 int mp_init(int argc, char *argv[], int par1);
 void mp_finalize();
 void mp_get_envars();

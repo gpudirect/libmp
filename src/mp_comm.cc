@@ -9,9 +9,9 @@
 int mp_irecv(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req) {
 	MP_CHECK_COMM_OBJ();
 
-	if(!mp_req || !mp_reg)
+	if(!mp_req || !mp_reg || !buf || size <= 0)
 	{
-		mp_err_msg(oob_rank, "request: %d, region: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0);
+		mp_err_msg(oob_rank, "request: %d, region: %d buf: %d, size: %d\n", (mp_req) ? 1 : 0, (mp_reg) ? 1 : 0, (buf) ? 1 : 0, size);
 		return MP_FAILURE;
 	}
 
