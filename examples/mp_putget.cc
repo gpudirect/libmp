@@ -264,13 +264,6 @@ int main (int argc, char *argv[])
     mp_query_param(MP_NUM_RANKS, &peers_num);
     peer = !my_rank;
 
-	// CUDA init
-	if(device_id > MP_NONE)
-	{
-		CUDA_CHECK(cudaSetDevice(device_id));
-		CUDA_CHECK(cudaFree(0));	
-	}
-
 	iter_count = ITER_COUNT_SMALL;
 	window_size = WINDOW_SIZE; 
 

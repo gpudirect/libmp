@@ -48,12 +48,6 @@ if test "x$with_cuda" != "x" && test -d $with_cuda; then
     CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib64"
     CUDA_LIBS="-lcuda -lcudart -lcufft"
 
-    NVCCFLAGS="$NVCCFLAGS $CPPFLAGS $MPI_CFLAGS $CUDA_CFLAGS"
-    NVCCLDFLAGS="$NVCCLDFLAGS $MPI_LDFLAGS $CUDA_LDFLAGS $CUDA_LIBS"
-    
-    AC_SUBST(NVCC, [nvcc])
-    AC_SUBST(NVCCFLAGS)
-    AC_SUBST(NVCCLDFLAGS)
 else
     want_cuda=no
     AC_MSG_NOTICE([CUDA not enabled: GPUDirect RDMA may not work properly.])
@@ -65,7 +59,7 @@ if test "x$with_libgdsync" == "x" || test "x$with_libgdsync" == "xno"; then
     want_libgdsync=no
 elif test -d $with_libgdsync; then
     want_libgdsync=yes
-    CPPFLAGS="$CPPFLAGS -I$with_libgdsync/include -DHAVE_GDSYNC"
+    CPPFLAGS="$CPPFLAGS -I$with_libgdsync/include -DHAVE_GDSYNC -DGDS_USE_EXP_INIT_ATTR -DGDS_OFED_HAS_PEER_DIRECT_ASYNC"
     LDFLAGS="$LDFLAGS -L$with_libgdsync/lib -L$with_libgdsync/lib64"
     AC_MSG_NOTICE([Setting LIBGDSYNC_PATH = ${with_libgdsync} ])
 fi
@@ -112,11 +106,17 @@ else
     AC_MSG_NOTICE([MPI not enabled or MPI dir does not exist.])
 fi
 
-dnl Checks for programs
-AC_PROG_CC
 
-dnl Checks for header files.
-AC_HEADER_STDC
+
+if test "$want_cuda" == "yes"; then
+    NVCCFLAGS="$NVCCFLAGS $CPPFLAGS $MPI_CFLAGS $CUDA_CFLAGS"
+    NVCCLDFLAGS="$NVCCLDFLAGS $MPI_LDFLAGS $CUDA_LDFLAGS $CUDA_LIBS"
+    
+    AC_SUBST(NVCC, [nvcc])
+    AC_SUBST(NVCCFLAGS)
+    AC_SUBST(NVCCLDFLAGS)
+
+fi
 
 if test "$want_libibverbs" == "yes"; then
     dnl Checks for Verbs support
@@ -135,6 +135,12 @@ if test "$want_libgdsync" == "yes"; then
     AC_CHECK_LIB(gdrapi, gdr_open, [], AC_MSG_ERROR([gdr_open() not found. If using --with-libgdsync LibMP requires GDRCopy.]))
     AC_CHECK_LIB(gdsync, gds_query_param, [], AC_MSG_ERROR([gds_query_param() not found. If using --with-libgdsync LibMP requires LibGDSync.]))
 fi
+
+dnl Checks for programs
+AC_PROG_CC
+
+dnl Checks for header files.
+AC_HEADER_STDC
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

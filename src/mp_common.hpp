@@ -239,6 +239,28 @@ typedef cudaStream_t asyncStream;
 #if defined(HAVE_GDSYNC)
     #include <gdsync/device.cuh>
     #define KERNEL_DESCRIPTOR_SEM gdsync::isem32_t
+
+    #ifndef MP_DESCR_KERNEL_H
+        #define MP_DESCR_KERNEL_H
+        
+        typedef struct mp_kernel_desc_send {
+            gdsync::isem32_t dbrec;
+            gdsync::isem64_t db;
+        } mp_kernel_desc_send;
+        typedef mp_kernel_desc_send * mp_kernel_desc_send_t;
+
+        typedef struct mp_kernel_desc_wait {
+            gdsync::wait_cond_t sema_cond;
+            gdsync::isem32_t sema;
+            gdsync::isem32_t flag;
+        } mp_kernel_desc_wait;
+        typedef mp_kernel_desc_wait * mp_kernel_desc_wait_t;
+
+        typedef gdsync::isem32_t mp_kernel_semaphore;
+        typedef mp_kernel_semaphore * mp_kernel_semaphore_t;
+
+    #endif
+
 #else
     #define KERNEL_DESCRIPTOR_SEM void
 #endif

@@ -1,7 +1,6 @@
 CUDA_PATH = @CUDA_PATH@
 MPI_PATH = @MPI_PATH@
 
-#AM_CPPFLAGS = $AM_MAKEFLAGS
 AM_CPPFLAGS = -D__STDC_FORMAT_MACROS
 AM_CPPFLAGS += -I$(top_srcdir)/include
 AM_CPPFLAGS += -I$(top_srcdir)/src
@@ -28,13 +27,14 @@ AM_LDFLAGS += -lgdsync -lgdrapi
 endif
 
 # ==== BIN ====
-bin_PROGRAMS = mp_sendrecv mp_putget
-
 if HAVE_GDSYNC
-bin_PROGRAMS += mp_sendrecv_async mp_putget_async
+bin_PROGRAMS = mp_sendrecv mp_putget mp_sendrecv_async mp_putget_async mp_sendrecv_kernel
+else
+bin_PROGRAMS = mp_sendrecv mp_putget
 endif
 
 noinst_PROGRAMS = 
+
 
 CCLD=$(MPICXX)
 CXXLD=$(MPICXX)
@@ -46,6 +46,7 @@ mp_putget_SOURCES = mp_putget.cc
 if HAVE_GDSYNC
 mp_sendrecv_async_SOURCES = mp_sendrecv_async.cc
 mp_putget_async_SOURCES = mp_putget_async.cc
+mp_sendrecv_kernel_SOURCES = mp_sendrecv_kernel.cu
 endif
 
 SUFFIXES= .cu

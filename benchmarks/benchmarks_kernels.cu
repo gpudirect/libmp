@@ -65,7 +65,7 @@ __global__ void dummy_kernel(double time, double clockrate)
 {
     long long int start, stop;
     double usec;
-    int counter;
+    volatile int counter;
 
     start = clock64();
     do {

@@ -2307,38 +2307,39 @@ int TL::Verbs_Async::descriptors_queue_post_async(cudaStream_t stream, mp_comm_d
         dq->flush();
     }
     return ret;
-}			
+}
 
+#if 1
 //================================== ASYNC KERNEL DESCRIPTOR =================================================
 int TL::Verbs_Async::descriptors_kernel(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value)
 {
-    int ret = 0;
-    struct gds_mlx5_dword_wait_info mlx5_i;
-    int flags = GDS_MEMORY_HOST;
-    int retcode = gds_mlx5_get_dword_wait_info(ptr, value, flags, &mlx5_i);
-    if (retcode) {
-        mp_err_msg(oob_rank, "got error %d/%s \n", retcode, strerror(retcode));
-        ret = MP_FAILURE;
-        goto out;
-    }
-    mp_dbg_msg(oob_rank, "wait_info ptr=%p value=%08x\n", mlx5_i.ptr, mlx5_i.value);
-    psem->ptr   = mlx5_i.ptr;
-    psem->value = mlx5_i.value;
-	
+	int ret = 0;
+	struct gds_mlx5_dword_wait_info mlx5_i;
+	int flags = GDS_MEMORY_HOST;
+	int retcode = gds_mlx5_get_dword_wait_info(ptr, value, flags, &mlx5_i);
+	if (retcode) {
+	    mp_err_msg(oob_rank, "got error %d/%s \n", retcode, strerror(retcode));
+	    ret = MP_FAILURE;
+	    goto out;
+	}
+	mp_dbg_msg(oob_rank, "wait_info ptr=%p value=%08x\n", mlx5_i.ptr, mlx5_i.value);
+	psem->ptr   = mlx5_i.ptr;
+	psem->value = mlx5_i.value;
+
 	out:
-    	return ret;
+		return ret;
 }
 
-int TL::Verbs_Async::descriptors_kernel_send(mp_kernel_send_desc_t * sinfo, mp_request_t *mp_req)
+int TL::Verbs_Async::descriptors_kernel_send(mp_kernel_desc_send_t * desc, mp_request_t *mp_req)
 {
 	verbs_request_async_t req = (verbs_request_async_t)(*mp_req);
-	verbs_kernel_send_desc_t desc = (verbs_kernel_send_desc_t) (*sinfo);
+//	verbs_kernel_send_desc_t desc = (verbs_kernel_send_desc_t) (*sinfo);
 
 	int retcode;
 	int ret = 0; 
 
 	mp_dbg_msg(oob_rank, "req=%p status=%d id=%d\n", req, req->status, req->id);
-
+	assert(desc);
 	// track req
 	assert(req->status == MP_PREPARED);
 	if (use_event_sync) {
@@ -2357,26 +2358,26 @@ int TL::Verbs_Async::descriptors_kernel_send(mp_kernel_send_desc_t * sinfo, mp_r
 	    ret = MP_FAILURE;
 	    goto out;
 	}
-	desc->dbrec.ptr   = mlx5_i.dbrec_ptr;
-	desc->dbrec.value = mlx5_i.dbrec_value;
-	desc->db.ptr      = mlx5_i.db_ptr;
-	desc->db.value    = mlx5_i.db_value;
+	(*desc)->dbrec.ptr   = mlx5_i.dbrec_ptr;
+	(*desc)->dbrec.value = mlx5_i.dbrec_value;
+	(*desc)->db.ptr      = mlx5_i.db_ptr;
+	(*desc)->db.value    = mlx5_i.db_value;
 
 	out:
 		return ret;
 }
 
-int TL::Verbs_Async::descriptors_kernel_wait(mp_kernel_wait_desc_t * winfo, mp_request_t *mp_req)
+int TL::Verbs_Async::descriptors_kernel_wait(mp_kernel_desc_wait_t * desc, mp_request_t *mp_req)
 {
 	int retcode;
 	int ret = 0;
 	verbs_request_async_t req = (verbs_request_async_t)(*mp_req);
-	verbs_kernel_wait_desc_t desc = (verbs_kernel_wait_desc_t) (*winfo);
+	//verbs_kernel_wait_desc_t desc = (verbs_kernel_wait_desc_t) (*winfo);
 
     //verbs_client_async_t client = &clients_async[client_index[peer]];
 
 	mp_dbg_msg(oob_rank, "req=%p status=%d id=%d\n", req, req->status, req->id);
-
+	assert(desc);
 	assert(req->status == MP_PENDING_NOWAIT || req->status == MP_COMPLETE);
 
 	req->stream = 0;
@@ -2391,15 +2392,16 @@ int TL::Verbs_Async::descriptors_kernel_wait(mp_kernel_wait_desc_t * winfo, mp_r
 	    goto out;
 	}
 	// BUG: need a switch() here
-	desc->sema_cond  = mlx5_i.cond;
-	desc->sema.ptr   = mlx5_i.cqe_ptr;
-	desc->sema.value = mlx5_i.cqe_value;
-	desc->flag.ptr   = mlx5_i.flag_ptr;
-	desc->flag.value = mlx5_i.flag_value;
+	(*desc)->sema_cond  = mlx5_i.cond;
+	(*desc)->sema.ptr   = mlx5_i.cqe_ptr;
+	(*desc)->sema.value = mlx5_i.cqe_value;
+	(*desc)->flag.ptr   = mlx5_i.flag_ptr;
+	(*desc)->flag.value = mlx5_i.flag_value;
 
 	out:
 		return ret;
 }
+#endif
 
 #if 0
 //================================== ASYNC KERNEL COMMUNICATION CALLS - DEVICE FUNCTIONS =================================================

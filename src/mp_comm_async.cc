@@ -407,30 +407,3 @@ int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptor
 	return tl_comm->descriptors_queue_post_async(stream, pdq, flags);
 
 }
-
-//================================== ASYNC KERNEL DESCRIPTOR =================================================
-int mp_kernel_descriptors_send(mp_kernel_send_desc_t * info, mp_request_t *mp_req)
-{
-	MP_CHECK_TL_OBJ();
-
-	if(!info || !mp_req)
-	{
-		mp_err_msg(oob_rank, "info: %d, request: %d\n", (info) ? 1 : 0, (mp_req) ? 1 : 0);
-		return MP_FAILURE;
-	}
-	
-	return tl_comm->descriptors_kernel_send(info, mp_req);
-}
-
-int mp_kernel_descriptors_wait(mp_kernel_wait_desc_t * info, mp_request_t *mp_req)
-{
-	MP_CHECK_TL_OBJ();
-
-	if(!info || !mp_req)
-	{
-		mp_err_msg(oob_rank, "info: %d, request: %d\n", (info) ? 1 : 0, (mp_req) ? 1 : 0);
-		return MP_FAILURE;
-	}
-	
-	return tl_comm->descriptors_kernel_wait(info, mp_req);
-}

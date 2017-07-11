@@ -1,6 +1,7 @@
 CUDA_PATH = @CUDA_PATH@
 MPI_PATH = @MPI_PATH@
 
+
 AM_CPPFLAGS  = -I$(srcdir)
 AM_CPPFLAGS += -I$(srcdir)/include
 AM_CPPFLAGS += -I$(srcdir)/src
@@ -32,7 +33,7 @@ AM_CFLAGS = -g -Wall
 SRC_LIST = src/mp.cc src/mp_comm.cc 
 
 if HAVE_GDSYNC
-SRC_LIST += src/mp_comm_async.cc
+SRC_LIST += src/mp_comm_async.cc src/mp_comm_kernel.cc
 endif
 
 SRC_LIST += src/oob.cc src/oob_mpi.cc src/tl.cc src/tl_verbs.cc
@@ -45,7 +46,7 @@ lib_LTLIBRARIES = src/libmp.la
 
 EXTRA_DIST = autogen.sh
 
-include_HEADERS = src/mp.hpp
+include_HEADERS = src/mp.hpp src/mp_comm_kernel.cuh
 noinst_HEADERS = src/mp_common.hpp src/mp_external.hpp src/oob.hpp src/tl.hpp src/tl_verbs.hpp src/tl_verbs_common.hpp src/tl_verbs_types_async.hpp
 #libmpincludedir = include/$(includedir)/mp
 #libmpinclude_HEADERS = include/mp/device.cuh
@@ -53,5 +54,6 @@ noinst_HEADERS = src/mp_common.hpp src/mp_external.hpp src/oob.hpp src/tl.hpp sr
 src_libmp_la_CFLAGS = $(AM_CFLAGS)
 src_libmp_la_SOURCES = $(SRC_LIST)
 src_libmp_la_LDFLAGS = -version-info 3:0:0
+
 
 SUBDIRS = . examples benchmarks

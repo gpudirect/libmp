@@ -165,7 +165,7 @@ int main (int argc, char *argv[])
         if(use_gpu_buffers == 1)
             dbg_msg("Using GPU buffers, GPUDirect RDMA\n");
     }
-
+    
     ret = mp_init(argc, argv, device_id);
     if(ret) exit(EXIT_FAILURE);
     
@@ -176,13 +176,6 @@ int main (int argc, char *argv[])
     {
         fprintf(stderr, "This test requires exactly two processes\n");
         mp_abort();
-    }
-
-    if(device_id > MP_NONE)
-    {
-        // CUDA init
-        CUDA_CHECK(cudaSetDevice(device_id));
-        CUDA_CHECK(cudaFree(0));        
     }
 
     peer = !my_rank;

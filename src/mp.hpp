@@ -24,14 +24,10 @@
 struct mp_request;
 struct mp_region;
 struct mp_window;
-struct mp_kernel_wait_desc;
-struct mp_kernel_send_desc;
 
 typedef struct mp_request * mp_request_t;
 typedef struct mp_region * mp_region_t;
 typedef struct mp_window * mp_window_t;
-typedef struct mp_kernel_send_desc * mp_kernel_send_desc_t;
-typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 
 #define MP_SUCCESS 0
 #define MP_FAILURE 1
@@ -138,6 +134,8 @@ int mp_wait_all(int number, mp_request_t * mp_reqs);
 #ifdef HAVE_GDSYNC
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <gdsync/device.cuh>
+#include <gdsync/device.cuh>
 
 //===== mp_comm_async.cc
 int mp_send_prepare(void * buf, size_t size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req);
@@ -175,7 +173,38 @@ int mp_comm_descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *dq,
 int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *dq, int flags);
 
 //================================== ASYNC KERNEL DESCRIPTOR =================================================
-int mp_kernel_descriptors_send(mp_kernel_send_desc_t * info, mp_request_t *mp_req);
-int mp_kernel_descriptors_wait(mp_kernel_wait_desc_t * info, mp_request_t *mp_req);
+#ifndef MP_DESCR_KERNEL_H
+#define MP_DESCR_KERNEL_H
+
+typedef struct mp_kernel_desc_send {
+    gdsync::isem32_t dbrec;
+    gdsync::isem64_t db;
+} mp_kernel_desc_send;
+typedef mp_kernel_desc_send * mp_kernel_desc_send_t;
+
+typedef struct mp_kernel_desc_wait {
+    gdsync::wait_cond_t sema_cond;
+    gdsync::isem32_t sema;
+    gdsync::isem32_t flag;
+} mp_kernel_desc_wait;
+typedef mp_kernel_desc_wait * mp_kernel_desc_wait_t;
+
+typedef gdsync::isem32_t mp_kernel_semaphore;
+typedef mp_kernel_semaphore * mp_kernel_semaphore_t;
+
+#endif
+
+int mp_kernel_descriptors_kernel(mp_kernel_semaphore_t psem, uint32_t *ptr, uint32_t value);
+int mp_kernel_descriptors_send(mp_kernel_desc_send_t info, mp_request_t *mp_req);
+int mp_kernel_descriptors_wait(mp_kernel_desc_wait_t info, mp_request_t *mp_req);
+int mp_prepare_kernel_send(void * buf, int size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, mp_kernel_desc_send_t sDesc, mp_kernel_desc_wait_t wDesc);
+int mp_prepare_kernel_recv(void * buf, int size, int peer, mp_region_t * mp_reg, mp_request_t * mp_req, mp_kernel_desc_wait_t wDesc);
+
+#if 0
+__device__ inline void mp_isend_kernel(mp_kernel_desc_send &info);
+__device__ inline int mp_wait_kernel(mp_kernel_desc_wait &info);
+__device__ inline void mp_signal_kernel(mp_kernel_desc_wait &info);
+#endif
+
 
 #endif

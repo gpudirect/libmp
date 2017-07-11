@@ -76,10 +76,12 @@ namespace TL
 			virtual int descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags)=0;
 			virtual int descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value)=0;
 			virtual int descriptors_queue_post_async(asyncStream stream, mp_comm_descriptors_queue_t *pdq, int flags)=0;
+#if 1
 			//Kernel-model descriptors
 			virtual int descriptors_kernel(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value)=0;
-			virtual int descriptors_kernel_send(mp_kernel_send_desc_t * sinfo, mp_request_t *mp_req)=0;
-			virtual int descriptors_kernel_wait(mp_kernel_wait_desc_t * winfo, mp_request_t *req_t)=0;
+			virtual int descriptors_kernel_send(mp_kernel_desc_send_t * sinfo, mp_request_t *mp_req)=0;
+			virtual int descriptors_kernel_wait(mp_kernel_desc_wait_t * winfo, mp_request_t *mp_req)=0;
+#endif
 			//================================================================
 	    };
 }

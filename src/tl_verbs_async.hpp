@@ -100,6 +100,7 @@ struct verbs_comm_desc_queue : mp_comm_descriptors_queue {
 };
 typedef struct verbs_comm_desc_queue * verbs_comm_desc_queue_t;
 
+#if 0
 struct verbs_kernel_send_desc : mp_kernel_send_desc {
 	gdsync::isem32_t dbrec;
 	gdsync::isem64_t db;
@@ -112,6 +113,7 @@ struct verbs_kernel_wait_desc : mp_kernel_wait_desc {
 	gdsync::isem32_t flag;
 };
 typedef struct verbs_kernel_wait_desc * verbs_kernel_wait_desc_t;
+#endif
 
 #if (GDS_API_MAJOR_VERSION==2 && GDS_API_MINOR_VERSION>=2) || (GDS_API_MAJOR_VERSION>2)
 #define HAS_GDS_DESCRIPTOR_API 1
@@ -226,10 +228,11 @@ namespace TL
 			int descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value, int flags);
 			int descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *pdq, uint32_t *ptr, uint32_t value);
 			int descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *pdq, int flags);
-
+#if 1
 			//================================== ASYNC KERNEL DESCRIPTOR =================================================
 			int descriptors_kernel(KERNEL_DESCRIPTOR_SEM *psem, uint32_t *ptr, uint32_t value);
-			int descriptors_kernel_send(mp_kernel_send_desc_t * sinfo, mp_request_t *mp_req);
-			int descriptors_kernel_wait(mp_kernel_wait_desc_t * winfo, mp_request_t *req_t);
+			int descriptors_kernel_send(mp_kernel_desc_send_t * sinfo, mp_request_t *mp_req);
+			int descriptors_kernel_wait(mp_kernel_desc_wait_t * winfo, mp_request_t *mp_req);
+#endif
 	};
 }
