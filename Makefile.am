@@ -36,10 +36,24 @@ if HAVE_GDSYNC
 SRC_LIST += src/mp_comm_async.cc src/mp_comm_kernel.cc
 endif
 
-SRC_LIST += src/oob.cc src/oob_mpi.cc src/tl.cc src/tl_verbs.cc
+SRC_LIST += src/oob.cc src/oob_mpi.cc src/tl.cc
 
 if HAVE_GDSYNC
+
 SRC_LIST += src/tl_verbs_async.cc
+
+else
+
+if HAVE_VERBS
+
+SRC_LIST += src/tl_verbs.cc
+
+else
+
+SRC_LIST += src/tl_psm2.cc
+
+endif
+
 endif
 
 lib_LTLIBRARIES = src/libmp.la
@@ -47,7 +61,8 @@ lib_LTLIBRARIES = src/libmp.la
 EXTRA_DIST = autogen.sh
 
 include_HEADERS = src/mp.hpp src/mp_comm_kernel.cuh
-noinst_HEADERS = src/mp_common.hpp src/mp_external.hpp src/oob.hpp src/tl.hpp src/tl_verbs.hpp src/tl_verbs_common.hpp src/tl_verbs_types_async.hpp
+noinst_HEADERS = src/mp_common.hpp src/mp_external.hpp src/oob.hpp src/tl.hpp src/tl_verbs.hpp src/tl_verbs_common.hpp src/tl_verbs_types_async.hpp src/tl_psm2.hpp
+
 #libmpincludedir = include/$(includedir)/mp
 #libmpinclude_HEADERS = include/mp/device.cuh
 
