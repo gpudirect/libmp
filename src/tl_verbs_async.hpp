@@ -7,8 +7,12 @@
 #include <gdsync/mlx5.h>
 #include <vector>
 
-#define CHECK_GPU(gid) {						\
-	if(gid <= MP_DEFAULT) return MP_FAILURE;	\
+#define CHECK_GPU(gid) {					\
+	if(gid <= MP_NONE)					\
+	{										\
+		mp_err_msg(0, "GPU check failed: %d\n", gid);	\
+		return MP_FAILURE;	\
+	}							\
 }
 
 struct verbs_request_async : verbs_request {

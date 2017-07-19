@@ -114,9 +114,10 @@ void mp_barrier();
 void mp_abort();
 double mp_time();
 
-int mp_prepare_acks_rdma();
+int mp_prepare_acks_rdma(int numAcks);
 int mp_send_ack_rdma(int dst_rank);
 int mp_wait_ack_rdma(int src_rank);
+int mp_flush_ack_rdma();
 int mp_cleanup_acks_rdma();
 
 //===== mp_comm.cc
@@ -175,7 +176,7 @@ int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptor
 int mp_prepare_acks_rdma_async(int numAcks);
 int mp_send_ack_rdma_async(int dst_rank, cudaStream_t ackStream);
 int mp_wait_ack_rdma_async(int src_rank, cudaStream_t ackStream);
-int mp_sync_ack_rdma_async();
+int mp_flush_ack_rdma_async();
 int mp_cleanup_acks_rdma_async();
 //================================== ASYNC KERNEL DESCRIPTOR =================================================
 #ifndef MP_DESCR_KERNEL_H

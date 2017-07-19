@@ -42,6 +42,12 @@
 #define MAX_SIZE 1*1024*1024 
 #define ITER_COUNT_SMALL 1000
 #define ITER_COUNT_LARGE 1000
+#define ALL_PINGPONG            0
+#define PT2PT_SYNC_PINGPONG     1
+#define PT2PT_ASYNC_PINGPONG    2
+#define MPI_PINGPONG            3
+#define RDMA_SYNC_PINGPONG      4
+#define RDMA_ASYNC_PINGPONG     5
 
 int enable_ud = 0;
 int device_id = MP_DEFAULT;
@@ -54,7 +60,7 @@ volatile uint32_t tracking_event = 0;
 int use_gpu_buffers=0;
 
 /* application and pack buffers */
-void *buf = NULL, *sbuf_d = NULL, *rbuf_d = NULL, *put_buf=NULL;
+void *buf = NULL, *sbuf_d = NULL, *rbuf_d = NULL, *put_buf=NULL, *get_buf=NULL;
 size_t buf_size; 
 
 /* MP specific objects */
@@ -62,7 +68,7 @@ mp_request_t *sreq = NULL;
 mp_request_t *rreq = NULL;
 mp_request_t *preq = NULL;
 
-mp_region_t * sreg, * rreg, * preg;
+mp_region_t * sreg, * rreg, * preg, * greg;
 mp_window_t put_win;
 /* MPI specific objects */
 MPI_Request * sreq_mpi;
@@ -271,11 +277,12 @@ void wait_put (int batch_index)
 {
     int j;
     int req_idx = batch_to_sreq_idx (batch_index); 
-
+    //printf("wait_put, batch_index%d, steps_per_batch%d \n",batch_index, steps_per_batch );
     for (j=0; j<steps_per_batch; j++) {
         MP_CHECK(mp_wait(&preq[req_idx + j]));
     }
 }
+
 
 void post_work_rdma_sync (int size, int batch_index, double kernel_size) 
 {
@@ -284,27 +291,27 @@ void post_work_rdma_sync (int size, int batch_index, double kernel_size)
     int sreq_idx = batch_to_sreq_idx (batch_index);
 
     for (j=0; j<steps_per_batch; j++) {
-    if (!my_rank) { 
- //           MP_CHECK(mp_wait(&rreq[rreq_idx + j]));
-            MP_CHECK(mp_wait_ack_rdma(!myRank));
+        if (!my_rank) { 
+                MP_CHECK(mp_wait_ack_rdma(peer));
 
-            #ifdef HAVE_CUDA
-                if (kernel_size > 0) {
-                    if (use_calc_size > 0)
-                        gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
-                    else
-                        gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
-                    CUDA_CHECK(cudaStreamSynchronize(stream));
-                }
-            #endif
-            MP_CHECK(mp_iput ((void *)((uintptr_t)sbuf_d), size, &preg[0], peer, size, &put_win, &preq[j], 0)); 
-//            MP_CHECK(mp_isend ((void *)((uintptr_t)sbuf_d), size, peer, &sreg[0], &sreq[sreq_idx + j]));
-    } else {
-            MP_CHECK(mp_iput ((void *)((uintptr_t)sbuf_d), size, &preg[0], peer, size, &put_win, &preq[j], 0)); 
-            MP_CHECK(mp_wait_ack_rdma(!myRank));
+                #ifdef HAVE_CUDA
+                    if (kernel_size > 0) {
+                        if (use_calc_size > 0)
+                            gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
+                        else
+                            gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
+                        CUDA_CHECK(cudaStreamSynchronize(stream));
+                    }
+                #endif
 
-//            MP_CHECK(mp_isend ((void *)((uintptr_t)sbuf_d), size, peer, &sreg[0], &sreq[sreq_idx + j]));
-  //          MP_CHECK(mp_wait(&rreq[rreq_idx + j]));
+                MP_CHECK(mp_iput ((void *)((uintptr_t)put_buf), size, &preg[0], peer, 0, &put_win, &preq[sreq_idx + j], 0)); 
+                MP_CHECK(mp_wait(&preq[sreq_idx + j]));
+                MP_CHECK(mp_send_ack_rdma(peer));
+        } else {
+            MP_CHECK(mp_iput ((void *)((uintptr_t)put_buf), size, &preg[0], peer, 0, &put_win, &preq[sreq_idx + j], 0)); 
+            MP_CHECK(mp_wait(&preq[sreq_idx + j]));
+            MP_CHECK(mp_send_ack_rdma(peer));
+            MP_CHECK(mp_wait_ack_rdma(peer));
 
             #ifdef HAVE_CUDA
                 if (kernel_size > 0) {
@@ -319,8 +326,55 @@ void post_work_rdma_sync (int size, int batch_index, double kernel_size)
     }
 }
 
+void wait_put_async(int batch_index) 
+{
+    int j;
+    int req_idx = batch_to_sreq_idx (batch_index); 
+    for (j=0; j<steps_per_batch; j++) {
+        MP_CHECK(mp_wait_async(&preq[req_idx + j], stream));
+    }
+}
 
-void post_work_rdma_async (int size, int batch_index, double kernel_size) { }
+void post_work_rdma_async (int size, int batch_index, double kernel_size)
+{
+    #ifdef HAVE_GDSYNC
+    int j;
+    int rreq_idx = batch_to_rreq_idx (batch_index);
+    int sreq_idx = batch_to_sreq_idx (batch_index);
+
+    for (j=0; j<steps_per_batch; j++) {
+        if (!my_rank) { 
+                MP_CHECK(mp_wait_ack_rdma_async(peer, stream));
+
+                if (kernel_size > 0) {
+                    if (use_calc_size > 0)
+                        gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
+                    else
+                        gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
+                }
+
+                MP_CHECK(mp_iput_async ((void *)((uintptr_t)put_buf), size, &preg[0], peer, 0, &put_win, &preq[sreq_idx + j], 0, stream)); 
+                //Guarantee the put order
+                MP_CHECK(mp_wait_async(&preq[sreq_idx + j], stream));
+                MP_CHECK(mp_send_ack_rdma_async(peer, stream));
+        } else {
+            MP_CHECK(mp_iput_async ((void *)((uintptr_t)put_buf), size, &preg[0], peer, 0, &put_win, &preq[sreq_idx + j], 0, stream)); 
+            //Guarantee the put order
+            MP_CHECK(mp_wait_async(&preq[sreq_idx + j], stream));
+            MP_CHECK(mp_send_ack_rdma_async(peer, stream));
+            MP_CHECK(mp_wait_ack_rdma_async(peer, stream));
+
+            if (kernel_size > 0) {
+                if (use_calc_size > 0)
+                    gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
+                else
+                    gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
+            }
+        }
+    }
+#endif
+}
+
 
 double sr_exchange_rdma(int size, int iter_count, double kernel_size, int use_async)
 {
@@ -351,19 +405,18 @@ double sr_exchange_rdma(int size, int iter_count, double kernel_size, int use_as
     wait_send_batch = wait_recv_batch = 0;
     while (wait_send_batch < batch_count) { 
         if (use_async) {
-//            wait_arck();
-//            wait_recv (wait_recv_batch);
+            wait_put (wait_send_batch);
             wait_recv_batch++;
         }
 
-        wait_put (wait_send_batch);
+        //wait_put (wait_send_batch);
         wait_send_batch++;
 
         if (j < batch_count) { 
             if (use_async) { 
-                post_work_async (size, j, kernel_size);
+                post_work_rdma_async (size, j, kernel_size);
             } else {
-                post_work_sync (size, j, kernel_size);
+                post_work_rdma_sync (size, j, kernel_size);
             }
         }
 
@@ -512,9 +565,10 @@ double sr_exchange_MPI (MPI_Comm comm, int size, int iter_count, double kernel_s
 int main (int argc, char *argv[])
 {
     int iter_count, max_size, size, dev_count, ret;
-    int kernel_size = 20;
+    int kernel_size = 5;
     int comm_comp_ratio = 0;
     int validate = 0;
+    int pingpong_type=0;
 
     size = 1;
     max_size = MAX_SIZE;
@@ -570,6 +624,11 @@ int main (int argc, char *argv[])
         enable_ud = atoi(value);
     }
 
+    value = getenv("MP_PINGPONG_TYPE");
+    if (value != NULL) {
+        pingpong_type = atoi(value);
+    }
+
     if (enable_ud) {
 	   if (max_size > 4096) max_size = 4096;
     }
@@ -596,7 +655,7 @@ int main (int argc, char *argv[])
     peer = !my_rank;
 
 #ifdef HAVE_CUDA
-    if(device_id > MP_DEFAULT)
+    if(device_id > MP_NONE)
     {
         // CUDA init
         CUDA_CHECK(cudaSetDevice(device_id));
@@ -605,7 +664,7 @@ int main (int argc, char *argv[])
         CUDA_CHECK(cudaGetDeviceProperties(&prop, device_id));
         clockrate = (double)prop.clockRate;
         gpu_num_sm = prop.multiProcessorCount;
-        fprintf(stdout, "[%d] GPU %d: %s GPU SM: %d PCIe %d:%d:%d\n", my_rank, device_id, prop.name, prop.multiProcessorCount, prop.pciDomainID, prop.pciBusID, prop.pciDeviceID);
+        printf("[%d] GPU %d: %s GPU SM: %d PCIe %d:%d:%d\n", my_rank, device_id, prop.name, prop.multiProcessorCount, prop.pciDomainID, prop.pciBusID, prop.pciDeviceID);
         CUDA_CHECK(cudaStreamCreateWithFlags(&stream, 0));
     }
 #else
@@ -622,6 +681,7 @@ int main (int argc, char *argv[])
     sreq = mp_create_request(steps_per_batch*batches_inflight);
     rreq = mp_create_request(steps_per_batch*(batches_inflight + 1));
     preq = mp_create_request(steps_per_batch*batches_inflight);
+
     sreg = mp_create_regions(1);
     rreg = mp_create_regions(1);
     preg = mp_create_regions(1);
@@ -629,30 +689,35 @@ int main (int argc, char *argv[])
     sreq_mpi = (MPI_Request *) calloc(steps_per_batch*batches_inflight, sizeof(MPI_Request));
     rreq_mpi = (MPI_Request *) calloc(steps_per_batch*(batches_inflight + 1), sizeof(MPI_Request));
    
-    #ifdef HAVE_GDSYNC
 
     if (!my_rank) {   
-    	if (use_calc_size) { 
-    		fprintf(stdout, "%10s \t %10s \t %10s \t %10s \t  %10s \t %10s \t %10s \t %10s\n", "Size", "CalcSize", "No-async", "No-async+Kern", "Async", "Async+Kern", "MPI", "MPI+Kern");
-    	} else {
-    		fprintf(stdout, "%10s \t %10s \t  %10s \t %10s \t %10s \t  %10s \t %10s \t %10s\n", "Size", "KernelTime", "No-async", "No-async+Kern", "Async", "Async+Kern", "MPI", "MPI+Kern");
-    	}
+        fprintf(stdout, "%10s \t ","Size");
+        //%10s \t %10s \t %10s \t  %10s \t %10s \t %10s \t %10s \t %10s  \t %10s \t %10s  \t %10s\n", "Size", "CalcSize", "No-async", "No-async+Kern", "Async", "Async+Kern", "MPI", "MPI+Kern", "Put", "Put+Kern", "Put Async", "Put Async+Kern");
+
+        if (use_calc_size) fprintf(stdout, "%10s \t ","CalcSize"); 
+        else fprintf(stdout, "%10s \t ","KernelTime"); 
+
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == PT2PT_SYNC_PINGPONG) fprintf(stdout, "%10s \t %10s ", "PtSync", "PtSync+Kern"); 
+        #ifdef HAVE_GDSYNC
+            if(pingpong_type == ALL_PINGPONG || pingpong_type == PT2PT_ASYNC_PINGPONG) fprintf(stdout, "%10s \t %10s ", "PtAsync", "PtAsync+Kern"); 
+        #endif
+
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == MPI_PINGPONG) fprintf(stdout, "%10s \t %10s ", "MPI", "MPI+Kern"); 
+
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == RDMA_SYNC_PINGPONG) fprintf(stdout, "%10s \t %10s ", "PutSync", "PutSync+Kern"); 
+        #ifdef HAVE_GDSYNC
+            if(pingpong_type == ALL_PINGPONG || pingpong_type == RDMA_ASYNC_PINGPONG) fprintf(stdout, "%10s \t %10s ", "PutAsync", "PutAsync+Kern"); 
+        #endif    
+
+        fprintf(stdout, "\n");
     }
-
-    #else
-
-    if (!my_rank) {   
-        if (use_calc_size) { 
-            fprintf(stdout, "%10s \t %10s \t %10s \t %10s \t %10s \t %10s\n", "Size", "CalcSize", "No-async", "No-async+Kern", "MPI", "MPI+Kern");
-        } else {
-            fprintf(stdout, "%10s \t %10s \t %10s \t %10s \t %10s \t %10s\n", "Size", "KernelTime", "No-async", "No-async+Kern", "MPI", "MPI+Kern");
-        }
-    }
-
-    #endif
 
     if (size != 1) size = max_size = size;
-    for (; size<=max_size; size*=2) 
+    //for (; size<=max_size; size*=2) 
+    max_size=149505;
+
+//    for (; size<=max_size; size*=2) 
+    for (size=1; size<=max_size; size += 1024) 
     {
         double latency;
 
@@ -699,92 +764,161 @@ int main (int argc, char *argv[])
 
         MP_CHECK(mp_register_region_buffer(sbuf_d, buf_size, &sreg[0]));
         MP_CHECK(mp_register_region_buffer(rbuf_d, buf_size, &rreg[0]));
+
         MP_CHECK(mp_register_region_buffer(put_buf, buf_size, &preg[0]));
         MP_CHECK(mp_window_create(put_buf, buf_size, &put_win));
 
+        MP_CHECK(mp_prepare_acks_rdma(steps_per_batch*batches_inflight));
+        MP_CHECK(mp_prepare_acks_rdma_async(steps_per_batch*batches_inflight));
+
+
         if (!my_rank) fprintf(stdout, "%10d", size);
 
-        MP_CHECK(mp_prepare_acks_rdma());
 
         // =================== WARMUP ===================
-        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
-        mp_barrier();
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == PT2PT_SYNC_PINGPONG)
+        {
+            latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
+            mp_barrier();            
+        }
 
 #ifdef HAVE_GDSYNC
-        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
-        mp_barrier();
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == PT2PT_ASYNC_PINGPONG)
+        {
+            latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
+            mp_barrier();
+        }
 #endif
 
-        latency = sr_exchange_rdma(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
-        mp_barrier();
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == MPI_PINGPONG)
+        {
+            latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/);
+            mp_barrier();
+        }
 
-        latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/);
-        mp_barrier();
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == RDMA_SYNC_PINGPONG)
+        {
+            latency = sr_exchange_rdma(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
+            mp_barrier();
+        }
 
-        // =================== Benchmarks ===================
-        //LibMP Sync
-        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
-        mp_barrier();
-     
+#ifdef HAVE_GDSYNC
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == RDMA_ASYNC_PINGPONG)
+        {
+            latency = sr_exchange_rdma(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
+            mp_barrier();
+        }
+#endif
+
         if (use_calc_size) kernel_size = calc_size; 
         else  kernel_size = (comm_comp_ratio > 0) ? comm_comp_ratio*(latency/2) : kernel_size;
 
         if (!my_rank) fprintf(stdout, "\t   %10d", kernel_size);
-        if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency);
 
-        //LibMP Sync + Kernel
-        latency = sr_exchange_pt2pt(size, iter_count, kernel_size, 0/*use_async*/);
-        mp_barrier();
-        if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
+        // =================== Benchmarks ===================
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == PT2PT_SYNC_PINGPONG)
+        {
+            //LibMP Sync
+            latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency);
+      
+            //LibMP Sync + Kernel
+            latency = sr_exchange_pt2pt(size, iter_count, kernel_size, 0/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
+        }
+
+#ifdef HAVE_GDSYNC
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == PT2PT_ASYNC_PINGPONG)
+        {
+            //LibMP Async
+            latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
+
+            //LibMP Async + Kernel
+            latency = sr_exchange_pt2pt(size, iter_count, kernel_size, 1/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
+        }
+#endif
+
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == MPI_PINGPONG)
+        {
+            //MPI
+            latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
+
+            //MPI + Kernel
+            latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, kernel_size);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency /*, prepost_latency */);
+        }
+
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == RDMA_SYNC_PINGPONG)
+        {  
+            //Put
+            latency = sr_exchange_rdma(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency /*, prepost_latency */);
+
+            //Put + Kernel
+            latency = sr_exchange_rdma(size, iter_count, kernel_size, 0/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency /*, prepost_latency */);
+        }
 
 #ifdef HAVE_GDSYNC
 
-        //LibMP Async
-        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
-        mp_barrier();
-        if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
+        if(pingpong_type == ALL_PINGPONG || pingpong_type == RDMA_ASYNC_PINGPONG)
+            { 
+            //Put Async
+            latency = sr_exchange_rdma(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency /*, prepost_latency */);
 
-        //LibMP Async + Kernel
-        latency = sr_exchange_pt2pt(size, iter_count, kernel_size, 1/*use_async*/);
-        mp_barrier();
-        if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
-
+            //Put Async + Kernel
+            latency = sr_exchange_rdma(size, iter_count, kernel_size, 1/*use_async*/);
+            mp_barrier();
+            if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency /*, prepost_latency */);
+        }
 #endif
-        //MPI
-        latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/);
-        mp_barrier();
-        if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
 
-        //MPI + Kernel
-        latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, kernel_size);
-        mp_barrier();
-        if (!my_rank) fprintf(stdout, "\t   %8.2lf \n", latency /*, prepost_latency */);
-
+        if (!my_rank) fprintf(stdout, "\n");
         if (!my_rank && validate) fprintf(stdout, "SendRecv test passed validation with message size: %d \n", size);
 
         MP_CHECK(mp_window_destroy(&put_win));
-        MP_CHECK(mp_unregister_regions(1, &preg[0]));
         MP_CHECK(mp_unregister_regions(1, &sreg[0]));
         MP_CHECK(mp_unregister_regions(1, &rreg[0]));
+        MP_CHECK(mp_unregister_regions(1, &preg[0]));
+
         mp_cleanup_acks_rdma();
+        mp_cleanup_acks_rdma_async();
 
 #ifdef HAVE_CUDA
         if(use_gpu_buffers == 0)
         {
             CUDA_CHECK(cudaFreeHost(sbuf_d));
             CUDA_CHECK(cudaFreeHost(rbuf_d));
+            CUDA_CHECK(cudaFreeHost(put_buf));
         }
         else
         {
             CUDA_CHECK(cudaFree(sbuf_d));
             CUDA_CHECK(cudaFree(rbuf_d));            
+            CUDA_CHECK(cudaFree(put_buf));
         }
 #else
         free(sbuf_d);
         free(rbuf_d);
+        free(put_buf);
 #endif
 
         free(buf);
+
+        if (size == 1) size=0;
     }
 
 

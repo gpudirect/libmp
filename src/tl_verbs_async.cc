@@ -365,7 +365,7 @@ int TL::Verbs_Async::verbs_post_send(verbs_client_async_t client, verbs_request_
 			goto out;
 		}
 	} else {
-		if(no_wait == 1 && async == 1) req->status = MP_COMPLETE;
+		if(no_wait == 1 && async == 1 ) req->status = MP_COMPLETE;
 	}
 	out:
 	return ret;
@@ -497,6 +497,7 @@ int TL::Verbs_Async::createEndpoints() {
 		ib_qp_init_attr.cap.max_recv_wr  = ib_rx_depth;
 		ib_qp_init_attr.cap.max_send_sge = ib_max_sge;
 		ib_qp_init_attr.cap.max_recv_sge = ib_max_sge;
+		ib_qp_init_attr.sq_sig_all = 0;
 
 		//create QP, set to INIT state and exchange QPN information
 		if (verbs_enable_ud) {
@@ -1090,6 +1091,7 @@ int TL::Verbs_Async::onesided_nb_put (void *buf, int size, mp_region_t *mp_reg, 
 		ret = MP_FAILURE;
 		goto out;
 	}
+	//printf("displ (%d) < window->rsize[%d](%d)\n", displ, client_id, window->rsize[client_id]);
 	assert(displ < window->rsize[client_id]);
 
 	req = verbs_new_request(client, MP_RDMA, MP_PENDING_NOWAIT);
@@ -1172,7 +1174,7 @@ int TL::Verbs_Async::setup_sublayer(int par1)
 	else
 	{
 		CUDA_CHECK(cudaSetDevice(gpu_id));
-		mp_dbg_msg(oob_rank, "Using gpu_id %d\n", gpu_id);
+		mp_warn_msg(oob_rank, "Using gpu_id %d\n", gpu_id);
 		//LibGDSync issue #18
 		cudaFree(0);					
 	}
@@ -1196,8 +1198,11 @@ int TL::Verbs_Async::pt2pt_nb_send_async(void * buf, size_t size, int peer, mp_r
         assert(req);
 
 		ret = verbs_fill_send_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client->ah, client->qpn);
-		if (ret) goto out;
-
+		if (ret)
+		{
+		    mp_err_msg(oob_rank, "verbs_fill_send_request failed\n");
+			goto out;
+		}
 
         client->last_posted_trigger_id[verbs_type_to_flow((mp_req_type_t)req->type)] = req->id;
 
@@ -1232,8 +1237,11 @@ int TL::Verbs_Async::pt2pt_nb_send_async(void * buf, size_t size, int peer, mp_r
         mp_dbg_msg(oob_rank, "req=%p id=%d\n", req, req->id);
 
 		ret = verbs_fill_send_request(buf, size, peer, reg, (uintptr_t) req, &(req->in.sr), &(req->sg_entry), client->ah, client->qpn);
-		if (ret) goto out;
-
+		if (ret)
+		{
+		    mp_err_msg(oob_rank, "verbs_fill_send_request\n");
+			goto out;
+		}
 		ret = verbs_post_send(client, req, stream, 1, 2, 0);
 		if (ret) {
 			mp_err_msg(oob_rank, "verbs_post_send failed: %s \n", strerror(ret));
@@ -1244,7 +1252,12 @@ int TL::Verbs_Async::pt2pt_nb_send_async(void * buf, size_t size, int peer, mp_r
 	*mp_req = (mp_request_t) req; 
 
 	out:
-		if (ret && req) verbs_release_request((verbs_request_async_t) req);
+		if (ret && req)
+		{
+		    mp_err_msg(oob_rank, "ret & req\n");
+			verbs_release_request((verbs_request_async_t) req);
+		}
+
 		return ret;
 }
 
@@ -1850,11 +1863,14 @@ int TL::Verbs_Async::wait_async(mp_request_t *mp_req, asyncStream stream)
 
 int TL::Verbs_Async::wait_all_async(int count, mp_request_t *mp_req, asyncStream stream)
 {
-    int i, ret = 0;
+    int i, ret = MP_SUCCESS;
     CHECK_GPU(gpu_id);
 
     if (!count)
+    {
+        mp_err_msg(oob_rank, "Num requests: %d\n", count);
         return MP_FAILURE;
+    }
 
     if (use_event_sync)
     {
@@ -1918,7 +1934,7 @@ int TL::Verbs_Async::wait_all_async(int count, mp_request_t *mp_req, asyncStream
             mp_dbg_msg(oob_rank, "posting wait cq req=%p id=%d\n", req, req->id);
 
             if (!verbs_req_can_be_waited(req)) {
-                mp_dbg_msg(oob_rank, "cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
+                mp_warn_msg(oob_rank, "cannot wait req:%p status:%d id=%d peer=%d type=%d flags=%08x\n", req, req->status, req->id, req->peer, req->type, req->flags);
                 ret = EINVAL;
                 goto out;
             }

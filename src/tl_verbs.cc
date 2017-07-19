@@ -516,6 +516,7 @@ int TL::Verbs::createEndpoints() {
 		ib_qp_init_attr.cap.max_recv_wr  = ib_rx_depth;
 		ib_qp_init_attr.cap.max_send_sge = ib_max_sge;
 		ib_qp_init_attr.cap.max_recv_sge = ib_max_sge;
+    ib_qp_init_attr.sq_sig_all = 0;
 
 		//create QP, set to INIT state and exchange QPN information
 		if (verbs_enable_ud) {

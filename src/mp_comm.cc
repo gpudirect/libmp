@@ -192,10 +192,19 @@ static uint32_t   	* local_ack_values;
 static uint32_t   	* remote_ack_values;
 static mp_region_t  * remote_ack_values_reg;
 
-int mp_prepare_acks_rdma()
+static mp_request_t * ack_request;
+static int num_ack_reqs=0;
+static int current_ack_req=0;
+
+int mp_prepare_acks_rdma(int numAcks)
 {
 	MP_CHECK_COMM_OBJ();
 	assert(oob_size);
+	if(numAcks <= 0)
+	{
+		mp_err_msg(oob_rank, "numAcks: %d\n", numAcks);
+		return MP_FAILURE;
+	}
 
 	// init ready stuff
 	size_t ack_table_size = MAX(sizeof(*local_ack_table) * oob_size, PAGE_SIZE);
@@ -229,6 +238,9 @@ int mp_prepare_acks_rdma()
 	MP_CHECK(mp_window_create(local_ack_table, ack_table_size, &local_ack_table_win));
 	mp_dbg_msg(oob_rank, "creating local_ack_table window\n");
 
+	num_ack_reqs=numAcks;
+	ack_request = mp_create_request(num_ack_reqs);
+	assert(ack_request);
 	ack_rdma=1;
 
 	return MP_SUCCESS;
@@ -236,32 +248,64 @@ int mp_prepare_acks_rdma()
 
 int mp_send_ack_rdma(int dst_rank)
 {
-	mp_request_t * ack_request;
 	assert(ack_rdma);
 
 	MP_CHECK_COMM_OBJ();
 	assert(dst_rank < oob_size);
 	assert(dst_rank != oob_rank);
 	assert(local_ack_table_win);
-	ack_request = mp_create_request(1);
+	if(num_ack_reqs <= 0)
+	{
+		mp_err_msg(oob_rank, "num_ack_reqs: %d\n", num_ack_reqs);
+		return MP_FAILURE;
+	}
+
+	if(current_ack_req >= num_ack_reqs)
+	{
+		mp_err_msg(oob_rank, "Current ACK (%d) > Tot Acks (%d). Need to flush!\n", current_ack_req, num_ack_reqs);
+		return MP_FAILURE;
+	}
+
 	assert(ack_request);
 
 	int remote_offset = oob_rank * sizeof(uint32_t);
-	mp_dbg_msg(oob_rank, "dest_rank=%d payload=%x remote_offset=%d\n", dst_rank, remote_ack_values[dst_rank], remote_offset);
+	mp_dbg_msg(oob_rank, "dest_rank=%d payload=%x remote_offset=%d\n", 
+												dst_rank, remote_ack_values[dst_rank], remote_offset);
 
 	MP_CHECK(mp_iput(&remote_ack_values[dst_rank], sizeof(uint32_t), &remote_ack_values_reg[0], dst_rank, remote_offset, 
-						&local_ack_table_win, &ack_request[0], MP_PUT_INLINE)); 
+						&local_ack_table_win, &ack_request[current_ack_req], MP_PUT_INLINE | MP_PUT_NOWAIT)); 
 	
-	//MP_PUT_NOWAIT will full the Send Queue! Why?
-	MP_CHECK(mp_wait(&ack_request[0]));
+	//mp_dbg_msg(oob_rank, "waiting for mp_wait\n");
+	//MP_CHECK(mp_wait(&ack_request[current_ack_req]));
+	//printf("send ack, current_ack_req: %d\n", current_ack_req);
+	current_ack_req=(current_ack_req+1)%num_ack_reqs;
+
 	//atomic_inc
 	__sync_fetch_and_add(&remote_ack_values[dst_rank], 1);
 	//++ACCESS_ONCE(*ptr);
 	iomb();
-	free(ack_request);
+//	free(ack_request);
 
 	return MP_SUCCESS;
 }
+
+int mp_flush_ack_rdma()
+{
+	assert(ack_rdma);
+	assert(ack_request);
+
+	MP_CHECK_COMM_OBJ();
+
+	if(current_ack_req == 0)
+		return MP_SUCCESS;
+
+	printf("waitall, current_ack_req: %d\n", current_ack_req);
+	MP_CHECK(mp_wait_all(current_ack_req, ack_request));
+
+	current_ack_req=0;
+	return MP_SUCCESS;
+}
+
 
 int mp_wait_ack_rdma(int src_rank)
 {

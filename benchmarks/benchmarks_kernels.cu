@@ -56,6 +56,8 @@ int gpu_launch_calc_kernel(size_t size, int gpu_num_sm, cudaStream_t stream)
             CUDA_CHECK(cudaMemset((void *)in, 1, size));
             CUDA_CHECK(cudaMemset((void *)out, 1, size));
         }
+//        printf("nblocks: %d, over_sub_factor: %d, gpu_num_sm: %d, nthreads: %d\n", 
+  //              nblocks, over_sub_factor, gpu_num_sm, nthreads);
         calc_kernel<<<nblocks, nthreads, 0, stream>>>(n, 1.0f, in, out);
         CUDA_CHECK(cudaGetLastError());
         return 0;
