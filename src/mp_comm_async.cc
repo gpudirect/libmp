@@ -407,3 +407,146 @@ int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptor
 	return tl_comm->descriptors_queue_post_async(stream, pdq, flags);
 
 }
+
+// ========================================================== SYNC ACK FACILITY ==========================================================
+static int ack_rdma=0;
+static int ack_pt2pt=0;
+
+// ---------------------------------------------------------- RDMA ----------------------------------------------------------
+// tables are indexed by rank, not peer
+static uint32_t   	* local_ack_table;
+static mp_region_t  * local_ack_table_reg;
+static mp_window_t 	local_ack_table_win;
+
+static uint32_t   	* local_ack_values;
+static uint32_t   	* remote_ack_values;
+static mp_region_t  * remote_ack_values_reg;
+
+static mp_request_t * ack_request;
+static int num_ack_reqs=0;
+static int current_ack_req=0;
+
+int mp_prepare_acks_rdma_async(int numAcks)
+{
+	MP_CHECK_COMM_OBJ();
+	assert(oob_size);
+	assert(numAcks);
+	num_ack_reqs=0;
+	// init ready stuff
+	size_t ack_table_size = MAX(sizeof(*local_ack_table) * oob_size, PAGE_SIZE);
+
+	posix_memalign((void **)&local_ack_table, PAGE_SIZE, ack_table_size);
+	assert(local_ack_table);
+
+	local_ack_values = (uint32_t *)malloc(ack_table_size);
+	assert(local_ack_values);
+
+	posix_memalign((void **)&remote_ack_values, PAGE_SIZE, ack_table_size);
+	assert(remote_ack_values);
+
+	for (int i=0; i<oob_size; ++i) {
+	    local_ack_table[i] = 0;  // remotely written table
+	    local_ack_values[i] = 1; // locally expected value
+	    remote_ack_values[i] = 1; // value to be sent remotely
+	}
+	iomb();
+
+	local_ack_table_reg = mp_create_regions(1);
+	assert(local_ack_table_reg);
+	MP_CHECK(mp_register_region_buffer(local_ack_table, ack_table_size, &local_ack_table_reg[0]));
+	mp_dbg_msg(oob_rank, "registering local_ack_table size=%d\n", ack_table_size);
+
+	remote_ack_values_reg = mp_create_regions(1);
+	assert(remote_ack_values_reg);
+	MP_CHECK(mp_register_region_buffer(remote_ack_values, ack_table_size, &remote_ack_values_reg[0]));
+	mp_dbg_msg(oob_rank, "registering remote_ack_table\n");
+
+	MP_CHECK(mp_window_create(local_ack_table, ack_table_size, &local_ack_table_win));
+	mp_dbg_msg(oob_rank, "creating local_ack_table window\n");
+
+	ack_request = mp_create_request(num_ack_reqs);
+
+	ack_rdma=1;
+
+	return MP_SUCCESS;
+}
+
+int mp_send_ack_rdma_async(int dst_rank, cudaStream_t ackStream)
+{
+	mp_request_t * ack_request;
+	assert(ack_rdma);
+
+	MP_CHECK_COMM_OBJ();
+	assert(dst_rank < oob_size);
+	assert(dst_rank != oob_rank);
+	assert(local_ack_table_win);
+	ack_request = mp_create_request(1);
+	assert(ack_request);
+
+	int remote_offset = oob_rank * sizeof(uint32_t);
+	mp_dbg_msg(oob_rank, "dest_rank=%d payload=%x remote_offset=%d\n", dst_rank, remote_ack_values[dst_rank], remote_offset);
+
+	MP_CHECK(mp_iput_async(&remote_ack_values[dst_rank], sizeof(uint32_t), &remote_ack_values_reg[0], dst_rank, remote_offset, 
+						&local_ack_table_win, &ack_request[current_ack_req], MP_PUT_INLINE, ackStream)); 
+	
+	//MP_PUT_NOWAIT will full the Send Queue! Why?
+	//atomic_inc
+	__sync_fetch_and_add(&remote_ack_values[dst_rank], 1);
+	//++ACCESS_ONCE(*ptr);
+	iomb();
+	free(ack_request);
+
+	return MP_SUCCESS;
+}
+
+int mp_wait_ack_rdma_async(int src_rank, cudaStream_t ackStream)
+{
+	assert(ack_rdma);
+	MP_CHECK_COMM_OBJ();
+	assert(src_rank < oob_size);
+	assert(src_rank != oob_rank);
+	mp_dbg_msg(oob_rank, "src_rank=%d payload=%x\n", src_rank, local_ack_values[src_rank]);
+	MP_CHECK(mp_wait_word_async(&(local_ack_table[src_rank]), local_ack_values[src_rank], MP_WAIT_GEQ, ackStream));
+	local_ack_values[src_rank]++;
+	return MP_SUCCESS;
+}
+
+int mp_sync_ack_rdma_async()
+{
+	assert(ack_rdma);
+	assert(ack_request);
+
+	MP_CHECK_COMM_OBJ();
+	assert(src_rank < oob_size);
+	assert(src_rank != oob_rank);
+
+	if(current_ack_req == 0)
+		return MP_SUCCESS;
+
+	MP_CHECK(mp_wait_all_async(current_ack_req, ack_request));
+
+	current_ack_req=0;
+	return MP_SUCCESS;
+}
+
+int mp_cleanup_acks_rdma_async()
+{
+	assert(ack_rdma);
+
+	if(local_ack_table_reg)
+		MP_CHECK(mp_unregister_regions(1, local_ack_table_reg));
+	
+	if(remote_ack_values_reg)
+		MP_CHECK(mp_unregister_regions(1, remote_ack_values_reg));
+	
+	if(local_ack_table_win)
+		MP_CHECK(mp_window_destroy(&local_ack_table_win));
+	
+	if(local_ack_table)
+		free(local_ack_table);
+
+	if(remote_ack_values)
+		free(remote_ack_values);
+
+	return MP_SUCCESS;
+}

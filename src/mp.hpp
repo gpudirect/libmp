@@ -172,6 +172,11 @@ int mp_comm_descriptors_queue_add_wait_value32(mp_comm_descriptors_queue_t *dq, 
 int mp_comm_descriptors_queue_add_write_value32(mp_comm_descriptors_queue_t *dq, uint32_t *ptr, uint32_t value);
 int mp_comm_descriptors_queue_post_async(cudaStream_t stream, mp_comm_descriptors_queue_t *dq, int flags);
 
+int mp_prepare_acks_rdma_async(int numAcks);
+int mp_send_ack_rdma_async(int dst_rank, cudaStream_t ackStream);
+int mp_wait_ack_rdma_async(int src_rank, cudaStream_t ackStream);
+int mp_sync_ack_rdma_async();
+int mp_cleanup_acks_rdma_async();
 //================================== ASYNC KERNEL DESCRIPTOR =================================================
 #ifndef MP_DESCR_KERNEL_H
 #define MP_DESCR_KERNEL_H

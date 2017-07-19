@@ -54,13 +54,16 @@ volatile uint32_t tracking_event = 0;
 int use_gpu_buffers=0;
 
 /* application and pack buffers */
-void *buf = NULL, *sbuf_d = NULL, *rbuf_d = NULL;
+void *buf = NULL, *sbuf_d = NULL, *rbuf_d = NULL, *put_buf=NULL;
 size_t buf_size; 
 
 /* MP specific objects */
 mp_request_t *sreq = NULL;
 mp_request_t *rreq = NULL;
-mp_region_t * sreg, * rreg; 
+mp_request_t *preq = NULL;
+
+mp_region_t * sreg, * rreg, * preg;
+mp_window_t put_win;
 /* MPI specific objects */
 MPI_Request * sreq_mpi;
 MPI_Request * rreq_mpi;
@@ -196,7 +199,7 @@ void post_work_async (int size, int batch_index, double kernel_size)
     #endif
 }
 
-double sr_exchange(int size, int iter_count, double kernel_size, int use_async)
+double sr_exchange_pt2pt(int size, int iter_count, double kernel_size, int use_async)
 {
     double latency, prepost_latency, time_start, time_stop;
     int j, batch_count, wait_send_batch = 0, wait_recv_batch = 0;
@@ -264,6 +267,120 @@ double sr_exchange(int size, int iter_count, double kernel_size, int use_async)
     return latency;
 }
 
+void wait_put (int batch_index) 
+{
+    int j;
+    int req_idx = batch_to_sreq_idx (batch_index); 
+
+    for (j=0; j<steps_per_batch; j++) {
+        MP_CHECK(mp_wait(&preq[req_idx + j]));
+    }
+}
+
+void post_work_rdma_sync (int size, int batch_index, double kernel_size) 
+{
+    int j;
+    int rreq_idx = batch_to_rreq_idx (batch_index);
+    int sreq_idx = batch_to_sreq_idx (batch_index);
+
+    for (j=0; j<steps_per_batch; j++) {
+    if (!my_rank) { 
+ //           MP_CHECK(mp_wait(&rreq[rreq_idx + j]));
+            MP_CHECK(mp_wait_ack_rdma(!myRank));
+
+            #ifdef HAVE_CUDA
+                if (kernel_size > 0) {
+                    if (use_calc_size > 0)
+                        gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
+                    else
+                        gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
+                    CUDA_CHECK(cudaStreamSynchronize(stream));
+                }
+            #endif
+            MP_CHECK(mp_iput ((void *)((uintptr_t)sbuf_d), size, &preg[0], peer, size, &put_win, &preq[j], 0)); 
+//            MP_CHECK(mp_isend ((void *)((uintptr_t)sbuf_d), size, peer, &sreg[0], &sreq[sreq_idx + j]));
+    } else {
+            MP_CHECK(mp_iput ((void *)((uintptr_t)sbuf_d), size, &preg[0], peer, size, &put_win, &preq[j], 0)); 
+            MP_CHECK(mp_wait_ack_rdma(!myRank));
+
+//            MP_CHECK(mp_isend ((void *)((uintptr_t)sbuf_d), size, peer, &sreg[0], &sreq[sreq_idx + j]));
+  //          MP_CHECK(mp_wait(&rreq[rreq_idx + j]));
+
+            #ifdef HAVE_CUDA
+                if (kernel_size > 0) {
+                    if (use_calc_size > 0)
+                        gpu_launch_calc_kernel(kernel_size, gpu_num_sm, stream);
+                    else
+                        gpu_launch_dummy_kernel(kernel_size, clockrate, stream);
+                    CUDA_CHECK(cudaStreamSynchronize(stream));
+                }
+            #endif
+        }
+    }
+}
+
+
+void post_work_rdma_async (int size, int batch_index, double kernel_size) { }
+
+double sr_exchange_rdma(int size, int iter_count, double kernel_size, int use_async)
+{
+    double latency, prepost_latency, time_start, time_stop;
+    int j, batch_count, wait_send_batch = 0, wait_recv_batch = 0;
+
+    assert((iter_count%steps_per_batch) == 0);
+    batch_count = iter_count/steps_per_batch;
+    tracking_event = 0;
+
+    mp_barrier();
+
+    time_start = MPI_Wtime();
+
+    for (j=0; (j<batches_inflight) && (j<batch_count); j++) { 
+
+        if (use_async) { 
+            post_work_rdma_async (size, j, kernel_size);
+        } else {               
+            post_work_rdma_sync (size, j, kernel_size);
+       }
+    }
+
+    time_stop = MPI_Wtime();
+    prepost_latency = ((time_stop - time_start)*1e6);
+    time_start = MPI_Wtime();
+
+    wait_send_batch = wait_recv_batch = 0;
+    while (wait_send_batch < batch_count) { 
+        if (use_async) {
+//            wait_arck();
+//            wait_recv (wait_recv_batch);
+            wait_recv_batch++;
+        }
+
+        wait_put (wait_send_batch);
+        wait_send_batch++;
+
+        if (j < batch_count) { 
+            if (use_async) { 
+                post_work_async (size, j, kernel_size);
+            } else {
+                post_work_sync (size, j, kernel_size);
+            }
+        }
+
+       j++;
+    }
+
+    mp_barrier();
+
+    time_stop = MPI_Wtime();
+    latency = (((time_stop - time_start)*1e6 + prepost_latency)/(iter_count));
+
+#ifdef HAVE_CUDA
+    CUDA_CHECK(cudaDeviceSynchronize());
+#endif
+
+    return latency;
+}
 void post_recv_mpi (int size, int batch_index)
 {
     int j;
@@ -504,8 +621,10 @@ int main (int argc, char *argv[])
     /*allocating requests*/
     sreq = mp_create_request(steps_per_batch*batches_inflight);
     rreq = mp_create_request(steps_per_batch*(batches_inflight + 1));
+    preq = mp_create_request(steps_per_batch*batches_inflight);
     sreg = mp_create_regions(1);
     rreg = mp_create_regions(1);
+    preg = mp_create_regions(1);
 
     sreq_mpi = (MPI_Request *) calloc(steps_per_batch*batches_inflight, sizeof(MPI_Request));
     rreq_mpi = (MPI_Request *) calloc(steps_per_batch*(batches_inflight + 1), sizeof(MPI_Request));
@@ -557,6 +676,9 @@ int main (int argc, char *argv[])
 
                 CUDA_CHECK(cudaMallocHost((void **)&rbuf_d, buf_size));
                 memset(rbuf_d, 0, buf_size);   
+
+                CUDA_CHECK(cudaMallocHost((void **)&put_buf, buf_size));
+                memset(put_buf, 0, buf_size); 
             }
             else
             {
@@ -565,31 +687,43 @@ int main (int argc, char *argv[])
 
                 CUDA_CHECK(cudaMalloc((void **)&rbuf_d, buf_size));
                 CUDA_CHECK(cudaMemset(rbuf_d, 0, buf_size)); 
+
+                CUDA_CHECK(cudaMalloc((void **)&put_buf, buf_size));
+                CUDA_CHECK(cudaMemset(put_buf, 0, buf_size)); 
             }
         #else
             sbuf_d = (void*) calloc(buf_size, sizeof(char));
             rbuf_d = (void*) calloc(buf_size, sizeof(char));
+            put_buf = (void*) calloc(buf_size, sizeof(char));
         #endif
 
         MP_CHECK(mp_register_region_buffer(sbuf_d, buf_size, &sreg[0]));
         MP_CHECK(mp_register_region_buffer(rbuf_d, buf_size, &rreg[0]));
+        MP_CHECK(mp_register_region_buffer(put_buf, buf_size, &preg[0]));
+        MP_CHECK(mp_window_create(put_buf, buf_size, &put_win));
 
         if (!my_rank) fprintf(stdout, "%10d", size);
 
+        MP_CHECK(mp_prepare_acks_rdma());
+
         // =================== WARMUP ===================
-        latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
+        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
         mp_barrier();
 
 #ifdef HAVE_GDSYNC
-        latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
+        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
         mp_barrier();
 #endif
+
+        latency = sr_exchange_rdma(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
+        mp_barrier();
+
         latency = sr_exchange_MPI(MPI_COMM_WORLD, size, iter_count, 0/*kernel_size*/);
         mp_barrier();
 
         // =================== Benchmarks ===================
         //LibMP Sync
-        latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
+        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 0/*use_async*/);
         mp_barrier();
      
         if (use_calc_size) kernel_size = calc_size; 
@@ -599,19 +733,19 @@ int main (int argc, char *argv[])
         if (!my_rank) fprintf(stdout, "\t   %8.2lf", latency);
 
         //LibMP Sync + Kernel
-        latency = sr_exchange(size, iter_count, kernel_size, 0/*use_async*/);
+        latency = sr_exchange_pt2pt(size, iter_count, kernel_size, 0/*use_async*/);
         mp_barrier();
         if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
 
 #ifdef HAVE_GDSYNC
 
         //LibMP Async
-        latency = sr_exchange(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
+        latency = sr_exchange_pt2pt(size, iter_count, 0/*kernel_size*/, 1/*use_async*/);
         mp_barrier();
         if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
 
         //LibMP Async + Kernel
-        latency = sr_exchange(size, iter_count, kernel_size, 1/*use_async*/);
+        latency = sr_exchange_pt2pt(size, iter_count, kernel_size, 1/*use_async*/);
         mp_barrier();
         if (!my_rank) fprintf(stdout, "\t   %8.2lf ", latency /*, prepost_latency */);
 
@@ -628,8 +762,11 @@ int main (int argc, char *argv[])
 
         if (!my_rank && validate) fprintf(stdout, "SendRecv test passed validation with message size: %d \n", size);
 
+        MP_CHECK(mp_window_destroy(&put_win));
+        MP_CHECK(mp_unregister_regions(1, &preg[0]));
         MP_CHECK(mp_unregister_regions(1, &sreg[0]));
         MP_CHECK(mp_unregister_regions(1, &rreg[0]));
+        mp_cleanup_acks_rdma();
 
 #ifdef HAVE_CUDA
         if(use_gpu_buffers == 0)
@@ -657,6 +794,7 @@ int main (int argc, char *argv[])
 
     free(sreq);
     free(rreq);
+    free(preq);
 
     mp_barrier();
     mp_finalize();
