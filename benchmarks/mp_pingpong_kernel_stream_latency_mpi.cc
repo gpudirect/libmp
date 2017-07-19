@@ -434,6 +434,7 @@ double sr_exchange_rdma(int size, int iter_count, double kernel_size, int use_as
 
     return latency;
 }
+
 void post_recv_mpi (int size, int batch_index)
 {
     int j;
