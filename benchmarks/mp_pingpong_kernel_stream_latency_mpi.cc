@@ -326,15 +326,6 @@ void post_work_rdma_sync (int size, int batch_index, double kernel_size)
     }
 }
 
-void wait_put_async(int batch_index) 
-{
-    int j;
-    int req_idx = batch_to_sreq_idx (batch_index); 
-    for (j=0; j<steps_per_batch; j++) {
-        MP_CHECK(mp_wait_async(&preq[req_idx + j], stream));
-    }
-}
-
 void post_work_rdma_async (int size, int batch_index, double kernel_size)
 {
     #ifdef HAVE_GDSYNC
