@@ -761,8 +761,9 @@ int main (int argc, char *argv[])
         MP_CHECK(mp_window_create(put_buf, buf_size, &put_win));
 
         MP_CHECK(mp_prepare_acks_rdma(steps_per_batch*batches_inflight));
+#ifdef HAVE_GDSYNC        
         MP_CHECK(mp_prepare_acks_rdma_async(steps_per_batch*batches_inflight));
-
+#endif
 
         if (!my_rank) fprintf(stdout, "%10d", size);
 
@@ -887,8 +888,10 @@ int main (int argc, char *argv[])
         MP_CHECK(mp_unregister_regions(1, &preg[0]));
 
         mp_cleanup_acks_rdma();
+#ifdef HAVE_GDSYNC
         mp_cleanup_acks_rdma_async();
-
+#endif
+        
 #ifdef HAVE_CUDA
         if(use_gpu_buffers == 0)
         {
