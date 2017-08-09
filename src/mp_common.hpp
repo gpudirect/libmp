@@ -263,6 +263,10 @@ typedef cudaStream_t asyncStream;
 
 #else
     #define KERNEL_DESCRIPTOR_SEM void
+    typedef void * mp_kernel_desc_wait_t;
+    typedef void * mp_kernel_desc_send_t;
+    typedef void mp_kernel_semaphore;
+    typedef void * mp_kernel_semaphore_t;
 #endif
 
 #else
