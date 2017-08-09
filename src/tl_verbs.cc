@@ -891,7 +891,7 @@ int TL::Verbs::finalize() {
         assert(clients[i].qp);
         ret = ibv_destroy_qp(clients[i].qp);
         if (ret) {
-            mp_err_msg(oob_rank, "error %d in destroy_qp\n", ret);
+            mp_err_msg(oob_rank, "error %d in destroy_qp client %d\n", ret, i);
             retcode = ret;
         }
 
@@ -899,20 +899,26 @@ int TL::Verbs::finalize() {
         assert(clients[i].send_cq);
         ret = ibv_destroy_cq(clients[i].send_cq);
         if (ret) {
-            mp_err_msg(oob_rank, "error %d in destroy_cq send_cq\n", ret);
+            mp_err_msg(oob_rank, "error %d in destroy_cq send_cq client %d\n", ret, i);
             retcode = ret;
         }
 
         assert(clients[i].recv_cq);
         ret = ibv_destroy_cq(clients[i].recv_cq);
         if (ret) {
-            mp_err_msg(oob_rank, "error %d in destroy_cq recv_cq\n", ret);
+            mp_err_msg(oob_rank, "error %d in destroy_cq recv_cq client %d\n", ret, i);
             retcode = ret;
         }
-
-
+      
+        if (verbs_enable_ud && clients[i].ah) {
+          ret = ibv_destroy_ah(clients[i].ah);
+          if (ret) {
+              mp_err_msg(oob_rank, "error %d in ibv_destroy_ah client %d\n", ret, i);
+              retcode = ret;
+          }
+        }
         //free(clients[i]);
-	}
+  }
 
 	ibv_dealloc_pd (ib_ctx->pd);
 	ibv_close_device (ib_ctx->context);
