@@ -13,7 +13,7 @@ TEST_NAME=$3
 
 export PATH=$PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
-export PREFIX=$HOME/libmp
+export PREFIX_LIBMP=$HOME/libmp
 OMPI_params="$OMPI_params --mca btl openib,self"
 OMPI_params="$OMPI_params --mca btl_openib_want_cuda_gdr 1"
 OMPI_params="$OMPI_params --mca btl_openib_warn_default_gid_prefix 0"
@@ -29,7 +29,7 @@ OMPI_params="$OMPI_params -x MP_BENCH_STEPS_PER_BATCH -x MP_BENCH_BATCHES_INFLIG
 OMPI_params="$OMPI_params -x MP_BENCH_SIZE -x MP_BENCH_USE_CALC_SIZE=0 -x MP_PINGPONG_TYPE=0"
 OMPI_params=""
 
-GDR_COPY_LIB=$PREFIX/lib/libgdrapi.so
+GDR_COPY_LIB=$PREFIX_LIBMP/lib/libgdrapi.so
 MVAPICH_params="$MVAPICH_params -genv MV2_USE_CUDA 1 -genv MV2_USE_GPUDIRECT 1 -genv MV2_GPUDIRECT_GDRCOPY_LIB $GDR_COPY_LIB -genv MV2_CUDA_IPC 0 "
 MVAPICH_params="$MVAPICH_params -genv MV2_USE_SHARED_MEM 0 -genv MV2_SMP_USE_CMA 0 "
 MVAPICH_params="$MVAPICH_params -genv MV2_CUDA_BLOCK_SIZE 16777216 -genv MV2_GPUDIRECT_LIMIT 16777216 -genv MV2_USE_GPUDIRECT_RECEIVE_LIMIT 16777216"
