@@ -37,7 +37,7 @@
 #define MP_DEFAULT 0
 
 #define OOB_SUCCESS 0
-#define OOB_FAILURE	1
+#define OOB_FAILURE     1
 
 #define MAX_PEERS 50
 
@@ -50,50 +50,50 @@
 #endif
 
 typedef enum {
-    MP_CHAR=0,
-    MP_BYTE,
-    MP_INT,
-    MP_LONG,
-    MP_FLOAT,
-    MP_DOUBLE
+        MP_CHAR=0,
+        MP_BYTE,
+        MP_INT,
+        MP_LONG,
+        MP_FLOAT,
+        MP_DOUBLE
 } mp_data_type;
 
 typedef enum mp_state {
-    MP_UNDEF,
-    MP_PREPARED,       // req just prepared
-    MP_PENDING_NOWAIT, // req posted, but not wait-for-end pending yet
-    MP_PENDING,        // req posted and wait is pending
-    // MP_WAIT_POSTED,
-    MP_COMPLETE,
-    MP_N_STATES
+        MP_UNDEF,
+MP_PREPARED,       // req just prepared
+MP_PENDING_NOWAIT, // req posted, but not wait-for-end pending yet
+MP_PENDING,        // req posted and wait is pending
+// MP_WAIT_POSTED,
+MP_COMPLETE,
+MP_N_STATES
 } mp_state_t ;
 
 typedef enum mp_req_type {
-    MP_NULL = 0,
-    MP_SEND,
-    MP_RECV,
-    MP_RDMA,
-    MP_N_TYPES
+        MP_NULL = 0,
+        MP_SEND,
+        MP_RECV,
+        MP_RDMA,
+        MP_N_TYPES
 } mp_req_type_t;
 
 typedef enum mp_flow {
-    TX_FLOW, // requests associated with tx_cq
-    RX_FLOW, // same for rx_cq
-    N_FLOWS
+TX_FLOW, // requests associated with tx_cq
+RX_FLOW, // same for rx_cq
+N_FLOWS
 } mp_flow_t;
 
 #ifndef MP_FLAGS_H
 #define MP_FLAGS_H
 enum mp_put_flags {
-    MP_PUT_INLINE  = 1<<0,
-    MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
+        MP_PUT_INLINE  = 1<<0,
+MP_PUT_NOWAIT  = 1<<1, // don't generate a CQE, req cannot be waited for
 };
 
 
 enum mp_wait_flags {
-    MP_WAIT_GEQ = 0,
-    MP_WAIT_EQ,
-    MP_WAIT_AND
+        MP_WAIT_GEQ = 0,
+        MP_WAIT_EQ,
+        MP_WAIT_AND
 };
 #endif
 
@@ -113,7 +113,7 @@ typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 
 #ifndef ACCESS_ONCE
 #define ACCESS_ONCE(V)                          \
-    (*(volatile typeof (V) *)&(V))
+(*(volatile typeof (V) *)&(V))
 #endif
 
 #ifndef MIN
@@ -121,46 +121,46 @@ typedef struct mp_kernel_wait_desc * mp_kernel_wait_desc_t;
 #endif
 
 #define mp_dbg_msg(RANK, FMT, ARGS...)  do {                                  \
-    if (mp_dbg_is_enabled)  {                                            \
+if (mp_dbg_is_enabled)  {                                            \
         fprintf(stderr, "[MP DBG] (%d-%d) %s() "                       \
                 FMT, getpid(),  RANK, __FUNCTION__ , ## ARGS); \
         fflush(stderr);                                                 \
-    }                                                                   \
+}                                                                   \
 } while(0)
 
 #define mp_warn_msg(RANK, FMT, ARGS...) do {                                  \
-        if (mp_warn_is_enabled) {                                        \
-            fprintf(stderr, "[MP WARN] (%d-%d) %s() "                   \
-                    FMT, getpid(), RANK, __FUNCTION__ , ## ARGS); \
-            fflush(stderr);                                             \
-        }                                                               \
-    } while(0)
+if (mp_warn_is_enabled) {                                        \
+    fprintf(stderr, "[MP WARN] (%d-%d) %s() "                   \
+            FMT, getpid(), RANK, __FUNCTION__ , ## ARGS); \
+    fflush(stderr);                                             \
+}                                                               \
+} while(0)
 
 
 
 #define mp_info_msg(RANK, FMT, ARGS...) do {                                  \
-        fprintf(stderr, "[MP INFO] (%d-%d) %s() "                       \
-                FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
-        fflush(stderr);                                                 \
-    } while(0)
+fprintf(stderr, "[MP INFO] (%d-%d) %s() "                       \
+        FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
+fflush(stderr);                                                 \
+} while(0)
 
 #define mp_err_msg(RANK, FMT, ARGS...)  do {                                  \
-        fprintf(stderr, "[MP ERROR] (%d-%d) %s() "                       \
-                FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
-        fflush(stderr);                                                 \
-    } while(0)
+fprintf(stderr, "[MP ERROR] (%d-%d) %s() "                       \
+        FMT, getpid(), RANK, __FUNCTION__ , ## ARGS);  \
+fflush(stderr);                                                 \
+} while(0)
 
 
 typedef uint64_t us_t;
 static inline us_t mp_get_cycles()
 {
-    struct timespec ts;
-    int ret = clock_gettime(CLOCK_MONOTONIC, &ts);
-    if (ret) {
-        mp_err_msg(0, "error in gettime %d/%s\n", errno, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    return (us_t)ts.tv_sec * 1000 * 1000 + (us_t)ts.tv_nsec / 1000;
+        struct timespec ts;
+        int ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+        if (ret) {
+                mp_err_msg(0, "error in gettime %d/%s\n", errno, strerror(errno));
+                exit(EXIT_FAILURE);
+        }
+        return (us_t)ts.tv_sec * 1000 * 1000 + (us_t)ts.tv_nsec / 1000;
 }
 
 #pragma once
@@ -187,12 +187,12 @@ static void arch_cpu_relax(void)
 static void wmb(void) __attribute__((unused)) ;
 static void wmb(void) 
 {
-    asm volatile("sync") ; 
+        asm volatile("sync") ; 
 }
 static void rmb(void) __attribute__((unused)) ;
 static void rmb(void) 
 {
-    asm volatile("sync") ; 
+        asm volatile("sync") ; 
 }
 
 #else
@@ -211,25 +211,25 @@ static void rmb(void)
 
 #define CUDA_CHECK(stmt)                                \
 do {                                                    \
-    cudaError_t result = (stmt);                        \
-    if (cudaSuccess != result) {                        \
-        fprintf(stderr, "[%s] [%d] cuda failed with %s \n",   \
-         __FILE__, __LINE__, cudaGetErrorString(result));\
-        exit(-1);                                       \
-    }                                                   \
-    assert(cudaSuccess == result);                      \
+        cudaError_t result = (stmt);                        \
+        if (cudaSuccess != result) {                        \
+                fprintf(stderr, "[%s] [%d] cuda failed with %s \n",   \
+                       __FILE__, __LINE__, cudaGetErrorString(result));\
+                exit(-1);                                       \
+        }                                                   \
+        assert(cudaSuccess == result);                      \
 } while (0)
 
 
 #define CU_CHECK(stmt)                                  \
 do {                                                    \
-    CUresult result = (stmt);                           \
-    if (CUDA_SUCCESS != result) {                       \
-        fprintf(stderr, "[%s] [%d] cu failed with %d \n",    \
-         __FILE__, __LINE__, result);    \
-        exit(-1);                                       \
-    }                                                   \
-    assert(CUDA_SUCCESS == result);                     \
+        CUresult result = (stmt);                           \
+        if (CUDA_SUCCESS != result) {                       \
+                fprintf(stderr, "[%s] [%d] cu failed with %d \n",    \
+                       __FILE__, __LINE__, result);    \
+                exit(-1);                                       \
+        }                                                   \
+        assert(CUDA_SUCCESS == result);                     \
 } while (0)
 
 //#include <cudaProfiler.h>
@@ -237,36 +237,36 @@ typedef cudaStream_t asyncStream;
 #define CUDA_DEVICE_INT __device__ int
 
 #if defined(HAVE_GDSYNC)
-    #include <gdsync/device.cuh>
-    #define KERNEL_DESCRIPTOR_SEM gdsync::isem32_t
+#include <gdsync/device.cuh>
+#define KERNEL_DESCRIPTOR_SEM gdsync::isem32_t
 
-    #ifndef MP_DESCR_KERNEL_H
-        #define MP_DESCR_KERNEL_H
-        
-        typedef struct mp_kernel_desc_send {
-            gdsync::isem32_t dbrec;
-            gdsync::isem64_t db;
-        } mp_kernel_desc_send;
-        typedef mp_kernel_desc_send * mp_kernel_desc_send_t;
+#ifndef MP_DESCR_KERNEL_H
+#define MP_DESCR_KERNEL_H
 
-        typedef struct mp_kernel_desc_wait {
-            gdsync::wait_cond_t sema_cond;
-            gdsync::isem32_t sema;
-            gdsync::isem32_t flag;
-        } mp_kernel_desc_wait;
-        typedef mp_kernel_desc_wait * mp_kernel_desc_wait_t;
+typedef struct mp_kernel_desc_send {
+    gdsync::isem32_t dbrec;
+    gdsync::isem64_t db;
+} mp_kernel_desc_send;
+typedef mp_kernel_desc_send * mp_kernel_desc_send_t;
 
-        typedef gdsync::isem32_t mp_kernel_semaphore;
-        typedef mp_kernel_semaphore * mp_kernel_semaphore_t;
+typedef struct mp_kernel_desc_wait {
+    gdsync::wait_cond_t sema_cond;
+    gdsync::isem32_t sema;
+    gdsync::isem32_t flag;
+} mp_kernel_desc_wait;
+typedef mp_kernel_desc_wait * mp_kernel_desc_wait_t;
 
-    #endif
+typedef gdsync::isem32_t mp_kernel_semaphore;
+typedef mp_kernel_semaphore * mp_kernel_semaphore_t;
+
+#endif
 
 #else
-    #define KERNEL_DESCRIPTOR_SEM void
-    typedef void * mp_kernel_desc_wait_t;
-    typedef void * mp_kernel_desc_send_t;
-    typedef void mp_kernel_semaphore;
-    typedef void * mp_kernel_semaphore_t;
+#define KERNEL_DESCRIPTOR_SEM void
+typedef void * mp_kernel_desc_wait_t;
+typedef void * mp_kernel_desc_send_t;
+typedef void mp_kernel_semaphore;
+typedef void * mp_kernel_semaphore_t;
 #endif
 
 #else

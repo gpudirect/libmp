@@ -5,9 +5,9 @@
 #include <infiniband/verbs_exp.h>
 
 enum verbs_wait_flags {
-    VERBS_WAIT_GEQ = 0,
-    VERBS_WAIT_EQ,
-    VERBS_WAIT_AND,
+        VERBS_WAIT_GEQ = 0,
+        VERBS_WAIT_EQ,
+        VERBS_WAIT_AND,
 };
 
 struct verbs_cq {
@@ -28,45 +28,45 @@ typedef struct ibv_exp_send_wr verbs_send_wr;
 
 /*exchange info*/
 typedef struct {
-    uint16_t lid;
-    uint32_t psn;
-    uint32_t qpn;
+        uint16_t lid;
+        uint32_t psn;
+        uint32_t qpn;
 } qpinfo_t;
 
 /*IB resources*/
 typedef struct {
-    struct ibv_context *context;
-    struct ibv_pd      *pd;
+        struct ibv_context *context;
+        struct ibv_pd      *pd;
 } ib_context_t;
 
 
 struct verbs_region : mp_region {
-    uint32_t key;
-    struct ibv_mr *mr;
+        uint32_t key;
+        struct ibv_mr *mr;
 };
 typedef struct verbs_region * verbs_region_t;
 
 struct verbs_window : mp_window {
-   void **base_ptr;
-   int size;
-   struct verbs_region *reg;
-   uint32_t lkey;
-   uint32_t *rkey;
-   uint64_t *rsize;
+        void **base_ptr;
+        int size;
+        struct verbs_region *reg;
+        uint32_t lkey;
+        uint32_t *rkey;
+        uint64_t *rsize;
 };
 typedef struct verbs_window * verbs_window_t;
 
 typedef struct mem_region {
-  void *region;
-  struct mem_region *next;
+        void *region;
+        struct mem_region *next;
 } mem_region_t;
 
 typedef uint64_t us_t;
 
 typedef struct {
-  void *base_addr;
-  uint32_t rkey;
-  int size;
+        void *base_addr;
+        uint32_t rkey;
+        int size;
 } exchange_win_info;
 
 #endif

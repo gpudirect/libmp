@@ -5,20 +5,20 @@
 
 namespace OOB
 {
-    class Communicator {
-	    public:	 
-			Communicator(){};
-			virtual ~Communicator()=0;
-	        virtual int init(int argc, char *argv[])=0;
-	      	virtual int getSize()=0;
-	        virtual int getMyId()=0;
-	        virtual int finalize()=0;
-   	        virtual void barrier()=0;
-   	        virtual double time()=0;
-   	        virtual int abort(int errCode)=0;
-			virtual int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)=0;
-			virtual int allgather(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)=0;
-    };
+        class Communicator {
+        public:      
+                Communicator(){};
+                virtual ~Communicator()=0;
+                virtual int init(int argc, char *argv[])=0;
+                virtual int getSize()=0;
+                virtual int getMyId()=0;
+                virtual int finalize()=0;
+                virtual void barrier()=0;
+                virtual double time()=0;
+                virtual int abort(int errCode)=0;
+                virtual int alltoall(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)=0;
+                virtual int allgather(void * sBuf, size_t sSize, mp_data_type sType, void * rBuf, size_t rSize, mp_data_type rType)=0;
+        };
 
 }
 

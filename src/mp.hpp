@@ -34,41 +34,40 @@ typedef struct mp_window * mp_window_t;
 #define MP_NONE   -1
 #define MP_DEFAULT 0
 
-#define MP_CHECK(stmt)                                  \
-do {                                                    \
-    int result = (stmt);                                \
-    if (MP_SUCCESS != result) {                         \
-        fprintf(stderr, "[%s:%d] mp call failed \n",    \
-         __FILE__, __LINE__);                           \
-        exit(EXIT_FAILURE);                             \
-    }                                                   \
-    assert(0 == result);                                \
+#define MP_CHECK(stmt)                                                  \
+do {                                                                    \
+        int result = (stmt);                                            \
+        if (MP_SUCCESS != result) {                                       \
+        fprintf(stderr, "[%s:%d] mp call failed \n", __FILE__, __LINE__); \
+        exit(EXIT_FAILURE);                                               \
+        }                                                               \
+        assert(0 == result);                                            \
 } while (0)
 //oob_comm->abort(-1);
 
-#define MP_CHECK_OOB_OBJ()																\
-	if(!oob_comm) {																		\
-		fprintf(stderr, "[%s:%d] OOB object not initialized \n", __FILE__, __LINE__);	\
-		exit(EXIT_FAILURE);																\
-	}
+#define MP_CHECK_OOB_OBJ()                                                                                                                              \
+if(!oob_comm) {                                                                                                                                         \
+        fprintf(stderr, "[%s:%d] OOB object not initialized \n", __FILE__, __LINE__);   \
+        exit(EXIT_FAILURE);                                                                                                                             \
+}
 
-#define MP_CHECK_TL_OBJ()																\
-	if(!tl_comm) {																		\
-		fprintf(stderr, "[%s:%d] TL object not initialized \n", __FILE__, __LINE__);	\
-		oob_comm->abort(-1);					                						\
-		exit(EXIT_FAILURE);																\
-	}
+#define MP_CHECK_TL_OBJ()                                                                                                                               \
+if(!tl_comm) {                                                                                                                                          \
+        fprintf(stderr, "[%s:%d] TL object not initialized \n", __FILE__, __LINE__);    \
+        oob_comm->abort(-1);                                                                                                    \
+        exit(EXIT_FAILURE);                                                                                                                             \
+}
 
-#define MP_CHECK_COMM_OBJ()		\
-	MP_CHECK_OOB_OBJ();			\
-	MP_CHECK_TL_OBJ();
+#define MP_CHECK_COMM_OBJ()             \
+MP_CHECK_OOB_OBJ();                     \
+MP_CHECK_TL_OBJ();
 
 #define MP_API_MAJOR_VERSION    3
 #define MP_API_MINOR_VERSION    0
 #define MP_API_VERSION          ((MP_API_MAJOR_VERSION << 16) | MP_API_MINOR_VERSION)
 
 #define MP_API_VERSION_COMPATIBLE(v) \
-    ( ((((v) & 0xffff0000U) >> 16) == MP_API_MAJOR_VERSION) &&   \
+( ((((v) & 0xffff0000U) >> 16) == MP_API_MAJOR_VERSION) &&   \
       ((((v) & 0x0000ffffU) >> 0 ) >= MP_API_MINOR_VERSION) )
 
 //===== INFO
