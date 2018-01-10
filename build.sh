@@ -16,7 +16,7 @@ if [ ! -e Makefile ]; then
         --prefix=$PREFIX_LIBMP \
         --with-libibverbs=/usr \
         --with-cuda=$CUDA \
-        --with-libgdsync=$PREFIX_LIBMP \
+        --with-libgdsync=$PREFIX_LIBGDSYNC \
         --with-mpi=$MPI_HOME \
         --enable-tests
 fi

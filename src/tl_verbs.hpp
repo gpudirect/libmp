@@ -12,7 +12,6 @@ struct verbs_request : mp_request {
         int trigger;
         int id;
         int flags;
-        int flags;
         union
         {
                 struct ibv_recv_wr rr;
