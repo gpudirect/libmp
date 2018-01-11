@@ -46,7 +46,6 @@ mp_putget_SOURCES = mp_putget.cc
 if HAVE_GDSYNC
 mp_sendrecv_async_SOURCES = mp_sendrecv_async.cc
 mp_putget_async_SOURCES = mp_putget_async.cc
-mp_sendrecv_kernel_SOURCES = mp_sendrecv_kernel.cu
 endif
 
 SUFFIXES= .cu
@@ -55,4 +54,13 @@ SUFFIXES= .cu
 	$(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -c -o $@ $<
 
 .cu.lo:
-	$(LIBTOOL) --tag=CC --mode=compile $(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -o $@ -c $< $(NVCCLDFLAGS)
+	$(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -o $@ -c $< $(NVCCLDFLAGS)
+
+# ====================================================================================
+# Libtool not working with C++ & CUDA files: 
+# --tag=CXX ignored, AM_V_CCLD instead of AM_V_CXXLD in build/examples/Makefile
+# AM_V_CCLD is empty because this is a C++ project
+# ====================================================================================
+# mp_sendrecv_kernel_SOURCES = mp_sendrecv_kernel.cu
+#$(LIBTOOL) --tag=CXX --mode=compile
+# ====================================================================================

@@ -38,23 +38,25 @@ endif
 
 SRC_LIST += src/oob.cc src/oob_mpi.cc src/tl.cc
 
+# ------------------------
+if HAVE_VERBS
+
+SRC_LIST += src/tl_verbs.cc
+
+# --------------
 if HAVE_GDSYNC
 
 SRC_LIST += src/tl_verbs_async.cc
 
-else
-
-if HAVE_VERBS
-
-SRC_LIST += src/tl_verbs.cc
+endif
+# --------------
 
 else
 
 SRC_LIST += src/tl_psm2.cc
 
 endif
-
-endif
+# ------------------------
 
 lib_LTLIBRARIES = src/libmp.la
 

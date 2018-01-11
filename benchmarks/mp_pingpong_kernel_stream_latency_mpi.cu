@@ -28,15 +28,12 @@
 
 #include "mp_common_benchmarks.hpp"
 #include <mpi.h>
+#include <mp.hpp>
+
 #if defined(HAVE_CUDA) || defined(HAVE_GDSYNC)
-    #include "benchmarks_kernels.hpp"
     cudaStream_t stream;
     double clockrate=0;
     int gpu_num_sm;
-#else
-    //NVTX Profiler Utility
-    #define PUSH_RANGE(name,cid)
-    #define POP_RANGE
 #endif
 
 #define MAX_SIZE 1*1024*1024 
@@ -73,7 +70,6 @@ mp_window_t put_win;
 /* MPI specific objects */
 MPI_Request * sreq_mpi;
 MPI_Request * rreq_mpi;
-
 
 int batch_to_rreq_idx (int batch_idx) { 
      return (batch_idx % (batches_inflight + 1))*steps_per_batch;

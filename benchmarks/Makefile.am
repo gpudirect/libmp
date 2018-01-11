@@ -31,9 +31,9 @@ endif
 # ==== BIN ====
 bin_PROGRAMS = mp_pingpong_kernel_stream_latency_mpi
 
-if HAVE_GDSYNC
+#if HAVE_GDSYNC
 #bin_PROGRAMS += benchmarks_kernels
-endif
+#endif
 
 noinst_PROGRAMS = 
 
@@ -41,11 +41,7 @@ CCLD=$(MPICXX)
 CXXLD=$(MPICXX)
 
 # ==== SRC ====
-mp_pingpong_kernel_stream_latency_mpi_SOURCES = mp_pingpong_kernel_stream_latency_mpi.cc
-
-if HAVE_CUDA
-mp_pingpong_kernel_stream_latency_mpi_SOURCES += benchmarks_kernels.cu
-endif
+#mp_pingpong_kernel_stream_latency_mpi_SOURCES = mp_pingpong_kernel_stream_latency_mpi.cc
 
 SUFFIXES= .cu
 
@@ -53,4 +49,13 @@ SUFFIXES= .cu
 	$(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -c -o $@ $<
 
 .cu.lo:
-	$(LIBTOOL) --tag=CC --mode=compile $(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -o $@ -c $< $(NVCCLDFLAGS) $(AM_LDFLAGS)
+	$(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -o $@ -c $< $(NVCCLDFLAGS)
+
+# ====================================================================================
+# Libtool not working with C++ & CUDA files: 
+# --tag=CXX ignored, AM_V_CCLD instead of AM_V_CXXLD in build/examples/Makefile
+# AM_V_CCLD is empty because this is a C++ project
+# ====================================================================================
+# mp_pingpong_kernel_stream_latency_mpi_SOURCES += benchmarks_kernels.cu
+#$(LIBTOOL) --tag=CXX --mode=compile
+# ====================================================================================

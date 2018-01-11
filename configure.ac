@@ -151,5 +151,11 @@ AM_CONDITIONAL(HAVE_VERBS, [ test x$want_libibverbs = xyes ])
 AM_CONDITIONAL(HAVE_GDSYNC, [ test x$want_libgdsync = xyes ])
 AM_CONDITIONAL(HAVE_MPI, [ test x$want_mpi = xyes ])
 
+AC_MSG_NOTICE([Final configuration: ])
+AC_MSG_NOTICE([HAVE_CUDA = $want_cuda ])
+AC_MSG_NOTICE([HAVE_VERBS = $want_libibverbs ])
+AC_MSG_NOTICE([HAVE_GDSYNC = $want_libgdsync ])
+AC_MSG_NOTICE([HAVE_MPI = $want_mpi ])
+
 AC_CONFIG_FILES([Makefile libmp.spec examples/Makefile benchmarks/Makefile])
 AC_OUTPUT
