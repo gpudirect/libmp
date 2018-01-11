@@ -5,7 +5,7 @@ if [ "$#" -ne 3 ]; then
     exit 1
 fi
 
-[ ! -e "hostfile" ] 	&& { echo "ERROR: missing hostfile";  exit 1; }
+[ ! -e "hostfile" ] && { echo "ERROR: missing hostfile";  exit 1; }
 
 NP=$1
 GPUBUF=$2
@@ -13,7 +13,7 @@ TEST_NAME=$3
 
 export PATH=$PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
-export PREFIX_LIBMP=$HOME/libmp
+#export PREFIX=$HOME/libmp
 OMPI_params="$OMPI_params --mca btl openib,self"
 OMPI_params="$OMPI_params --mca btl_openib_want_cuda_gdr 1"
 OMPI_params="$OMPI_params --mca btl_openib_warn_default_gid_prefix 0"
@@ -27,9 +27,9 @@ OMPI_params="$OMPI_params -x MP_BENCH_ENABLE_DEBUG -x MP_BENCH_ENABLE_VALIDATION
 OMPI_params="$OMPI_params -x MP_BENCH_COMM_COMP_RATIO -x MP_BENCH_CALC_SIZE -x MP_BENCH_USE_CALC_SIZE"
 OMPI_params="$OMPI_params -x MP_BENCH_STEPS_PER_BATCH -x MP_BENCH_BATCHES_INFLIGHT -x MP_ENABLE_UD"
 OMPI_params="$OMPI_params -x MP_BENCH_SIZE -x MP_BENCH_USE_CALC_SIZE=0 -x MP_PINGPONG_TYPE=0"
-OMPI_params=""
+#OMPI_params=""
 
-GDR_COPY_LIB=$PREFIX_LIBMP/lib/libgdrapi.so
+GDR_COPY_LIB=$PREFIX/lib/libgdrapi.so
 MVAPICH_params="$MVAPICH_params -genv MV2_USE_CUDA 1 -genv MV2_USE_GPUDIRECT 1 -genv MV2_GPUDIRECT_GDRCOPY_LIB $GDR_COPY_LIB -genv MV2_CUDA_IPC 0 "
 MVAPICH_params="$MVAPICH_params -genv MV2_USE_SHARED_MEM 0 -genv MV2_SMP_USE_CMA 0 "
 MVAPICH_params="$MVAPICH_params -genv MV2_CUDA_BLOCK_SIZE 16777216 -genv MV2_GPUDIRECT_LIMIT 16777216 -genv MV2_USE_GPUDIRECT_RECEIVE_LIMIT 16777216"
@@ -43,10 +43,10 @@ MVAPICH_params="$MVAPICH_params -genv MP_BENCH_ENABLE_DEBUG 0 -genv MP_BENCH_ENA
 #MVAPICH_params="$MVAPICH_params -genv MP_BENCH_STEPS_PER_BATCH -genv MP_BENCH_BATCHES_INFLIGHT -genv MP_ENABLE_UD"
 #MVAPICH_params="$MVAPICH_params -genv MP_BENCH_SIZE"
 
-#MVAPICH_params=""
+MVAPICH_params=""
 
 set -x
-$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile $HOME/libmp/scripts/wrapper.sh $HOME/libmp/bin/$TEST_NAME
+$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile $PREFIX/scripts/wrapper.sh $PREFIX/bin/$TEST_NAME
 
 #-verbose
 #nvprof -o nvprof-singlestream.%q{MV2_COMM_WORLD_LOCAL_RANK}.nvprof
