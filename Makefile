@@ -12,18 +12,18 @@ gdrcopy:
 ifeq ($(GDRCOPY_BUILD), 1)
 	make -C gdrcopy PREFIX=$(PREFIX) DESTLIB=$(PREFIX)/lib clean all install
 else
-	$(GDRCopy not built)
+	echo "GDRCopy not built"
 endif
 
 libgdsync:
 ifeq ($(GDSYNC_BUILD), 1)
 	cd libgdsync && ./build.sh
 else
-	$(LibGDSync not built)
+	echo "LibGDSync not built"
 endif
 
 libmp:
-	./build.sh $(CUDA_ENABLE) $(GDSYNC_ENABLE) $(MPI_PATH)
+	./build.sh $(CUDA_ENABLE) $(GDSYNC_ENABLE) $(MPI_ENABLE)
 
 clean:
 	make -C gdrcopy clean && \
