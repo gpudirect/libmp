@@ -8,18 +8,32 @@
 
 cd build
 
-#export PREFIX_LIBMP=$HOME/libmp
+CUDA_PATH=$1
+GDSYNC_PATH=$2
+MPI_PATH=$3
+
+if [[ -z $CUDA_PATH ]]; then
+	CUDA_PATH="no"
+fi
+
+if [[ -z $GDSYNC_PATH ]]; then
+	GDSYNC_PATH="no"
+fi
+
+if [[ -z $MPI_PATH ]]; then
+	MPI_PATH="no"
+fi
 
 if [ ! -e Makefile ]; then
     echo "configuring..."
-    $PREFIX_LIBMP/configure \
-        --prefix=$PREFIX_LIBMP \
+
+    $PREFIX/configure \
+        --prefix=$PREFIX \
         --with-libibverbs=/usr \
-        --with-cuda=$CUDA \
-        --with-libgdsync=$PREFIX_LIBGDSYNC \
-        --with-mpi=$MPI_HOME \
+        --with-cuda=$CUDA_PATH \
+        --with-libgdsync=$GDSYNC_PATH \
+        --with-mpi=$MPI_PATH \
         --enable-tests
 fi
-#--with-libgdsync=$PREFIX_LIBMP \
 
 make clean all install

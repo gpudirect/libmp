@@ -45,7 +45,7 @@ if test "x$with_cuda" != "x" && test -d $with_cuda; then
     AC_SUBST( GPU_ARCH, [${gpu_arch}] )
 
     CUDA_CFLAGS="$CUDA_CFLAGS -arch=${gpu_arch} -I$CUDA_PATH/include"
-    CUDA_LDFLAGS="-L$CUDA_INSTALL_PATH/lib64"
+    CUDA_LDFLAGS="-L$CUDA_PATH/lib64 -L$CUDA_PATH/lib"
     CUDA_LIBS="-lcuda -lcudart -lcufft"
 
 else
@@ -103,7 +103,7 @@ elif test "x$with_mpi" != "x" && test -d $with_mpi; then
         MPI_LDFLAGS="$MPI_LDFLAGS -L$MPI_HOME/lib"
 else
     want_mpi=no
-    AC_MSG_NOTICE([MPI not enabled or MPI dir does not exist.])
+    AC_MSG_NOTICE([MPI not enabled or MPI dir does not exist ("$with_mpi").])
 fi
 
 
