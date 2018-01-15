@@ -20,7 +20,6 @@ int dbg_enabled()
         if (env) {
             int en = atoi(env);
             dbg_is_enabled = !!en;
-            printf("COMM_ENABLE_DEBUG=%s\n", env);
         } else
             dbg_is_enabled = 0;
     }
@@ -30,7 +29,7 @@ int dbg_enabled()
 #define DBG(FMT, ARGS...)                                           \
 do {                                                                \
     if (dbg_enabled()) {                                            \
-        fprintf(stderr, "[%d] [%d] HPGMG %s(): " FMT,               \
+        fprintf(stderr, "[%d] [%d] COMM DBG %s(): " FMT,               \
                 getpid(), mpi_comm_rank, __FUNCTION__ , ## ARGS);   \
         fflush(stderr);                                             \
     }                                                               \
@@ -200,13 +199,13 @@ int comm_init(MPI_Comm comm, int gpuId)
 
     // init ready stuff
     size_t table_size = MAX(sizeof(*ready_table) * comm_size, PAGE_SIZE);
-    posix_memalign((void **)&ready_table, PAGE_SIZE, table_size);
+    assert(0 == posix_memalign((void **)&ready_table, PAGE_SIZE, table_size));
     assert(ready_table);
 
     ready_values = (uint32_t *)malloc(table_size);
     assert(ready_values);
 
-    posix_memalign((void **)&remote_ready_values, PAGE_SIZE, table_size);
+    assert(0 == posix_memalign((void **)&remote_ready_values, PAGE_SIZE, table_size));
     assert(remote_ready_values);
     
     for (i=0; i<comm_size; ++i) {
@@ -216,7 +215,7 @@ int comm_init(MPI_Comm comm, int gpuId)
     }
     iomb();
 
-    DBG("registering ready_table size=%d\n", table_size);
+    DBG("registering ready_table size=%zd\n", table_size);
     MP_CHECK(mp_register(ready_table, table_size, &ready_table_reg));
     DBG("creating ready_table window\n");
     MP_CHECK(mp_window_create(ready_table, table_size, &ready_table_win));
@@ -238,6 +237,9 @@ static size_t comm_size_of_mpi_type(MPI_Datatype mpi_type)
 
     if (mpi_type == MPI_DOUBLE) {
         ret = sizeof(double);
+    }
+    if (mpi_type == MPI_FLOAT) {
+        ret = sizeof(float);
     }
     else if (mpi_type == MPI_CHAR) {
         ret = sizeof(char);
@@ -297,12 +299,13 @@ int comm_send_ready_on_stream(int rank, comm_request_t *creq, cudaStream_t strea
     mp_request_t *req = (mp_request_t*)creq;
     assert(req);
     int remote_offset = /*self rank*/comm_rank * sizeof(uint32_t);
-    DBG("dest_rank=%d payload=%x offset=%d\n", rank, remote_ready_values[rank], remote_offset);
+    DBG("dest_rank=%d/%d payload=%x offset=%d\n", rank, peer, remote_ready_values[rank], remote_offset);
     MP_CHECK(mp_iput_on_stream(&remote_ready_values[rank], sizeof(uint32_t), &remote_ready_values_reg, 
                                peer, remote_offset, &ready_table_win, req, MP_PUT_INLINE | MP_PUT_NOWAIT, stream));
     //MP_CHECK(mp_wait(req));
     //comm_track_request(req);
     atomic_inc(&remote_ready_values[rank]);
+    return ret;
 }
 
 int comm_send_ready(int rank, comm_request_t *creq)
@@ -320,6 +323,7 @@ int comm_send_ready(int rank, comm_request_t *creq)
     //MP_CHECK(mp_wait(req));
     //comm_track_request(req);
     atomic_inc(&remote_ready_values[rank]);
+    return ret;
 }
 
 int comm_wait_ready_on_stream(int rank, cudaStream_t stream)
@@ -430,7 +434,7 @@ int comm_irecv(void *recv_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
     assert(req);
     int peer = comm_mpi_rank_to_peer(src_rank);
 
-    DBG("src_rank=%d peer=%d nbytes=%d buf=%p *reg=%p\n", src_rank, peer, nbytes, recv_buf, *reg);
+    DBG("src_rank=%d peer=%d nbytes=%zd buf=%p *reg=%p\n", src_rank, peer, nbytes, recv_buf, *reg);
 
     if (!size) {
         ret = -EINVAL;
@@ -470,7 +474,7 @@ int comm_isend_on_stream(void *send_buf, size_t size, MPI_Datatype type, comm_re
     mp_request_t *req = (mp_request_t*)creq;
     int peer = comm_mpi_rank_to_peer(dest_rank);
 
-    DBG("dest_rank=%d peer=%d nbytes=%d\n", dest_rank, peer, nbytes);
+    DBG("dest_rank=%d peer=%d nbytes=%zd\n", dest_rank, peer, nbytes);
 
     if (!size) {
         ret = -EINVAL;
@@ -510,7 +514,7 @@ int comm_isend(void *send_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
     mp_request_t *req = (mp_request_t*)creq;
     int peer = comm_mpi_rank_to_peer(dest_rank);
 
-    DBG("dest_rank=%d peer=%d nbytes=%d\n", dest_rank, peer, nbytes);
+    DBG("dest_rank=%d peer=%d nbytes=%zd\n", dest_rank, peer, nbytes);
 
     if (!size) {
         ret = -EINVAL;
@@ -538,12 +542,12 @@ out:
     return ret;
 }
 
-int comm_register(void *buf, size_t size, comm_reg_t *creg)
+int comm_register(void *buf, size_t size, MPI_Datatype type, comm_reg_t *creg)
 {
     assert(comm_initialized);
     int ret = 0;
     int retcode;
-    size_t nbytes = size*comm_size_of_mpi_type(MPI_DOUBLE);
+    size_t nbytes = size * comm_size_of_mpi_type(type);
     mp_reg_t *reg = (mp_reg_t*)creg;
     assert(reg);
 
@@ -744,7 +748,7 @@ int comm_prepare_isend(void *send_buf, size_t size, MPI_Datatype type, comm_reg_
     mp_request_t *req = (mp_request_t*)creq;
     int peer = comm_mpi_rank_to_peer(dest_rank);
 
-    DBG("dest_rank=%d peer=%d nbytes=%d\n", dest_rank, peer, nbytes);
+    DBG("dest_rank=%d peer=%d nbytes=%zd\n", dest_rank, peer, nbytes);
 
     if (!size) {
         ret = -EINVAL;

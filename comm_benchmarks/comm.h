@@ -66,8 +66,8 @@ extern "C" {
                            int dest_rank, comm_request_t *creq);
     int comm_prepare_wait_all(int count, comm_request_t *creqs);
     comm_dev_descs_t comm_prepared_requests();
-    int comm_register(void *buf, size_t size, comm_reg_t *creg);
-        int comm_select_device(int mpiRank);
+    int comm_register(void *buf, size_t size, MPI_Datatype type, comm_reg_t *creg);
+    int comm_select_device(int mpiRank);
 
 #ifdef __cplusplus
 }

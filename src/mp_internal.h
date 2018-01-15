@@ -261,8 +261,8 @@ void release_mp_request(struct mp_request *req);
 
 static inline int req_valid(struct mp_request *req)
 {
-    return (req->type   > MP_NULL  && req->type   < MP_N_TYPES ) && 
-           (req->status > MP_UNDEF && req->status < MP_N_STATES);
+    return (req->type   >= MP_NULL  && req->type   < MP_N_TYPES ) && 
+           (req->status >= MP_UNDEF && req->status < MP_N_STATES);
 }
 
 static inline int req_type_tx(mp_req_type_t type)

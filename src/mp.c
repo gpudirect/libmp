@@ -531,7 +531,7 @@ int mp_wait(mp_request_t *req)
 {
   int ret = 0;
 
-  ret = mp_ (1, req);
+  ret = mp_wait_all(1, req);
 
   return ret;
 }
@@ -649,7 +649,7 @@ int mp_progress_all (uint32_t count, mp_request_t *req_)
     struct mp_request *req = req_[r];
     
     if (!req_valid(req)) {
-        mp_err_msg("invalid req=%p req->id=%d\n", req, req->id);
+        mp_err_msg("invalid req:%p status:%d id=%d peer=%d type=%d, going on anyway\n", req, req->status, req->id, req->peer, req->type);
     }
 
     ret = mp_progress_single_flow(TX_FLOW);
@@ -1756,6 +1756,7 @@ struct mp_request *new_stream_request(client_t *client, mp_req_type_t type, mp_s
   //mp_dbg_msg("new req=%p\n", req);
   if (req) {
       req->peer = client->mpi_rank;
+      req->flags = 0;
       req->sgv = NULL;
       req->next = NULL;
       req->prev = NULL;
@@ -1773,6 +1774,7 @@ void release_mp_request(struct mp_request *req)
   req->next = mp_request_free_list;
   req->prev = NULL;
   req->type = MP_NULL;
+  req->status = MP_UNDEF;
 
   mp_request_free_list = req;
 }
