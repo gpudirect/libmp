@@ -5,6 +5,9 @@ all: checks libs
 checks:
 	@if [ ! -d $(PREFIX) ]; then echo "PREFIX env not defined"; exit; fi;\
 	echo "Using PREFIX=$(PREFIX)"
+	mkdir -p $(PREFIX)/lib
+	mkdir -p $(PREFIX)/include
+	mkdir -p $(PREFIX)/bin
 
 libs: gdrcopy libgdsync libmp
 
@@ -12,14 +15,14 @@ gdrcopy:
 ifeq ($(GDRCOPY_BUILD), 1)
 	make -C gdrcopy PREFIX=$(PREFIX) DESTLIB=$(PREFIX)/lib clean all install
 else
-	echo "GDRCopy not built"
+	@echo "GDRcopy not built"
 endif
 
 libgdsync:
 ifeq ($(GDSYNC_BUILD), 1)
-	cd libgdsync && ./build.sh
+	cp -r libgdsync/include/* include && cd libgdsync && ./build.sh
 else
-	echo "LibGDSync not built"
+	@echo "LibGDSync in $(GDSYNC_ENABLE)"
 endif
 
 libmp:
