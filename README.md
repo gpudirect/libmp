@@ -37,7 +37,7 @@ GDRCOPY_BUILD = 0
 CUDA_ENABLE = no
 ```
 
-### GPUDirect RDMA LibMP configuration
+### Enable GPUDirect RDMA
 
 In file *libmp.mk*:
 ```
@@ -48,7 +48,7 @@ GDRCOPY_BUILD = 0
 CUDA_ENABLE = /path/to/cuda/directory
 ```
 
-### GPUDirect Async LibMP configuration
+### Enable GPUDirect Async
 
 ```
 git submodule init
