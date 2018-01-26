@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-if [ "$#" -ne 3 ]; then
-    echo "Illegal parameters number: <MPI proc num> <GPU Buffers=0:1> </path/test/name>"
+if [ "$#" -ne 4 ]; then
+    echo "Illegal parameters number: <MPI proc num> <GPU Buffers=0:1> <libmp prefix> <test name>"
     exit 1
 fi
 
@@ -9,11 +9,16 @@ fi
 
 NP=$1
 GPUBUF=$2
-TEST_NAME=$3
+PREFIX_LIBMP=$3
+TEST_NAME=$4
+
+[ ! -e $PREFIX_LIBMP/bin/$TEST_NAME ] && { echo "ERROR: test $PREFIX_LIBMP/bin/$TEST_NAME not found";  exit 1; }
+
 
 export PATH=$PATH
+# N.B. PREFIX_LIBMP/lib must be included in LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH
-#export PREFIX=$HOME/libmp
+
 OMPI_params="$OMPI_params --mca btl openib,self"
 OMPI_params="$OMPI_params --mca btl_openib_want_cuda_gdr 1"
 OMPI_params="$OMPI_params --mca btl_openib_warn_default_gid_prefix 0"
@@ -46,7 +51,7 @@ MVAPICH_params="$MVAPICH_params -genv MP_BENCH_ENABLE_DEBUG 0 -genv MP_BENCH_ENA
 MVAPICH_params=""
 
 set -x
-$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile $PREFIX/scripts/wrapper.sh $PREFIX/bin/$TEST_NAME
+$MPI_HOME/bin/mpirun $OMPI_params $MVAPICH_params -np $NP -hostfile hostfile $PREFIX_LIBMP/scripts/wrapper.sh $PREFIX_LIBMP/bin/$TEST_NAME
 
 #-verbose
 #nvprof -o nvprof-singlestream.%q{MV2_COMM_WORLD_LOCAL_RANK}.nvprof
