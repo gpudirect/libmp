@@ -12,11 +12,11 @@ CUDA_PATH=$1
 GDSYNC_PATH=$2
 MPI_ENABLE=$3
 
-if [[ -z $CUDA_PATH ]]; then
+if ( [ -z $CUDA_PATH ] || [ ! -d $CUDA_PATH ] ); then
 	CUDA_PATH="no"
 fi
 
-if [[ -z $GDSYNC_PATH ]]; then
+if ( [ -z $GDSYNC_PATH ] || [ ! -d $GDSYNC_PATH ] ); then
 	GDSYNC_PATH="no"
 fi
 

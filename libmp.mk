@@ -15,7 +15,7 @@ PREFIX = $(HOME)/libmp
 # GDSYNC_ENABLE = "no" otherwise
 # **********************************************************************
 GDSYNC_BUILD = 1
-GDSYNC_ENABLE = $(HOME)/libgdsync
+GDSYNC_ENABLE = $(HOME)/libmp
 
 # **********************************************************************
 # GPUDirect RDMA Copy library configuration
