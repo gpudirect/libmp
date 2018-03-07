@@ -12,7 +12,7 @@
 
 #define MAX_PEERS 10
 #define BUF_SIZE 1024
-#define NUM_ITERS 1024
+#define MAX_ITERS 128
 
 #define CUDA_CHECK(stmt)                                \
 do {                                                    \
@@ -32,7 +32,7 @@ double time_start, time_stop;
 unsigned char * send_buf[MAX_PEERS];
 unsigned char * recv_buf[MAX_PEERS];
 int use_gpu_buffers=0;
-int tot_iters=NUM_ITERS;
+int tot_iters=MAX_ITERS;
 int max_size=BUF_SIZE;
 int validate=0;
 
@@ -119,6 +119,12 @@ int main(int argc, char **argv) {
     value = getenv("TOT_ITERS");
     if (value != NULL) {
         tot_iters = atoi(value);
+        if(tot_iters > MAX_ITERS)
+        {
+            printf("ERROR: max iters number allowed=%d\n", MAX_ITERS);
+            tot_iters = MAX_ITERS;
+        }
+
     }
     
     value = getenv("ENABLE_VALIDATION");
