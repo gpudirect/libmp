@@ -197,7 +197,7 @@ int main(int argc, char **argv) {
     }   
     stop_time = MPI_Wtime();
 
-    tot_time=((stop_time - start_time)*1e6);
+    tot_time=( ((stop_time - start_time)*1e6) / tot_iters);
     if(!my_rank)
         printf("Stats:\n\tIterations: %d\n\tProcs: %d\n\tTotal RTT: %8.2lfusec\n", 
                     tot_iters, comm_size, tot_time);
