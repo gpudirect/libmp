@@ -145,10 +145,7 @@ int main(int argc, char **argv) {
     
     comm_init(MPI_COMM_WORLD, device_id);
 
-    if(!my_rank) 
-        printf("----> async sa=%d, use_gpu_buffers=%d, max_size=%d, tot_iters=%d num peers=%d validate=%d\n", 
-                        comm_use_async()?0:1, use_gpu_buffers, max_size, tot_iters, comm_size, validate);
-
+    
     for(i=0; i<comm_size; i++)
     {
         if(!use_gpu_buffers)
@@ -175,6 +172,10 @@ int main(int argc, char **argv) {
     sreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
     rreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
     
+    if(!my_rank) 
+        printf("----> async sa=%d, use_gpu_buffers=%d, max_size=%d, tot_iters=%d num peers=%d validate=%d\n", 
+                    comm_use_async()?1:0, use_gpu_buffers, max_size, tot_iters, comm_size, validate);
+
     start_time = MPI_Wtime();
     for(iter=0; iter<tot_iters; iter++)
     {

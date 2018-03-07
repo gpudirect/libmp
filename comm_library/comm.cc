@@ -836,7 +836,6 @@ int comm_select_device(int mpiRank)
     char * value = getenv("USE_GPU"); 
     if (value != NULL) {
         gpuId = atoi(value);
-        //DBG("USE_GPU: %d\n", gpuId);
     }
     else
     {
@@ -844,6 +843,8 @@ int comm_select_device(int mpiRank)
         cudaGetDeviceCount(&numDevices);
         gpuId = mpiRank % numDevices;
     }
+
+    DBG("Using GPU ID: %d\n", gpuId);
 
     return gpuId;
 }
