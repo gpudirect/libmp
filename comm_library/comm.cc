@@ -26,36 +26,6 @@ int dbg_enabled()
     return dbg_is_enabled;
 }
 
-#define DBG(FMT, ARGS...)                                           \
-do {                                                                \
-    if (dbg_enabled()) {                                            \
-        fprintf(stderr, "[%d] [%d] COMM DBG %s(): " FMT,               \
-                getpid(), mpi_comm_rank, __FUNCTION__ , ## ARGS);   \
-        fflush(stderr);                                             \
-    }                                                               \
-} while(0)
-
-
-#define MP_CHECK(stmt)                                  \
-do {                                                    \
-    int result = (stmt);                                \
-    if (0 != result) {                                  \
-        fprintf(stderr, "[%s:%d] mp call failed \n",    \
-         __FILE__, __LINE__);                           \
-        exit(-1);                                       \
-    }                                                   \
-    assert(0 == result);                                \
-} while (0)
-
-
-#define comm_err(FMT, ARGS...)  do { fprintf(stderr, "ERR [%d] %s() " FMT, comm_rank, __FUNCTION__ , ## ARGS); fflush(stderr); } while(0)
-
-
-#ifndef MAX
-#define MAX(A,B) ((A)>(B)?(A):(B))
-#endif
-
-#define MAX_RANKS 128
 
 static int         comm_initialized = 0;
 static int         rank_to_peer[MAX_RANKS] = {0,};
@@ -74,10 +44,7 @@ static uint32_t   *ready_values;
 static uint32_t   *remote_ready_values;
 static mp_reg_t    remote_ready_values_reg;
 
-static int startGlobalReqsIndex=0;
-static int startGlobalFlushReqsIndex=0;
-
-#define MAX_REQS 16384 //32768 //1048576
+#define MAX_REQS 16384 //32768
 static mp_request_t reqs[MAX_REQS];
 static int n_reqs = 0;
 
@@ -86,13 +53,12 @@ static int n_reqs = 0;
 #define PAGE_OFF  (PAGE_SIZE-1)
 #define PAGE_MASK (~(PAGE_OFF))
 
+#if defined(__x86_64__) || defined (__i386__)
+
 #define mb()    __asm__ volatile("mfence":::"memory")
 #define rmb()   __asm__ volatile("lfence":::"memory")
 #define wmb()   __asm__ volatile("sfence" ::: "memory")
 #define iomb() mb()
-
-#define ACCESS_ONCE(V)                          \
-    (*(volatile __typeof__ (V) *)&(V))
 
 static inline void arch_pause(void)
 {
@@ -109,6 +75,40 @@ static inline void arch_cpu_relax(void)
         //BUG: poll_lat hangs after a few iterations
         //arch_wait();
 }
+
+
+#elif defined(__powerpc__)
+
+static void mb(void) __attribute__((unused)) ;
+static void mb(void)
+{
+    asm volatile("sync") ;
+}
+
+static void wmb(void) __attribute__((unused)) ;
+static void wmb(void)
+{
+    asm volatile("sync") ;
+}
+static void rmb(void) __attribute__((unused)) ;
+static void rmb(void)
+{
+    asm volatile("sync") ;
+}
+
+#define iomb() mb()
+
+static void arch_cpu_relax(void) __attribute__((unused)) ;
+static void arch_cpu_relax(void)
+{
+}
+
+#else
+#error "platform not supported"
+#endif
+#define ACCESS_ONCE(V)                          \
+    (*(volatile __typeof__ (V) *)&(V))
+
 
 int comm_use_comm()
 {
@@ -191,26 +191,38 @@ int comm_init(MPI_Comm comm, int gpuId)
     }
     n_peers = j;
     assert(comm_size-1 == n_peers);
-    DBG("n_peers=%d\n", n_peers);
+    
 
     //CUDA context initialization
     cudaFree(0);
+    DBG("mp_init(m_peers=%d, gpuId=%d), comm_size=%d\n", n_peers, gpuId, comm_size);
     MP_CHECK(mp_init(comm, peers, n_peers, MP_INIT_DEFAULT, gpuId));
-
+    
     // init ready stuff
     size_t table_size = MAX(sizeof(*ready_table) * comm_size, PAGE_SIZE);
-    assert(0 == posix_memalign((void **)&ready_table, PAGE_SIZE, table_size));
-    assert(ready_table);
 
     ready_values = (uint32_t *)malloc(table_size);
     assert(ready_values);
+    DBG("ready_values (%p, sizeof=%zd) ok\n", ready_values, sizeof(*ready_values));
 
+    //Why does it return NULL pointer without ret != 0???
     assert(0 == posix_memalign((void **)&remote_ready_values, PAGE_SIZE, table_size));
+    //remote_ready_values = (uint32_t *)malloc(table_size);
     assert(remote_ready_values);
+    DBG("remote_ready_values (%p, sizeof=%zd) ok\n", remote_ready_values, sizeof(*remote_ready_values));
+
+    //Why does it return NULL pointer without ret != 0???
+    assert(0 == posix_memalign((void **)&ready_table, PAGE_SIZE, table_size));
+    //ready_table = (uint32_t *)malloc(table_size);
+    assert(ready_table);
+    DBG("ready_table (%p, sizeof=%zd) ok\n", ready_table, sizeof(*ready_table));
     
     for (i=0; i<comm_size; ++i) {
+        //DBG("Setting values for ready_table %d (%p)\n", i, &ready_table[i]);
         ready_table[i] = 0;  // remotely written table
+        //DBG("Setting values for ready_values %d (%p)\n", i, &ready_values[i]);
         ready_values[i] = 1; // locally expected value
+        //DBG("Setting values for remote_ready_values %d (%p)\n", i, &remote_ready_values[i]);
         remote_ready_values[i] = 1; // value to be sent remotely
     }
     iomb();
@@ -238,7 +250,7 @@ static size_t comm_size_of_mpi_type(MPI_Datatype mpi_type)
     if (mpi_type == MPI_DOUBLE) {
         ret = sizeof(double);
     }
-    if (mpi_type == MPI_FLOAT) {
+    else if (mpi_type == MPI_FLOAT) {
         ret = sizeof(float);
     }
     else if (mpi_type == MPI_CHAR) {
@@ -247,8 +259,8 @@ static size_t comm_size_of_mpi_type(MPI_Datatype mpi_type)
     else if (mpi_type == MPI_INT) {
         ret = sizeof(int);
     }
-     else {
-        comm_err("invalid type\n");
+    else {
+        comm_err("invalid type %d\n", mpi_type);
         exit(1);
     }
     return ret;
@@ -301,9 +313,9 @@ int comm_send_ready_on_stream(int rank, comm_request_t *creq, cudaStream_t strea
     int remote_offset = /*self rank*/comm_rank * sizeof(uint32_t);
     DBG("dest_rank=%d/%d payload=%x offset=%d\n", rank, peer, remote_ready_values[rank], remote_offset);
     MP_CHECK(mp_iput_on_stream(&remote_ready_values[rank], sizeof(uint32_t), &remote_ready_values_reg, 
-                               peer, remote_offset, &ready_table_win, req, MP_PUT_INLINE | MP_PUT_NOWAIT, stream));
+                               peer, remote_offset, &ready_table_win, req, MP_PUT_INLINE /* MP_PUT_NOWAIT */, stream));
+    comm_track_request(req);
     //MP_CHECK(mp_wait(req));
-    //comm_track_request(req);
     atomic_inc(&remote_ready_values[rank]);
     return ret;
 }
@@ -425,6 +437,7 @@ int comm_irecv(void *recv_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
                int src_rank, comm_request_t *creq)
 {
     assert(comm_initialized);
+    DBG("start\n");
     int ret = 0;
     int retcode;
     size_t nbytes = size*comm_size_of_mpi_type(type);
@@ -468,6 +481,7 @@ int comm_isend_on_stream(void *send_buf, size_t size, MPI_Datatype type, comm_re
     assert(comm_initialized);
     int ret = 0;
     int retcode;
+    DBG("start\n");
     size_t nbytes = size*comm_size_of_mpi_type(type);
     mp_reg_t *reg = (mp_reg_t*)creg;
     assert(reg);
@@ -508,6 +522,7 @@ int comm_isend(void *send_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
     assert(comm_initialized);
     int ret = 0;
     int retcode;
+    DBG("start\n");
     size_t nbytes = size*comm_size_of_mpi_type(type);
     mp_reg_t *reg = (mp_reg_t*)creg;
     assert(reg);
@@ -542,12 +557,12 @@ out:
     return ret;
 }
 
-int comm_register(void *buf, size_t size, MPI_Datatype type, comm_reg_t *creg)
+int comm_register(void *buf, size_t size, comm_reg_t *creg)
 {
     assert(comm_initialized);
     int ret = 0;
     int retcode;
-    size_t nbytes = size * comm_size_of_mpi_type(type);
+    DBG("start\n");
     mp_reg_t *reg = (mp_reg_t*)creg;
     assert(reg);
 
@@ -559,7 +574,7 @@ int comm_register(void *buf, size_t size, MPI_Datatype type, comm_reg_t *creg)
 
     if (!*reg) {
         DBG("registering buffer %p\n", buf);
-        MP_CHECK(mp_register(buf, nbytes, reg));
+        MP_CHECK(mp_register(buf, size, reg));
     }
 
 out:
@@ -568,11 +583,12 @@ out:
 
 
 static struct comm_dev_descs *pdreqs = NULL;
-static const size_t n_dreqs = 128; //36 prima
+static const size_t n_dreqs = 128;
 static int dreq_idx = 0;
 #define CONST_FLUSH 1024
 #define CONST_PROGRESS 50
 
+//N.B. it can be very expensive with a lot of pending creqs (i.e. HPGMG, 32 ranks)
 int comm_progress()
 {
     int ret=0;
@@ -580,19 +596,7 @@ int comm_progress()
     DBG("n_reqs=%d\n", n_reqs);
     assert(n_reqs < MAX_REQS);
     ret = mp_progress_all(n_reqs, reqs);
-#if 0
-   // if( (startGlobalReqsIndex+CONST_PROGRESS) < n_reqs)
-   // {
-//        if(comm_rank == 0)
- //           printf("progress CONST_PROGRESS da req: startGlobalReqsIndex %d, n_reqs: %d\n", startGlobalReqsIndex, n_reqs);
-        
-        ret = p_progress_all(CONST_PROGRESS, reqs+startGlobalReqsIndex); //*CONST_PROGRESS));
-        if (ret < 0)
-            comm_err("ret=%d\n", ret);
 
-    //    startGlobalReqsIndex = (startGlobalReqsIndex+CONST_PROGRESS)%MAX_REQS; //(startGlobalReqsIndex+1)%MAX_REQS;
-   // }
-#endif
     return ret;
 }
 
@@ -605,11 +609,8 @@ int comm_flush()
         return ret;
 
     assert(n_reqs < MAX_REQS);
-    //int diff = n_reqs - startGlobalFlushReqsIndex;
-    ret = mp_wait_all(n_reqs, reqs); //+startGlobalFlushReqsIndex);
+    ret = mp_wait_all(n_reqs, reqs);
     n_reqs=0;
-    startGlobalReqsIndex=0;
-    startGlobalFlushReqsIndex=0;
 
     return ret;
 }
@@ -742,6 +743,7 @@ int comm_prepare_isend(void *send_buf, size_t size, MPI_Datatype type, comm_reg_
     assert(comm_initialized);
     int ret = 0;
     int retcode;
+    DBG("start\n");
     size_t nbytes = size*comm_size_of_mpi_type(type);
     mp_reg_t *reg = (mp_reg_t*)creg;
     assert(reg);
@@ -775,6 +777,8 @@ int comm_prepare_isend(void *send_buf, size_t size, MPI_Datatype type, comm_reg_
         ret = -1;
         goto unreg;
     }
+
+    DBG("prepares send=%p (%d), rank: %d, %d\n", &dreqs()->tx[(dreqs()->n_tx-1)], dreqs()->n_tx, peer, dest_rank);
 
     comm_track_request(req);
 

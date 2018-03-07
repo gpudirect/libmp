@@ -29,6 +29,36 @@ typedef struct comm_dev_descs *comm_dev_descs_t;
 
 #define COMM_CHECK(stmt) __COMM_CHECK(stmt, #stmt)
 
+#define DBG(FMT, ARGS...)                                           \
+do {                                                                \
+    if (dbg_enabled()) {                                            \
+        fprintf(stderr, "[%d] [%d] COMM DBG %s(): " FMT,               \
+                getpid(), mpi_comm_rank, __FUNCTION__ , ## ARGS);   \
+        fflush(stderr);                                             \
+    }                                                               \
+} while(0)
+
+
+#define MP_CHECK(stmt)                                  \
+do {                                                    \
+    int result = (stmt);                                \
+    if (0 != result) {                                  \
+        fprintf(stderr, "[%s:%d] mp call failed \n",    \
+         __FILE__, __LINE__);                           \
+        exit(-1);                                       \
+    }                                                   \
+    assert(0 == result);                                \
+} while (0)
+
+
+#define comm_err(FMT, ARGS...)  do { fprintf(stderr, "ERR [%d] %s() " FMT, comm_rank, __FUNCTION__ , ## ARGS); fflush(stderr); } while(0)
+
+#ifndef MAX
+#define MAX(A,B) ((A)>(B)?(A):(B))
+#endif
+
+#define MAX_RANKS 128
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,8 +96,9 @@ extern "C" {
                            int dest_rank, comm_request_t *creq);
     int comm_prepare_wait_all(int count, comm_request_t *creqs);
     comm_dev_descs_t comm_prepared_requests();
-    int comm_register(void *buf, size_t size, MPI_Datatype type, comm_reg_t *creg);
+    int comm_register(void *buf, size_t size, comm_reg_t *creg);
     int comm_select_device(int mpiRank);
+
 
 #ifdef __cplusplus
 }
