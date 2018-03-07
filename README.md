@@ -9,14 +9,34 @@ LibMP is a lightweight messaging library built on top of [LibGDSync APIs](https:
 Basic LibMP requirements are:
 - OpenMPI v1.10 or newer
 - Mellanox OFED (MOFED) 4.0 or newer 
-- Mellanox Connect-IB or ConnectX-4 HCAs
-- [LibGDSync requirements](https://github.com/gpudirect/libgdsync#requirements)
+- Mellanox Connect-IB, ConnectX-4 HCAs or newer
+- [LibGDSync](https://github.com/gpudirect/libgdsync#requirements)
 
 To use GPUDirect Async in combination with GPUDirect RDMA:
 - OpenMPI with CUDA support
 - A recent CUDA Toolkit is required, minimally 8.0
 - A recent display driver, i.e. r361, r367 or later, is required
 - The Mellanox OFED GPUDirect RDMA kernel module, https://github.com/Mellanox/nv_peer_memory, is required to allow the HCA to access the GPU memory.
+
+
+## Build
+
+Use the *scripts/env_setup.sh* file to specify MPI_PATH, CUDA_PATH, LIBGDSYNC_PATH and LIBMP_PATH.
+Use the *build.sh* script to build LibMP.
+
+## Run
+
+In *scripts* folder:
+- wrapper.sh: sample script with some topology example
+- test.sh: sample script to test all libmp examples and benchmarks
+
+N.B. you need to create your own hostfile inside *scripts* directory
+
+# Applications using GPUDirect Async by means of LibMP
+
+- [HPGMG-FV Async](https://github.com/e-ago/hpgmg-cuda-async)
+- [CoMD-CUDA Async](https://github.com/e-ago/CoMD-CUDA-Async)
+- [Lulesh2 Async](https://github.com/e-ago/lulesh2-cuda-async)
 
 # Acknowledging LibMP and GPUDirect Async
 
