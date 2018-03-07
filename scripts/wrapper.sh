@@ -11,12 +11,14 @@ shift
 params=$*
 
 extra_params=
+
+#Assuming OpenMPI
 lrank=$OMPI_COMM_WORLD_LOCAL_RANK
 echo "hostname=${HOSTNAME}"
 echo "lrank=$lrank"
 
 case ${HOSTNAME} in
-    *sdgx*)
+    *dgx*)
 	# let's pick:
 	# GPU #0,2,4,6
 	# HCA #0,1,2,3

@@ -21,7 +21,8 @@ To use GPUDirect Async in combination with GPUDirect RDMA:
 
 ## Build
 
-Use the *scripts/env_setup.sh* file to specify MPI_PATH, CUDA_PATH, LIBGDSYNC_PATH and LIBMP_PATH.
+Use the *scripts/env_setup.sh* file to specify MPI_PATH, CUDA_PATH, LIBGDSYNC_PATH and LIBMP_PATH env vars useful for both LibMP and LibGDSync.
+
 Use the *build.sh* script to build LibMP.
 
 ## Run
@@ -32,13 +33,13 @@ In *scripts* folder:
 
 N.B. you need to create your own hostfile inside *scripts* directory
 
-# Applications using GPUDirect Async by means of LibMP
+## Applications using GPUDirect Async by means of LibMP
 
 - [HPGMG-FV Async](https://github.com/e-ago/hpgmg-cuda-async)
 - [CoMD-CUDA Async](https://github.com/e-ago/CoMD-CUDA-Async)
 - [Lulesh2 Async](https://github.com/e-ago/lulesh2-cuda-async)
 
-# Acknowledging LibMP and GPUDirect Async
+## Acknowledging LibMP and GPUDirect Async
 
 If you find this software useful in your work, please cite:
 

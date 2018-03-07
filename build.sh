@@ -6,7 +6,12 @@
 
 [ ! -d build ] && mkdir build
 
+mkdir $PREFIX/bin
+mkdir $PREFIX/include
+mkdir $PREFIX/lib
+
 cd build
+
 
 if [ ! -e Makefile ]; then
     echo "configuring..."

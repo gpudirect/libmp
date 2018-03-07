@@ -27,4 +27,4 @@ src_libmp_la_LDFLAGS = -version-info 2:0:0
 noinst_HEADERS = src/mp_internal.h src/archutils.h
 
 
-SUBDIRS = . examples benchmarks comm_benchmarks
+SUBDIRS = . examples benchmarks comm_library
