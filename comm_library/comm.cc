@@ -142,7 +142,7 @@ int comm_use_gpu_comm()
 {
     static int use_gpu_comm = -1;
     if (-1 == use_gpu_comm) {
-        const char *env = getenv("COMM_USE_GPU_COMM");
+        const char *env = getenv("COMM_USE_ASYNC_KI");
         if (env) {
             use_gpu_comm = !!atoi(env);
             printf("WARNING: %s GPU-initiated communications\n", (use_gpu_comm)?"enabling":"disabling");
@@ -156,7 +156,7 @@ int comm_use_async()
 {
     static int use_async = -1;
     if (-1 == use_async) {
-        const char *env = getenv("COMM_USE_ASYNC");
+        const char *env = getenv("COMM_USE_ASYNC_SA");
         if (env) {
             use_async = !!atoi(env);
             printf("WARNING: %s GPUDirect Async for communications\n", (use_async)?"enabling":"disabling");
