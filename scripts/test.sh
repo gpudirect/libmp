@@ -6,12 +6,14 @@ if [[ $# -ne 2 ]]; then
 fi
 
 NP=$1
-shift 1
-TEST=$@
+TEST=$2
+shift 2
+PARAMS=$@
 
 [[ -z $MPI_HOME ]] 	&& { echo "ERROR: MPI_HOME env var empy";	exit 1; }
 [[ -z $NP ]] 		&& { echo "ERROR: NP input not specified";	exit 1; }
 [[ -z $TEST ]] 		&& { echo "ERROR: TEST input not specified";	exit 1; }
+[[ ! -e $TEST ]] 	&& { echo "ERROR: $TEST not found"; 		exit 1; }
 [[ ! -e hostfile ]] 	&& { echo "ERROR: hostfile missing"; 		exit 1; }
 
 export PATH=$PATH
@@ -23,6 +25,7 @@ OMPI_params="$OMPI_params --mca btl_openib_want_cuda_gdr 1"
 OMPI_params="$OMPI_params --mca btl_openib_warn_default_gid_prefix 0"
 
 #set -x
+#MLX5_DEBUG_MASK=65535
 $MPI_HOME/bin/mpirun -verbose  $OMPI_params \
 	-x COMM_ENABLE_DEBUG=0  \
         -x COMM_USE_COMM=1     	\
@@ -50,7 +53,7 @@ $MPI_HOME/bin/mpirun -verbose  $OMPI_params \
         \
         -x MLX5_DEBUG_MASK=0 \
         -x LD_LIBRARY_PATH -x PATH -x CUDA_PASCAL_FORCE_40_BIT=1 \
-        --map-by node -np $NP -hostfile hostfile ./wrapper.sh $TEST
+        --map-by node -np $NP -hostfile hostfile ./wrapper.sh $TEST $PARAMS
 
 # Example ./test.sh 2 ../bin/mp_pingpong
 

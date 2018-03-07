@@ -31,7 +31,7 @@ In *scripts* folder:
 - wrapper.sh: sample script with some topology example
 - test.sh: sample script to test all libmp examples and benchmarks
 
-N.B. you need to create your own hostfile inside *scripts* directory
+You need to create your own hostfile inside *scripts* directory
 
 ## Applications using GPUDirect Async by means of LibMP
 

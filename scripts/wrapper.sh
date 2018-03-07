@@ -33,63 +33,46 @@ case ${HOSTNAME} in
         OMPI_MCA_btl_openib_if_include=${HCA}
 	;;
 
-    *ivy0*) CUDA_VISIBLE_DEVICES=1; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
-    *ivy1*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
     *ivy2*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
     *ivy3*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
     *hsw0*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
     *hsw1*)                         USE_GPU=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0; 
-            # used by mp_pinpong_kernel_stream
-            #extra_params="-W 1"; 
-            # not implemented on OFED 3.2... not true!
-            #MP_DBREC_ON_GPU=1
-            #MP_RX_CQ_ON_GPU=1
-            #MP_TX_CQ_ON_GPU=1
-            #GDS_ENABLE_DEBUG=1
-            #MP_ENABLE_DEBUG=1
-            #ENABLE_DEBUG_MSG=1
-            #CUDA_ERROR_LEVEL=100
-            #CUDA_FILE_LEVEL=100
-            #CUDA_ERROR_FILE=cuda.log
-            #CUDA_PASCAL_FORCE_40_BIT=1
-            #CUDA_VISIBLE_DEVICES="0,1"
             ;;
 esac
 
 echo "# ${HOSTNAME}: picking GPU:$CUDA_VISIBLE_DEVICES/$USE_GPU CPU:$USE_CPU HCA:$MP_USE_IB_HCA" >&2
-#ulimit -c 100
-
 PATH=$PATH:$PWD
-#echo "PATH=$PATH"
-#echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 
 export \
-    QUDA_ENABLE_P2P \
-    QUDA_RESOURCE_PATH \
-    QUDA_USE_COMM_ASYNC_STREAM \
-    QUDA_USE_COMM_ASYNC_PREPARED \
-    QUDA_ASYNC_ENABLE_DEBUG \
-    ENABLE_DEBUG_MSG \
-    CUDA_VISIBLE_DEVICES CUDA_ERROR_LEVEL CUDA_ERROR_FILE CUDA_FILE_LEVEL CUDA_PASCAL_FORCE_40_BIT \
-    MP_USE_IB_HCA USE_IB_HCA USE_CPU USE_GPU \
-    USE_SINGLE_STREAM USE_GPU_ASYNC \
-    MP_ENABLE_DEBUG MP_ENABLE_WARN GDS_ENABLE_DEBUG \
-    MP_DBREC_ON_GPU MP_RX_CQ_ON_GPU MP_TX_CQ_ON_GPU \
-    MP_ENABLE_IPC MP_EVENT_ASYNC \
-    GDS_DISABLE_WRITE64 GDS_DISABLE_INLINECOPY GDS_DISABLE_MEMBAR \
-    GDS_DISABLE_WEAK_CONSISTENCY GDS_SIMULATE_WRITE64 \
-    COMM_USE_GDRDMA COMM_USE_COMM COMM_USE_ASYNC COMM_USE_GPU_COMM OMP_NUM_THREADS \
-    DEBUGGER \
-    MLX5_DEBUG_MASK \
-    OMPI_MCA_btl_openib_if_include \
-    GDS_ENABLE_DUMP_MEMOPS \
-    PX PY USE_GPU_COMM_BUFFERS USE_MPI 
-#    MLX5_DEBUG_MASK=65535 \
 
-    
-#echo $LD_LIBRARY_PATH
-#ldd $exe
-#unset USE_CPU
+	COMM_ENABLE_DEBUG= \
+        COMM_USE_COMM=1   	\
+        COMM_USE_ASYNC_SA= \
+        COMM_USE_ASYNC_KI=	\
+	\
+        MP_ENABLE_DEBUG \
+        MP_ENABLE_WARN \
+        MP_EVENT_ASYNC \
+        MP_DBREC_ON_GPU \
+        MP_RX_CQ_ON_GPU \
+        MP_TX_CQ_ON_GPU \
+        \
+        GDS_ENABLE_DEBUG \
+        GDS_FLUSHER_TYPE \
+        GDS_DISABLE_WRITE64 \
+        GDS_SIMULATE_WRITE64 \
+        GDS_DISABLE_INLINECOPY \
+        GDS_DISABLE_WEAK_CONSISTENCY \
+        GDS_DISABLE_MEMBAR \
+        \
+        USE_CALC_SIZE \
+        KERNEL_TIME \
+        GPU_ENABLE_DEBUG \
+        \
+        MLX5_DEBUG_MASK \
+        LD_LIBRARY_PATH PATH CUDA_PASCAL_FORCE_40_BIT \
+        PATH LD_LIBRARY_PATH
+        
 set -x
 
 if [ "$use_nvprof" != "0" ]; then
