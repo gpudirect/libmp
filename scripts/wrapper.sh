@@ -44,18 +44,17 @@ echo "# ${HOSTNAME}: picking GPU:$CUDA_VISIBLE_DEVICES/$USE_GPU CPU:$USE_CPU HCA
 PATH=$PATH:$PWD
 
 export \
-
-	COMM_ENABLE_DEBUG= \
-        COMM_USE_COMM=1   	\
-        COMM_USE_ASYNC_SA= \
-        COMM_USE_ASYNC_KI=	\
+	COMM_ENABLE_DEBUG \
+        COMM_USE_COMM 	  \
+        COMM_USE_ASYNC_SA \
+        COMM_USE_ASYNC_KI \
 	\
-        MP_ENABLE_DEBUG \
-        MP_ENABLE_WARN \
-        MP_EVENT_ASYNC \
-        MP_DBREC_ON_GPU \
-        MP_RX_CQ_ON_GPU \
-        MP_TX_CQ_ON_GPU \
+        MP_ENABLE_DEBUG   \
+        MP_ENABLE_WARN 	  \
+        MP_EVENT_ASYNC    \
+        MP_DBREC_ON_GPU   \
+        MP_RX_CQ_ON_GPU   \
+        MP_TX_CQ_ON_GPU   \
         \
         GDS_ENABLE_DEBUG \
         GDS_FLUSHER_TYPE \
@@ -72,7 +71,7 @@ export \
         MLX5_DEBUG_MASK \
         LD_LIBRARY_PATH PATH CUDA_PASCAL_FORCE_40_BIT \
         PATH LD_LIBRARY_PATH
-        
+
 set -x
 
 if [ "$use_nvprof" != "0" ]; then
