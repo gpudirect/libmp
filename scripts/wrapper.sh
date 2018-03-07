@@ -18,10 +18,8 @@ echo "hostname=${HOSTNAME}"
 echo "lrank=$lrank"
 
 case ${HOSTNAME} in
-    *dgx*)
-	# let's pick:
-	# GPU #0,2,4,6
-	# HCA #0,1,2,3
+	#DGX-1 Topology GPU <--> HCA
+	*dgx*)
 	if (( $lrank > 4 )); then echo "too many ranks"; exit; fi
 	hlrank=$(($lrank / 2)) # 0,1
 	dlrank=$(($lrank * 2)) # 0,2,4,6
@@ -30,20 +28,24 @@ case ${HOSTNAME} in
 	USE_CPU=${hlrank}
 	HCA=mlx5_${lrank}
 	MP_USE_IB_HCA=${HCA}
-        OMPI_MCA_btl_openib_if_include=${HCA}
+	OMPI_MCA_btl_openib_if_include=${HCA}
 	;;
 
-    *ivy2*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
-    *ivy3*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
-    *hsw0*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
-    *hsw1*)                         USE_GPU=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0; 
-            ;;
+	*brdw0*) CUDA_VISIBLE_DEVICES=3; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
+	*brdw1*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
+	*ivy2*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
+	*ivy3*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
+	*hsw0*) CUDA_VISIBLE_DEVICES=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0;;
+	*hsw1*)                         USE_GPU=0; USE_CPU=0; MP_USE_IB_HCA=mlx5_0; 
+	    ;;
 esac
 
 echo "# ${HOSTNAME}: picking GPU:$CUDA_VISIBLE_DEVICES/$USE_GPU CPU:$USE_CPU HCA:$MP_USE_IB_HCA" >&2
 PATH=$PATH:$PWD
 
 export \
+	CUDA_VISIBLE_DEVICES USE_GPU USE_CPU MP_USE_IB_HCA OMPI_MCA_btl_openib_if_include \
+	\
 	COMM_ENABLE_DEBUG \
         COMM_USE_COMM 	  \
         COMM_USE_ASYNC_SA \
@@ -70,7 +72,8 @@ export \
         \
         MLX5_DEBUG_MASK \
         LD_LIBRARY_PATH PATH CUDA_PASCAL_FORCE_40_BIT \
-        PATH LD_LIBRARY_PATH
+        PATH LD_LIBRARY_PATH \
+
 
 set -x
 
