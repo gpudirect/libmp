@@ -1,4 +1,4 @@
-# LibMP
+# LibMP 2.0 -- Work in progress, use master branch
 
 ## Introduction
 
