@@ -28,7 +28,6 @@ do {                                                    \
 
 comm_reg_t * sreg, * rreg;
 int comm_size, my_rank, device_id;
-double time_start, time_stop;
 unsigned char * send_buf[MAX_PEERS];
 unsigned char * recv_buf[MAX_PEERS];
 int use_gpu_buffers=0;
@@ -198,7 +197,7 @@ int main(int argc, char **argv) {
     }   
     stop_time = MPI_Wtime();
 
-    tot_time=((time_stop - time_start)*1e6);
+    tot_time=((stop_time - start_time)*1e6);
     if(!my_rank)
         printf("Stats:\n\tIterations: %d\n\tProcs: %d\n\tTotal RTT: %8.2lfusec\n", 
                     tot_iters, comm_size, tot_time);
