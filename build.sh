@@ -21,6 +21,7 @@ if [ ! -e Makefile ]; then
         --with-libgdsync=$PREFIX \
         --with-cuda=$CUDA \
         --with-mpi=$MPI_HOME \
+        --enable-gpu-arch=sm_35 \
         --enable-tests
 fi
 
