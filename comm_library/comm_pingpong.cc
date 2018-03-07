@@ -104,6 +104,7 @@ int sync_exchange(int iter) {
 int main(int argc, char **argv) {
     int i,j,k,iter;
     char *value;
+    double tot_time, start_time, stop_time;
 
     value = getenv("USE_GPU_BUFFERS");
     if (value != NULL) {
@@ -144,8 +145,9 @@ int main(int argc, char **argv) {
     
     comm_init(MPI_COMM_WORLD, device_id);
 
-    if(!my_rank) printf("----> use_gpu_buffers=%d, max_size=%d, tot_iters=%d num peers=%d validate=%d\n", 
-                        use_gpu_buffers, max_size, tot_iters, comm_size, validate);
+    if(!my_rank) 
+        printf("----> async sa=%d, use_gpu_buffers=%d, max_size=%d, tot_iters=%d num peers=%d validate=%d\n", 
+                        comm_use_async()?0:1, use_gpu_buffers, max_size, tot_iters, comm_size, validate);
 
     for(i=0; i<comm_size; i++)
     {
@@ -173,10 +175,9 @@ int main(int argc, char **argv) {
     sreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
     rreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
     
+    start_time = MPI_Wtime();
     for(iter=0; iter<tot_iters; iter++)
     {
-        if(!my_rank) printf("--> Iter %d, Size %d\n", iter, max_size);
-    
         if(comm_use_async())
             async_exchange(iter);        
         else
@@ -188,7 +189,13 @@ int main(int argc, char **argv) {
         cudaDeviceSynchronize();
         comm_flush();
     }   
-    
+    stop_time = MPI_Wtime();
+
+    tot_time=((time_stop - time_start)*1e6);
+    if(!my_rank)
+        printf("Stats:\n\tIterations: %d\n\tProcs: %d\n\tTotal RTT: %8.2lfusec\n", 
+                    tot_iters, comm_size, tot_time);
+
     if(!use_gpu_buffers)
     {
         for(i=0; i<comm_size; i++)
@@ -211,4 +218,6 @@ int main(int argc, char **argv) {
 
     comm_finalize();
     MPI_Finalize();
+
+    return 0;
 }
