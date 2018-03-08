@@ -78,7 +78,7 @@ $MPI_HOME/bin/mpirun -verbose  $OMPI_params \
         -x GPU_ENABLE_DEBUG=0 \
         \
         -x MLX5_DEBUG_MASK=0 \
-        -x LD_LIBRARY_PATH -x PATH -x CUDA_PASCAL_FORCE_40_BIT=1 \
+        -x LD_LIBRARY_PATH -x PATH \
         --map-by node -np $NP -hostfile hostfile ./wrapper.sh $TEST $PARAMS
 
 # Example ./test.sh 2 ../bin/mp_pingpong

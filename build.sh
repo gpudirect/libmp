@@ -32,12 +32,15 @@
 
 [ ! -d build ] && mkdir build
 
-mkdir $PREFIX/bin
-mkdir $PREFIX/include
-mkdir $PREFIX/lib
+[[ -z $PREFIX ]] 	&& { echo "ERROR: PREFIX env var empy";	exit 1; }
+[[ -z $MPI_HOME ]] 	&& { echo "ERROR: MPI_HOME env var empy";	exit 1; }
+[[ -z $CUDA ]] 		&& { echo "ERROR: CUDA env var empy";	exit 1; }
+
+mkdir -p $PREFIX/bin
+mkdir -p $PREFIX/include
+mkdir -p $PREFIX/lib
 
 cd build
-
 
 if [ ! -e Makefile ]; then
     echo "configuring..."
@@ -47,7 +50,7 @@ if [ ! -e Makefile ]; then
         --with-libgdsync=$PREFIX \
         --with-cuda=$CUDA \
         --with-mpi=$MPI_HOME \
-        --enable-gpu-arch=sm_35 \
+        --enable-gpu-arch=sm_60 \
         --enable-tests
 fi
 

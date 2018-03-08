@@ -97,9 +97,7 @@ export \
         GPU_ENABLE_DEBUG \
         \
         MLX5_DEBUG_MASK \
-        LD_LIBRARY_PATH PATH CUDA_PASCAL_FORCE_40_BIT \
-        PATH LD_LIBRARY_PATH \
-
+        LD_LIBRARY_PATH PATH
 
 set -x
 
