@@ -33,11 +33,15 @@ In *scripts* folder:
 
 You need to create your own hostfile inside *scripts* directory
 
+## COMM library
+
+COMM is an additional library built on top of LibMP.
+With COMM you can easily deploy LibMP in you applications; the pingpong is an example of COMM usage.
+
 ## Applications using GPUDirect Async by means of LibMP
 
 - [HPGMG-FV Async](https://github.com/e-ago/hpgmg-cuda-async)
 - [CoMD-CUDA Async](https://github.com/e-ago/CoMD-CUDA-Async)
-- [Lulesh2 Async](https://github.com/e-ago/lulesh2-cuda-async)
 
 ## Acknowledging LibMP and GPUDirect Async
 
