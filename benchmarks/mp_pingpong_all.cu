@@ -289,7 +289,7 @@ void wait_send (int batch_index)
 	int req_idx = batch_to_sreq_idx (batch_index); 
 
 	//if(!my_rank) printf("wait_send req [%d, %d]\n", req_idx,  req_idx+steps_per_batch);
-	MP_CHECK(mp_wait_all(steps_per_batch, &sreq[req_idx], stream));
+	MP_CHECK(mp_wait_all(steps_per_batch, &sreq[req_idx]));
 	//for (j=0; j<steps_per_batch; j++) {
 	//	MP_CHECK(mp_wait(&sreq[req_idx + j]));
 	//}
