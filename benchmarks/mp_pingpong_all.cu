@@ -289,10 +289,10 @@ void wait_send (int batch_index)
 	int req_idx = batch_to_sreq_idx (batch_index); 
 
 	//if(!my_rank) printf("wait_send req [%d, %d]\n", req_idx,  req_idx+steps_per_batch);
-	//MP_CHECK(mp_wait_all(steps_per_batch, &sreq[req_idx]));
-	for (j=0; j<steps_per_batch; j++) {
-		MP_CHECK(mp_wait(&sreq[req_idx + j]));
-	}
+	MP_CHECK(mp_wait_all(steps_per_batch, &sreq[req_idx]));
+	//for (j=0; j<steps_per_batch; j++) {
+	//	MP_CHECK(mp_wait(&sreq[req_idx + j]));
+	//}
 }
 
 void wait_send_async (int batch_index) 
@@ -301,10 +301,9 @@ void wait_send_async (int batch_index)
 	int req_idx = batch_to_sreq_idx (batch_index); 
 
 	//if(!my_rank) printf("wait_send_async req [%d, %d]\n", req_idx,  req_idx+steps_per_batch);
-	for (j=0; j<steps_per_batch; j++) {
-		MP_CHECK(mp_wait_on_stream(&sreq[req_idx+j], stream));
-	}
-	//MP_CHECK(mp_wait_all_on_stream(steps_per_batch, &sreq[req_idx], stream));
+	//for (j=0; j<steps_per_batch; j++) {
+	MP_CHECK(mp_wait_all_on_stream(steps_per_batch, &sreq[req_idx], stream));
+	//}
 }
 
 void wait_send_mpi (int batch_index) 
@@ -312,10 +311,10 @@ void wait_send_mpi (int batch_index)
 	int j;
 	int req_idx = batch_to_sreq_idx (batch_index); 
 
-	//MP_CHECK(MPI_Waitall(steps_per_batch, &sreq_mpi[req_idx], MPI_STATUS_IGNORE));
-	for (j=0; j<steps_per_batch; j++) {
-		MP_CHECK(MPI_Wait(&sreq_mpi[req_idx + j], MPI_STATUS_IGNORE));
-	}
+	MP_CHECK(MPI_Waitall(steps_per_batch, &sreq_mpi[req_idx], MPI_STATUS_IGNORE));
+	//for (j=0; j<steps_per_batch; j++) {
+		//MP_CHECK(MPI_Wait(&sreq_mpi[req_idx + j], MPI_STATUS_IGNORE));
+	//}
 }
 
 
@@ -378,6 +377,9 @@ void post_work_async (int size, int batch_index, double kernel_size)
 			POP_RANGE;
 		}
 	}
+
+	//Required to unlock CQEs
+	wait_send_async (batch_index);
 }
 
 void post_work_sync (int size, int batch_index, double kernel_size) 
@@ -406,8 +408,6 @@ void post_work_sync (int size, int batch_index, double kernel_size)
 				CUDA_CHECK(cudaStreamSynchronize(stream));
 			}
 		}
-		//Required to unlock CQEs
-		wait_send_async (batch_index);
 	}
 }
 
