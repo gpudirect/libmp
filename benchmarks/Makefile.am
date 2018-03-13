@@ -31,9 +31,10 @@ AM_CPPFLAGS  = -I$(CUDA_PATH)/include -I$(MPI_PATH)/include
 AM_CPPFLAGS += -D__STDC_FORMAT_MACROS
 AM_CPPFLAGS += -I$(top_srcdir)/include
 
-AM_LDFLAGS   = $(LDFLAGS) -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lmpi -lcuda -lcudart
+AM_LDFLAGS   = $(LDFLAGS) -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lmpi -lcuda -lcudart -lnvToolsExt
 
-bin_PROGRAMS = mp_sendrecv_kernel_stream \
+bin_PROGRAMS = mp_pingpong_all \
+	mp_sendrecv_kernel_stream \
 	mp_pingpong_kernel_stream \
 	mp_pingpong_kernel_stream_mpi \
 	mp_producer_consumer_kernel_stream \
@@ -48,6 +49,7 @@ CXXLD=$(MPICXX)
 
 LINK = $(LIBTOOL) --tag=CXX --mode=link $(CXXLD) -o $@ $(AM_LDFLAGS) $(AM_LIBS)
 
+mp_pingpong_all_SOURCES = mp_pingpong_all.cu
 mp_sendrecv_kernel_stream_SOURCES = mp_sendrecv_kernel_stream.cu
 mp_pingpong_kernel_stream_SOURCES = mp_pingpong_kernel_stream.cu
 mp_pingpong_kernel_stream_mpi_SOURCES = mp_pingpong_kernel_stream_mpi.cu
