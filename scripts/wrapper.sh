@@ -94,6 +94,7 @@ export \
         \
         USE_CALC_SIZE \
         KERNEL_TIME \
+        MAX_SIZE \
         GPU_ENABLE_DEBUG \
         \
         MLX5_DEBUG_MASK \

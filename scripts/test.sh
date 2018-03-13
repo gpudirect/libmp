@@ -73,8 +73,9 @@ $MPI_HOME/bin/mpirun -verbose  $OMPI_params \
         -x GDS_DISABLE_WEAK_CONSISTENCY=0 \
         -x GDS_DISABLE_MEMBAR=0 \
         \
-        -x USE_CALC_SIZE=1 \
+        -x USE_CALC_SIZE=0 \
         -x KERNEL_TIME=0 \
+        -x MAX_SIZE=131072 \
         -x GPU_ENABLE_DEBUG=0 \
         \
         -x MLX5_DEBUG_MASK=0 \
