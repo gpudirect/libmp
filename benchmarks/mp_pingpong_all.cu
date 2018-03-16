@@ -146,6 +146,7 @@ int enable_debug_prints = 0;
 int gpu_num_sm;
 int enable_ud = 0;
 int gpu_id = -1;
+int validate = 0;
 
 int comm_size, my_rank, peer;
 int steps_per_batch = 20, batches_inflight = 4;
@@ -652,7 +653,6 @@ int main (int argc, char *argv[])
 {
 	int iter_count, max_size, size, dev_count, local_rank, dev_id = 0;
 	int kernel_size = 20;
-	int validate = 0;
 
 	size = 1;
 	max_size = MAX_SIZE;
