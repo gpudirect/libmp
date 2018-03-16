@@ -620,13 +620,13 @@ double sr_exchange_MPI (MPI_Comm comm, int size, int iter_count, double kernel_s
 	wait_send_batch = wait_recv_batch = 0;
 	while (wait_send_batch < batch_count) 
 	{ 
+		wait_send_mpi (wait_send_batch);
+		wait_send_batch++;
+
 		if (j < (batch_count-1)) {
 			post_recv_mpi (size, j+1);
 		}
 		
-		wait_send_mpi (wait_send_batch);
-		wait_send_batch++;
-
 		if (j < batch_count) { 
 			post_work_mpi (size, j, kernel_size);
 		}
