@@ -581,7 +581,7 @@ double sr_exchange (MPI_Comm comm, int size,
        //CUDA_CHECK(cudaDeviceSynchronize());
 
         char *value = (char *)((uintptr_t)buf);
-        for (i=0; i<buf_size; i++) {
+        for (int i=0; i<buf_size; i++) {
              if (value[i] != (size + 1)%CHAR_MAX) {
                  mp_dbg_msg("MPI validation check failed index: %d expected: %d actual: %d \n", 
                             i, (size + 1)%CHAR_MAX, value[i]);
@@ -600,6 +600,24 @@ double sr_exchange_MPI (MPI_Comm comm, int size, int iter_count, double kernel_s
 
 	assert((iter_count%steps_per_batch) == 0);
 	batch_count = iter_count/steps_per_batch;
+
+	if (validate)
+	{
+        mp_dbg_msg("initializing the buffer \n");
+        if(use_gpu_buffers == 0)
+        {
+            memset(sbuf_d, (size + 1)%CHAR_MAX, buf_size);
+            memset(rbuf_d, 0, buf_size);
+        }
+        else
+        {
+            CUDA_CHECK(cudaMemset(sbuf_d, (size + 1)%CHAR_MAX, buf_size));
+            CUDA_CHECK(cudaMemset(rbuf_d, 0, buf_size));
+        }
+
+        memset(buf, 0, buf_size);
+    }
+
 
 	post_recv_mpi (size, 0);
 
@@ -644,6 +662,24 @@ double sr_exchange_MPI (MPI_Comm comm, int size, int iter_count, double kernel_s
 	latency = (((time_stop - time_start)*1e6 + prepost_latency)/(iter_count));
 
 	CUDA_CHECK(cudaDeviceSynchronize());
+
+	if (validate) {
+        if(use_gpu_buffers == 0)
+            memcpy(buf, rbuf_d, buf_size);
+        else
+            CUDA_CHECK(cudaMemcpy((void *)((uintptr_t)buf), (void *)((uintptr_t)rbuf_d), 
+        buf_size, cudaMemcpyDefault));
+       //CUDA_CHECK(cudaDeviceSynchronize());
+
+        char *value = (char *)((uintptr_t)buf);
+        for (int i=0; i<buf_size; i++) {
+             if (value[i] != (size + 1)%CHAR_MAX) {
+                 mp_dbg_msg("MPI validation check failed index: %d expected: %d actual: %d \n", 
+                            i, (size + 1)%CHAR_MAX, value[i]);
+                 exit(-1);
+             }
+        }
+    }
 
 	return latency;
 }
