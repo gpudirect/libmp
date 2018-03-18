@@ -648,6 +648,12 @@ int mp_progress_all (uint32_t count, mp_request_t *req_)
   while (r < count) {
     struct mp_request *req = req_[r];
     
+    if (req->status == MP_COMPLETE) {
+        completed_reqs++;
+        r++;
+        continue;
+    }
+
     if (!req_valid(req)) {
         mp_err_msg("invalid req:%p status:%d id=%d peer=%d type=%d, going on anyway\n", req, req->status, req->id, req->peer, req->type);
     }
