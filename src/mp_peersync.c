@@ -1589,7 +1589,7 @@ int mp_wait32_on_stream(uint32_t *ptr, uint32_t value, int flags, cudaStream_t s
     }
     ret = gds_stream_post_descriptors(stream, n_descs, descs, 0);
 #else
-    ret = gds_stream_post_poll_dword(stream, ptr, value, cond_flags, GDS_MEMORY_HOST|GDS_WAIT_POST_FLUSH);
+    ret = gds_stream_post_poll_dword(stream, ptr, value, cond_flags, GDS_MEMORY_HOST);//|GDS_WAIT_POST_FLUSH);
 #endif
     if (ret) {
         mp_err_msg("error %d while posting poll on ptr=%p value=%08x flags=%08x\n", ret, ptr, value, flags);
