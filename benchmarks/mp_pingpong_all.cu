@@ -212,22 +212,22 @@ __global__ void exchange_kernel(int my_rank,
 				mp::device::mlx5::signal(rx_wait_d[i]);
 			}
 
-			if (1 == threadIdx.x) {
-				mp::device::mlx5::send(tx_d[i]);
-				//mp::device::mlx5::wait(tx_wait_d[i]);
-				//mp::device::mlx5::signal(tx_wait_d[i]);
-			}
 			__syncthreads();
 			fixed_time(kernel_time);
 			//__threadfence();
 
+			if (0 == threadIdx.x) {
+				mp::device::mlx5::send(tx_d[i]);
+				//mp::device::mlx5::wait(tx_wait_d[i]);
+				//mp::device::mlx5::signal(tx_wait_d[i]);
+			}
 		} else {
 			if (0 == threadIdx.x) {
 				mp::device::mlx5::send(tx_d[i]);
 				//mp::device::mlx5::wait(tx_wait_d[i]);
 				//mp::device::mlx5::signal(tx_wait_d[i]);
 			}
-			if (1 == threadIdx.x) {    
+			if (0 == threadIdx.x) {    
 				mp::device::mlx5::wait(rx_wait_d[i]);
 				mp::device::mlx5::signal(rx_wait_d[i]);
 			}
@@ -417,7 +417,7 @@ void post_work_ki (int size, int batch_index, double kernel_size)
 	int sreq_idx = batch_to_sreq_idx (batch_index);
 	int rreq_idx = batch_to_rreq_idx (batch_index);
 
-	exchange_kernel<<<1,2,0,stream>>>(
+	exchange_kernel<<<1,1,0,stream>>>(
 		my_rank, tx_d+sreq_idx, 
 		//tx_wait_d+sreq_idx, 
 		rx_wait_d+rreq_idx,
