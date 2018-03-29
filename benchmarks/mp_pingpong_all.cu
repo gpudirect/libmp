@@ -167,8 +167,8 @@ MPI_Request * sreq_mpi;
 MPI_Request * rreq_mpi;
 mp::mlx5::send_desc_t *tx;
 mp::mlx5::send_desc_t *tx_d;
-//mp::mlx5::wait_desc_t *tx_wait;
-//mp::mlx5::wait_desc_t *tx_wait_d;
+mp::mlx5::wait_desc_t *tx_wait;
+mp::mlx5::wait_desc_t *tx_wait_d;
 mp::mlx5::wait_desc_t *rx_wait;
 mp::mlx5::wait_desc_t *rx_wait_d;
 
@@ -196,7 +196,7 @@ __global__ void dummy_kernel(double time)
 
 __global__ void exchange_kernel(int my_rank, 
 	mp::mlx5::send_desc_t *tx_d, 
-	//mp::mlx5::wait_desc_t *tx_wait_d, 
+	mp::mlx5::wait_desc_t *tx_wait_d, 
 	mp::mlx5::wait_desc_t *rx_wait_d, 
 	int iter_number, double kernel_time)
 {
@@ -214,18 +214,18 @@ __global__ void exchange_kernel(int my_rank,
 
 			__syncthreads();
 			fixed_time(kernel_time);
-			//__threadfence();
+			__syncthreads();
 
 			if (0 == threadIdx.x) {
 				mp::device::mlx5::send(tx_d[i]);
-				//mp::device::mlx5::wait(tx_wait_d[i]);
-				//mp::device::mlx5::signal(tx_wait_d[i]);
+				mp::device::mlx5::wait(tx_wait_d[i]);
+				mp::device::mlx5::signal(tx_wait_d[i]);
 			}
 		} else {
 			if (0 == threadIdx.x) {
 				mp::device::mlx5::send(tx_d[i]);
-				//mp::device::mlx5::wait(tx_wait_d[i]);
-				//mp::device::mlx5::signal(tx_wait_d[i]);
+				mp::device::mlx5::wait(tx_wait_d[i]);
+				mp::device::mlx5::signal(tx_wait_d[i]);
 			}
 			if (0 == threadIdx.x) {    
 				mp::device::mlx5::wait(rx_wait_d[i]);
@@ -233,7 +233,7 @@ __global__ void exchange_kernel(int my_rank,
 			}
 			__syncthreads();
 			fixed_time(kernel_time);
-			//__threadfence();
+			__syncthreads();
 		}
 	}
 }
@@ -269,7 +269,7 @@ void post_send_ki (int size, int batch_index)
 	for (j=0; j<steps_per_batch; j++) {
 		MP_CHECK(mp_send_prepare((void *)((uintptr_t)sbuf_d), size, peer, &sreg, &sreq[req_idx + j]));
 		MP_CHECK(mp::mlx5::get_descriptors(&tx[req_idx + j],      &sreq[req_idx + j]));
-//		MP_CHECK(mp::mlx5::get_descriptors(&tx_wait[req_idx + j], &sreq[req_idx + j]));
+		MP_CHECK(mp::mlx5::get_descriptors(&tx_wait[req_idx + j], &sreq[req_idx + j]));
 	}
 }
 
@@ -419,12 +419,12 @@ void post_work_ki (int size, int batch_index, double kernel_size)
 
 	exchange_kernel<<<1,1,0,stream>>>(
 		my_rank, tx_d+sreq_idx, 
-		//tx_wait_d+sreq_idx, 
+		tx_wait_d+sreq_idx, 
 		rx_wait_d+rreq_idx,
 		steps_per_batch, kernel_size);
 
 	//Required to unlock CQEs
-	wait_send_async(batch_index);
+	//wait_send_async(batch_index);
 }
 
 void post_work_mpi (int size, int batch_index, double kernel_size) 
@@ -801,8 +801,8 @@ int main (int argc, char *argv[])
 	//KI model
 	CUDA_CHECK( cudaHostAlloc( (void**)&tx, steps_per_batch*batches_inflight*sizeof(mp::mlx5::send_desc_t), cudaHostAllocMapped ) );
 	CUDA_CHECK( cudaHostGetDevicePointer ( &tx_d, tx, 0 )); 
-	// CUDA_CHECK( cudaHostAlloc( (void**)&tx_wait, steps_per_batch*batches_inflight*sizeof(mp::mlx5::wait_desc_t), cudaHostAllocMapped ) );
-	// CUDA_CHECK( cudaHostGetDevicePointer ( &tx_wait_d, tx_wait, 0 ));
+	CUDA_CHECK( cudaHostAlloc( (void**)&tx_wait, steps_per_batch*batches_inflight*sizeof(mp::mlx5::wait_desc_t), cudaHostAllocMapped ) );
+	CUDA_CHECK( cudaHostGetDevicePointer ( &tx_wait_d, tx_wait, 0 ));
 	CUDA_CHECK( cudaHostAlloc( (void**)&rx_wait, steps_per_batch*(batches_inflight + 1)*sizeof(mp::mlx5::wait_desc_t), cudaHostAllocMapped ) );
 	CUDA_CHECK( cudaHostGetDevicePointer ( &rx_wait_d, rx_wait, 0 ));
 
@@ -932,7 +932,7 @@ int main (int argc, char *argv[])
 	free(sreq);
 	free(rreq);
 	CUDA_CHECK(cudaFreeHost(tx));
-	//CUDA_CHECK(cudaFreeHost(tx_wait));
+	CUDA_CHECK(cudaFreeHost(tx_wait));
 	CUDA_CHECK(cudaFreeHost(rx_wait));
 
 	mp_finalize();
