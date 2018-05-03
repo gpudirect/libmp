@@ -40,7 +40,7 @@ noinst_PROGRAMS =
 CCLD=$(MPICXX)
 CXXLD=$(MPICXX)
 
-comm_pingpong_SOURCES = comm_pingpong.cc comm.cc
+comm_pingpong_SOURCES = comm_pingpong.cc ../comm.cc
 
 SUFFIXES= .cu
 
