@@ -124,5 +124,5 @@ AC_SUBST(NVCC, [nvcc])
 AC_SUBST(NVCCFLAGS)
 AC_SUBST(NVCCLDFLAGS)
 
-AC_CONFIG_FILES([Makefile libmp.spec examples/Makefile benchmarks/Makefile comm_library/Makefile])
+AC_CONFIG_FILES([Makefile libmp.spec examples/Makefile benchmarks/Makefile comm_library/examples/Makefile])
 AC_OUTPUT

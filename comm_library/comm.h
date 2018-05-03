@@ -93,8 +93,8 @@ extern "C" {
 
     int comm_use_comm();
     int comm_use_gdrdma();
-    int comm_use_async();
-    int comm_use_gpu_comm();
+    int comm_use_model_sa();
+    int comm_use_model_ki();
 
     typedef struct comm_request  *comm_request_t;
     typedef struct comm_reg      *comm_reg_t;

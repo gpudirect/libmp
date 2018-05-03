@@ -463,15 +463,15 @@ int comm_irecv(void *recv_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
     mp_reg_t *reg;
     mp_request_t *req = (mp_request_t*)creq;
     size_t nbytes = size*comm_size_of_mpi_type(type);
-    int peer = comm_mpi_rank_to_peer(dest_rank);
+    int peer = comm_mpi_rank_to_peer(src_rank);
 
     DBG("src_rank=%d peer=%d nbytes=%zd buf=%p *reg=%p\n", src_rank, peer, nbytes, recv_buf, *reg);
 
-    COMM_CHECK(comm_register(send_buf, nbytes, creg));
+    COMM_CHECK(comm_register(recv_buf, nbytes, creg));
     reg = (mp_reg_t*)creg;
     assert(reg);
 
-    retcote = mp_irecv(recv_buf, nbytes, peer, reg, req);
+    retcode = mp_irecv(recv_buf, nbytes, peer, reg, req);
     if (retcode) {
         comm_err("error in mp_irecv ret=%d\n", retcode);
         ret = -1;
@@ -537,7 +537,7 @@ int comm_isend(void *send_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
         goto out;
     }
 
-    COMM_CHECK(comm_track_request(req));
+    comm_track_request(req);
 
 out:
     return ret;
@@ -722,8 +722,7 @@ int comm_deregister(comm_reg_t *creg)
     assert(reg);
 
     if (!*reg) {
-        DBG("registering buffer %p\n", buf);
-        MP_CHECK(mp_deregister(reg));
+       mp_deregister(reg);
     }
 
 out:

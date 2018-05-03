@@ -42,10 +42,3 @@ CXXLD=$(MPICXX)
 
 comm_pingpong_SOURCES = comm_pingpong.cc ../comm.cc
 
-SUFFIXES= .cu
-
-.cu.o:
-	$(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -c -o $@ $<
-
-.cu.lo:
-	$(LIBTOOL) --tag=CC --mode=compile $(NVCC) $(NVCCFLAGS) $(AM_CPPFLAGS) -o $@ -c $< $(NVCCLDFLAGS)

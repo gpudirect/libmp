@@ -36,7 +36,7 @@
 #include <mpi.h>
 #include <cuda_runtime.h>
 #include <mp.h>
-#include "comm.h"
+#include "../comm.h"
 
 #define MAX_PEERS 10
 #define BUF_SIZE 1024
@@ -207,18 +207,18 @@ int main(int argc, char **argv) {
     
     if(!my_rank) 
         printf("----> async sa=%d, use_gpu_buffers=%d, max_size=%d, tot_iters=%d num peers=%d validate=%d\n", 
-                    comm_use_async()?1:0, use_gpu_buffers, max_size, tot_iters, comm_size, validate);
+                    comm_use_model_sa()?1:0, use_gpu_buffers, max_size, tot_iters, comm_size, validate);
 
     start_time = MPI_Wtime();
     for(iter=0; iter<tot_iters; iter++)
     {
-        if(comm_use_async())
+        if(comm_use_model_sa())
             async_exchange(iter);        
         else
             sync_exchange(iter);
     }
 
-    if(comm_use_async())
+    if(comm_use_model_sa())
     {
         cudaDeviceSynchronize();
         comm_flush();
