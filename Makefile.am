@@ -43,9 +43,9 @@ AM_CFLAGS = -g -Wall
 EXTRA_DIST = autogen.sh
 
 # Remove comment if your PREFIX is different from libmp directory
-#include_HEADERS = include/mp.h
-#libmpincludedir = $(includedir)/mp
-#libmpinclude_HEADERS = include/mp/device.cuh
+include_HEADERS = include/mp.h
+libmpincludedir = $(includedir)/mp
+libmpinclude_HEADERS = include/mp/device.cuh
 
 src_libmp_la_CFLAGS = $(AM_CFLAGS)
 src_libmp_la_SOURCES = src/mp.c src/mp_peersync.c src/mp_device.cpp src/desc_queue.cpp
