@@ -31,7 +31,7 @@ AM_CPPFLAGS  = -I$(CUDA_PATH)/include -I$(MPI_PATH)/include
 AM_CPPFLAGS += -D__STDC_FORMAT_MACROS
 AM_CPPFLAGS += -I$(top_srcdir)/include
 
-AM_LDFLAGS   = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lmpi -lcuda -lcudart
+AM_LDFLAGS   = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmpcomm.la $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lmpi -lcuda -lcudart
 
 bin_PROGRAMS = comm_pingpong
 
@@ -40,5 +40,5 @@ noinst_PROGRAMS =
 CCLD=$(MPICXX)
 CXXLD=$(MPICXX)
 
-comm_pingpong_SOURCES = comm_pingpong.cc ../comm.cc
+comm_pingpong_SOURCES = comm_pingpong.cpp
 
