@@ -35,23 +35,25 @@ AM_CPPFLAGS += -D__STDC_FORMAT_MACROS
 
 AM_LDFLAGS   = -L$(CUDA_PATH)/lib64
 
-lib_LTLIBRARIES = src/libmp.la
+lib_LTLIBRARIES = src/libmp.la src/libmpcomm.la
 
 ACLOCAL_AMFLAGS = -Iconfig
-AM_CFLAGS = -g -Wall
+AM_CFLAGS = -g -Wall -fPIC
 
 EXTRA_DIST = autogen.sh
 
-# Remove comment if your PREFIX is different from libmp directory
-include_HEADERS = include/mp.h
+include_HEADERS = include/mp.h comm_library/comm.h
 libmpincludedir = $(includedir)/mp
-libmpinclude_HEADERS = include/mp/device.cuh
+libmpinclude_HEADERS = include/mp/device.cuh comm_library/comm.h
 
 src_libmp_la_CFLAGS = $(AM_CFLAGS)
 src_libmp_la_SOURCES = src/mp.c src/mp_peersync.c src/mp_device.cpp src/desc_queue.cpp
 src_libmp_la_LDFLAGS = -version-info 2:0:0
 
-noinst_HEADERS = src/mp_internal.h src/archutils.h
+src_libmpcomm_la_CFLAGS = $(AM_CFLAGS)
+src_libmpcomm_la_SOURCES = src/mp.c src/mp_peersync.c src/mp_device.cpp src/desc_queue.cpp comm_library/comm.cpp
+src_libmpcomm_la_LDFLAGS = -version-info 2:0:0
 
+noinst_HEADERS = src/mp_internal.h src/archutils.h
 
 SUBDIRS = . examples benchmarks comm_library/examples
