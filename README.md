@@ -18,7 +18,6 @@ To use GPUDirect Async in combination with GPUDirect RDMA:
 - A recent display driver, i.e. r361, r367 or later, is required
 - The Mellanox OFED GPUDirect RDMA kernel module, https://github.com/Mellanox/nv_peer_memory, is required to allow the HCA to access the GPU memory.
 
-
 ## Build
 
 Use the *scripts/env_setup.sh* file to specify MPI_PATH, CUDA_PATH, LIBGDSYNC_PATH and LIBMP_PATH env vars useful for both LibMP and LibGDSync.
@@ -38,10 +37,10 @@ You need to create your own hostfile inside *scripts* directory
 COMM is an additional library built on top of LibMP.
 With COMM you can easily deploy LibMP in you applications; the pingpong is an example of COMM usage.
 
-## Applications using GPUDirect Async by means of LibMP
+## GPUDirect Async suite
 
-- [HPGMG-FV Async](https://github.com/e-ago/hpgmg-cuda-async)
-- [CoMD-CUDA Async](https://github.com/e-ago/CoMD-CUDA-Async)
+We created a new GPUDirect Asyc repository [here](https://github.com/gpudirect/gdasync) in order, under the same project, all the required libraries and applications.<br>
+In this repo you can find several scripts useful to configure, build and run all GPUDirect Async libraries, tests, benchmarks and examples.
 
 ## Acknowledging LibMP and GPUDirect Async
 
