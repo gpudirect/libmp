@@ -3,6 +3,13 @@
 ## Introduction
 
 LibMP is a lightweight messaging library built on top of [LibGDSync APIs](https://github.com/gpudirect/libgdsync/tree/devel), developed as a technology demonstrator to easily deploy the GPUDirect Async technology in applications.
+Main LibMP features are:
+- Thin layer on top of IB Verbs, LibGDSync
+- MPI out-of-band mechanism to distribute the process info order to establish IB connections
+- MPI is never used during actual communications
+- Point-to-point and one-sided communications, no collectives
+- No tags, no wildcards, no data types
+- Can easily combine GPUDirect Async with GPUDirect RDMA
 
 ## Requirements
 
@@ -39,8 +46,8 @@ With COMM you can easily deploy LibMP in you applications; the pingpong is an ex
 
 ## GPUDirect Async suite
 
-We created a new GPUDirect Asyc repository [here](https://github.com/gpudirect/gdasync) in order, under the same project, all the required libraries and applications.<br>
-In this repo you can find several scripts useful to configure, build and run all GPUDirect Async libraries, tests, benchmarks and examples.
+We created a new repository [here](https://github.com/gpudirect/gdasync) in order to collect in a single project all the components of the GPUDirect Async technology. In this repo you can find several scripts useful to configure, build and run all the GPUDirect Async libraries, tests, benchmarks and examples.
+
 
 ## Acknowledging LibMP and GPUDirect Async
 
