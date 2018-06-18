@@ -86,7 +86,7 @@ int mp_init(MPI_Comm comm, int *peers, int count, int flags, int gpu_id);
 void mp_finalize();
 
 int mp_register(void *addr, size_t length, mp_reg_t *reg_t);
-void mp_deregister(mp_reg_t *reg);
+int mp_deregister(mp_reg_t *reg);
 
 /*
  * regular, CPU synchronous primitives

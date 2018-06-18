@@ -797,14 +797,22 @@ int mp_register(void *addr, size_t length, mp_reg_t *reg_)
   return MP_SUCCESS;
 }
 
-void mp_deregister(mp_reg_t *reg_)
+int mp_deregister(mp_reg_t *reg_)
 {
+  int ret=0;
   struct mp_reg *reg = (struct mp_reg *) *reg_; 
 
   assert(reg);
   assert(reg->mr);
-  ibv_dereg_mr(reg->mr);
+  ret = ibv_dereg_mr(reg->mr);
+  if(ret)
+  {
+      mp_err_msg("ibv_dereg_mr returned %d\n", ret);
+      return MP_FAILURE;
+  }
+
   free(reg);
+  return MP_SUCCESS;
 }
 
 char shm_filename[100];
@@ -1811,6 +1819,7 @@ int mp_window_create(void *addr, size_t size, mp_window_t *window_t)
   exchange_win = malloc (mpi_comm_size*sizeof(exchange_win_info));
   assert(exchange_win != NULL); 
 
+  window->reg=NULL;
   result = mp_register(addr, size, &window->reg);  
   assert(result == MP_SUCCESS); 
   
