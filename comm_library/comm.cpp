@@ -695,7 +695,6 @@ int comm_register(void *buf, size_t size, comm_reg_t *creg)
     assert(comm_initialized);
     int ret = 0;
     int retcode;
-    DBG("start\n");
     mp_reg_t *reg = (mp_reg_t*)creg;
     assert(reg);
 
@@ -721,7 +720,7 @@ int comm_deregister(comm_reg_t *creg)
     mp_reg_t *reg = (mp_reg_t*)creg;
     assert(reg);
 
-    if (!*reg) {
+    if (*reg) {
        mp_deregister(reg);
     }
 
