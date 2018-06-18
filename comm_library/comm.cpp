@@ -721,7 +721,8 @@ int comm_deregister(comm_reg_t *creg)
     assert(reg);
 
     if (*reg) {
-       mp_deregister(reg);
+       MP_CHECK(mp_deregister(reg));
+       *creg=NULL;
     }
 
 out:
