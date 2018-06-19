@@ -339,12 +339,12 @@ int main (int argc, char *argv[])
 
     size = 1;
     value = getenv("SIZE");
-    if (value != NULL) {
+    if (value != NULL && atoi(value)) {
         size = atoi(value);
     }
 
     value = getenv("MAX_SIZE");
-    if (value != NULL) {
+    if (value != NULL && atoi(value)) {
         max_size = atoi(value);
     }
 

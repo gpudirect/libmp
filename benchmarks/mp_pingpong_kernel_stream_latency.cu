@@ -411,7 +411,7 @@ int main (int argc, char *argv[])
     }
 
     value = getenv("SIZE");
-    if (value != NULL) {
+    if (value != NULL && atoi(value)) {
         size = atoi(value);
     }
 

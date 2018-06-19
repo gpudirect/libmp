@@ -287,7 +287,7 @@ int main (int c, char *v[])
 
     size = 0; 
     value = getenv("SIZE");
-    if (value != NULL) {
+    if (value != NULL && atoi(value)) {
         size = atoi(value);
     }
 
