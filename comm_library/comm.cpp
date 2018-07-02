@@ -713,7 +713,7 @@ out:
     return ret;
 }
 
-int comm_register_odp(void *buf, size_t size, comm_reg_t *creg)
+int comm_register_odp(comm_reg_t *creg)
 {
     assert(comm_initialized);
     int ret = 0;
@@ -722,8 +722,8 @@ int comm_register_odp(void *buf, size_t size, comm_reg_t *creg)
     assert(reg);
 
     if (!*reg) {
-        DBG("registering buffer %p\n", buf);
-        MP_CHECK(mp_register(buf, size, reg, IBV_EXP_ACCESS_ON_DEMAND));
+        DBG("registering implicit ODP MR\n");
+        MP_CHECK(mp_register(NULL, 0, reg, IBV_EXP_ACCESS_ON_DEMAND));
     }
 
 out:

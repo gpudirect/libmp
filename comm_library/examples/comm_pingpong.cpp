@@ -251,7 +251,7 @@ int main(int argc, char **argv) {
     {
         odpreg = (comm_reg_t*)calloc(1, sizeof(comm_reg_t));
         assert(odpreg);
-        COMM_CHECK(comm_register_odp(NULL, 0, &odpreg[0]));
+        COMM_CHECK(comm_register_odp(&odpreg[0]));
     }
     else
     {

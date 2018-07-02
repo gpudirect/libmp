@@ -744,9 +744,9 @@ int mp_register(void *addr, size_t length, mp_reg_t *reg_, uint64_t exp_flags)
     /*set SYNC MEMOPS if its device buffer*/
     unsigned int type, flag;
     size_t size;
-    CUdeviceptr base;
-    CUresult curesult; 
-    int flags=0;
+    int flags=0, ret=0;
+    struct ibv_exp_reg_mr_in in;
+    struct ibv_exp_device_attr dattr;
 
     struct mp_reg *reg = calloc(1, sizeof(struct mp_reg));
     if (!reg) {
@@ -762,39 +762,15 @@ int mp_register(void *addr, size_t length, mp_reg_t *reg_, uint64_t exp_flags)
                  IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC;
     }  
 
-    mp_dbg_msg("exp_flags=%llx\n", exp_flags);
+    in.pd = ib_ctx->pd;
+    in.exp_access = flags;
+    in.comp_mask = 0;
 
-    if(exp_flags & IBV_EXP_ACCESS_ON_DEMAND)
+    if(addr != NULL && length > 0)
     {
-        struct ibv_exp_device_attr dattr;
-        dattr.comp_mask = IBV_EXP_DEVICE_ATTR_ODP | IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS;
-        int ret = ibv_exp_query_device(ib_ctx->context, &dattr);
-        if (!(dattr.exp_device_cap_flags & IBV_EXP_DEVICE_ODP))
-        {
-            mp_err_msg("ODP not supported!\n");
-            return MP_FAILURE;
-        }
-
-        //In LibMP we only support implicit ODP for the moment
-        if(!(dattr.odp_caps.general_odp_caps & IBV_EXP_ODP_SUPPORT_IMPLICIT))
-        {
-            mp_err_msg("Implicit ODP not supported!\n");
-            return MP_FAILURE;
-        }
-        
-        //Implicit On-Demand Paging is supported.
-        struct ibv_exp_reg_mr_in in;
-        in.pd = ib_ctx->pd;
-        in.addr = 0;
-        in.length = IBV_EXP_IMPLICIT_MR_SIZE;
-        in.exp_access = IBV_EXP_ACCESS_ON_DEMAND|flags;
-        in.comp_mask = 0;
-
-        mp_dbg_msg("ibv_exp_reg_mr addr:0 size:IBV_EXP_IMPLICIT_MR_SIZE flags=0x%08x\n", in.exp_access);
-        reg->mr = ibv_exp_reg_mr(&in);    
-    }
-    else
-    {
+        CUdeviceptr base;
+        CUresult curesult; 
+    
         // note: register addr, not base. no advantage in registering the whole buffer as we don't
         // maintain a registration cache yet
         curesult = cuPointerGetAttribute((void *)&type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)addr);
@@ -804,9 +780,42 @@ int mp_register(void *addr, size_t length, mp_reg_t *reg_, uint64_t exp_flags)
            flag = 1;
            CU_CHECK(cuPointerSetAttribute(&flag, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, base)); 
         }
-        mp_dbg_msg("ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
-        reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
+
+        in.addr = addr;
+        in.length = length;
     }
+
+    mp_dbg_msg("exp_flags=%llx\n", exp_flags);
+
+    if(exp_flags & IBV_EXP_ACCESS_ON_DEMAND)
+    {
+        dattr.comp_mask = IBV_EXP_DEVICE_ATTR_ODP | IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS;
+        int ret = ibv_exp_query_device(ib_ctx->context, &dattr);
+        if (!(dattr.exp_device_cap_flags & IBV_EXP_DEVICE_ODP))
+        {
+            mp_err_msg("ODP not supported!\n");
+            return MP_FAILURE;
+        }
+
+        //In LibMP we only support implicit ODP
+        if(!(dattr.odp_caps.general_odp_caps & IBV_EXP_ODP_SUPPORT_IMPLICIT))
+        {
+            mp_err_msg("Implicit ODP not supported!\n");
+            return MP_FAILURE;
+        }
+
+#if defined(__x86_64__) || defined (__i386__)
+        mp_warn_msg("NOTE: This implicit ODP MR can't be used with GMEM buffers on x86 systems\n");
+#endif        
+        //Implicit On-Demand Paging is supported.
+        in.addr = 0;
+        in.length = IBV_EXP_IMPLICIT_MR_SIZE;
+        in.exp_access |= IBV_EXP_ACCESS_ON_DEMAND;
+    }
+
+    mp_dbg_msg("ibv_exp_reg_mr addr:0 size:IBV_EXP_IMPLICIT_MR_SIZE flags=0x%08x\n", in.exp_access);
+    reg->mr = ibv_exp_reg_mr(&in);    
+//  reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
 
     if (!reg->mr) {
         mp_err_msg("ibv_reg_mr returned NULL for addr:%p size:%zu errno=%d(%s)\n", 
