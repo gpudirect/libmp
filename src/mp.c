@@ -762,7 +762,7 @@ int mp_register(void *addr, size_t length, mp_reg_t *reg_, uint64_t exp_flags)
                  IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC;
     }  
 
-    mp_dbg_msg(stderr, "exp_flags=%llx\n", exp_flags);
+    mp_dbg_msg("exp_flags=%llx\n", exp_flags);
 
     if(exp_flags & IBV_EXP_ACCESS_ON_DEMAND)
     {
