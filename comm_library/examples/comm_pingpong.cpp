@@ -194,16 +194,25 @@ int main(int argc, char **argv) {
         validate = atoi(value);
     }
 
-    if(!comm_use_comm())
-        fprintf(stderr, "ERROR: pingpong + one sided for comm library only\n");
-
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
     if (comm_size < 2 || comm_size > MAX_PEERS) { 
-    fprintf(stderr, "this test requires 2<ranks<%d\n", MAX_PEERS);
-        exit(-1);
+        fprintf(stderr, "this test requires 2<ranks<%d\n", MAX_PEERS);
+        exit(EXIT_FAILURE);
+    }
+
+    if(!comm_use_comm())
+    {
+        fprintf(stderr, "ERROR: you need to enable COMM\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(use_odp && use_gpu_buffers)
+    {
+        fprintf(stderr, "ERROR: Can't use device memory with on-demand paging\n");
+        exit(EXIT_FAILURE);        
     }
 
     device_id = comm_select_device(my_rank);
