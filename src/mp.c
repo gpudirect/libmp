@@ -739,27 +739,19 @@ static void check_cuda_ptr(void *addr, size_t length)
 }
 #endif // DADO_DEBUG
 
-int mp_register(void *addr, size_t length, mp_reg_t *reg_, int exp_flags)
+int mp_register(void *addr, size_t length, mp_reg_t *reg_, uint64_t exp_flags)
 {
     /*set SYNC MEMOPS if its device buffer*/
     unsigned int type, flag;
     size_t size;
     CUdeviceptr base;
     CUresult curesult; 
-    int flags;
+    int flags=0;
 
     struct mp_reg *reg = calloc(1, sizeof(struct mp_reg));
     if (!reg) {
       mp_err_msg("malloc returned NULL while allocating struct mp_reg\n");
       return MP_FAILURE;
-    }
-
-    curesult = cuPointerGetAttribute((void *)&type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)addr);
-    if ((curesult == CUDA_SUCCESS) && (type == CU_MEMORYTYPE_DEVICE)) { 
-       CU_CHECK(cuMemGetAddressRange(&base, &size, (CUdeviceptr)addr));
-
-       flag = 1;
-       CU_CHECK(cuPointerSetAttribute(&flag, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, base)); 
     }
 
     if (mp_enable_ud) {
@@ -768,7 +760,9 @@ int mp_register(void *addr, size_t length, mp_reg_t *reg_, int exp_flags)
     } else { 
         flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
                  IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC;
-    }
+    }  
+
+    mp_dbg_msg(stderr, "exp_flags=%llx\n", exp_flags);
 
     if(exp_flags & IBV_EXP_ACCESS_ON_DEMAND)
     {
@@ -803,6 +797,13 @@ int mp_register(void *addr, size_t length, mp_reg_t *reg_, int exp_flags)
     {
         // note: register addr, not base. no advantage in registering the whole buffer as we don't
         // maintain a registration cache yet
+        curesult = cuPointerGetAttribute((void *)&type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)addr);
+        if ((curesult == CUDA_SUCCESS) && (type == CU_MEMORYTYPE_DEVICE)) { 
+           CU_CHECK(cuMemGetAddressRange(&base, &size, (CUdeviceptr)addr));
+
+           flag = 1;
+           CU_CHECK(cuPointerSetAttribute(&flag, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, base)); 
+        }
         mp_dbg_msg("ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
         reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
     }
