@@ -739,80 +739,113 @@ static void check_cuda_ptr(void *addr, size_t length)
 }
 #endif // DADO_DEBUG
 
-int mp_register(void *addr, size_t length, mp_reg_t *reg_)
+int mp_register(void *addr, size_t length, mp_reg_t *reg_, int exp_flags)
 {
+    /*set SYNC MEMOPS if its device buffer*/
+    unsigned int type, flag;
+    size_t size;
+    CUdeviceptr base;
+    CUresult curesult; 
+    int flags;
 
-  //int myrank;
-  //MPI_Comm_rank (MPI_COMM_WORLD, &myrank);
-
-  struct mp_reg *reg = calloc(1, sizeof(struct mp_reg));
-  if (!reg) {
+    struct mp_reg *reg = calloc(1, sizeof(struct mp_reg));
+    if (!reg) {
       mp_err_msg("malloc returned NULL while allocating struct mp_reg\n");
       return MP_FAILURE;
-  }
+    }
 
-  /*set SYNC MEMOPS if its device buffer*/
-  unsigned int type, flag;
-  size_t size;
-  CUdeviceptr base;
-  CUresult curesult; 
-  int flags;
-  curesult = cuPointerGetAttribute((void *)&type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)addr);
-  if ((curesult == CUDA_SUCCESS) && (type == CU_MEMORYTYPE_DEVICE)) { 
+    curesult = cuPointerGetAttribute((void *)&type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)addr);
+    if ((curesult == CUDA_SUCCESS) && (type == CU_MEMORYTYPE_DEVICE)) { 
        CU_CHECK(cuMemGetAddressRange(&base, &size, (CUdeviceptr)addr));
 
        flag = 1;
        CU_CHECK(cuPointerSetAttribute(&flag, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, base)); 
-  }
+    }
 
-  if (mp_enable_ud) {
-      mp_dbg_msg("UD enabled, registering buffer for LOCAL_WRITE\n");
-      flags = IBV_ACCESS_LOCAL_WRITE;
-  } else { 
-      flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
+    if (mp_enable_ud) {
+        mp_dbg_msg("UD enabled, registering buffer for LOCAL_WRITE\n");
+        flags = IBV_ACCESS_LOCAL_WRITE;
+    } else { 
+        flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
                  IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_ATOMIC;
-  }
-  mp_dbg_msg("ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
-  // note: register addr, not base. no advantage in registering the whole buffer as we don't
-  // maintain a registration cache yet
-  reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
-  if (!reg->mr) {
-      mp_err_msg("ibv_reg_mr returned NULL for addr:%p size:%zu errno=%d(%s)\n", 
-                 addr, length, errno, strerror(errno));
-#ifdef DADO_DEBUG
-    check_cuda_ptr(addr, length);
-    spin_forever();
-    free(reg);
-    MPI_Abort(MPI_COMM_WORLD, 1);
-#endif
-    return MP_FAILURE;
-  }
-	
-  reg->key = reg->mr->lkey;
+    }
 
-  mp_dbg_msg("reg=%p key=%x\n", reg, reg->key);
+    if(exp_flags & IBV_EXP_ACCESS_ON_DEMAND)
+    {
+        struct ibv_exp_device_attr dattr;
+        dattr.comp_mask = IBV_EXP_DEVICE_ATTR_ODP | IBV_EXP_DEVICE_ATTR_EXP_CAP_FLAGS;
+        int ret = ibv_exp_query_device(ib_ctx->context, &dattr);
+        if (!(dattr.exp_device_cap_flags & IBV_EXP_DEVICE_ODP))
+        {
+            mp_err_msg("ODP not supported!\n");
+            return MP_FAILURE;
+        }
 
-  *reg_ = reg;
- 
-  return MP_SUCCESS;
+        //In LibMP we only support implicit ODP for the moment
+        if(!(dattr.odp_caps.general_odp_caps & IBV_EXP_ODP_SUPPORT_IMPLICIT))
+        {
+            mp_err_msg("Implicit ODP not supported!\n");
+            return MP_FAILURE;
+        }
+        
+        //Implicit On-Demand Paging is supported.
+        struct ibv_exp_reg_mr_in in;
+        in.pd = ib_ctx->pd;
+        in.addr = 0;
+        in.length = IBV_EXP_IMPLICIT_MR_SIZE;
+        in.exp_access = IBV_EXP_ACCESS_ON_DEMAND|flags;
+        in.comp_mask = 0;
+
+        mp_dbg_msg("ibv_exp_reg_mr addr:0 size:IBV_EXP_IMPLICIT_MR_SIZE flags=0x%08x\n", in.exp_access);
+        reg->mr = ibv_exp_reg_mr(&in);    
+    }
+    else
+    {
+        // note: register addr, not base. no advantage in registering the whole buffer as we don't
+        // maintain a registration cache yet
+        mp_dbg_msg("ibv_reg_mr addr:%p size:%zu flags=0x%08x\n", addr, length, flags);
+        reg->mr = ibv_reg_mr(ib_ctx->pd, addr, length, flags);
+    }
+
+    if (!reg->mr) {
+        mp_err_msg("ibv_reg_mr returned NULL for addr:%p size:%zu errno=%d(%s)\n", 
+                    addr, length, errno, strerror(errno));
+       
+        #ifdef DADO_DEBUG
+            check_cuda_ptr(addr, length);
+            spin_forever();
+            free(reg);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        #endif
+       
+        return MP_FAILURE;
+    }
+
+    reg->key = reg->mr->lkey;
+
+    mp_dbg_msg("reg=%p key=%x\n", reg, reg->key);
+
+    *reg_ = reg;
+
+    return MP_SUCCESS;
 }
 
 int mp_deregister(mp_reg_t *reg_)
 {
-  int ret=0;
-  struct mp_reg *reg = (struct mp_reg *) *reg_; 
+    int ret=0;
+    struct mp_reg *reg = (struct mp_reg *) *reg_; 
 
-  assert(reg);
-  assert(reg->mr);
-  ret = ibv_dereg_mr(reg->mr);
-  if(ret)
-  {
+    assert(reg);
+    assert(reg->mr);
+    ret = ibv_dereg_mr(reg->mr);
+    if(ret)
+    {
       mp_err_msg("ibv_dereg_mr returned %d\n", ret);
       return MP_FAILURE;
-  }
+    }
 
-  free(reg);
-  return MP_SUCCESS;
+    free(reg);
+    return MP_SUCCESS;
 }
 
 char shm_filename[100];
@@ -1206,7 +1239,7 @@ int mp_init (MPI_Comm comm, int *peers, int count, int init_flags, int gpu_id)
   }
 
   if (mp_enable_ud) { 
-      int result = mp_register(ud_padding, UD_ADDITION, &ud_padding_reg);
+      int result = mp_register(ud_padding, UD_ADDITION, &ud_padding_reg, 0);
       assert(result == MP_SUCCESS);
   }
 
@@ -1820,7 +1853,7 @@ int mp_window_create(void *addr, size_t size, mp_window_t *window_t)
   assert(exchange_win != NULL); 
 
   window->reg=NULL;
-  result = mp_register(addr, size, &window->reg);  
+  result = mp_register(addr, size, &window->reg, 0);  
   assert(result == MP_SUCCESS); 
   
   exchange_win[mpi_comm_rank].base_addr = addr; 

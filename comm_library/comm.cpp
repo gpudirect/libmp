@@ -246,11 +246,11 @@ int comm_init(MPI_Comm comm, int gpuId)
     iomb();
 
     DBG("registering ready_table size=%zd\n", table_size);
-    MP_CHECK(mp_register(ready_table, table_size, &ready_table_reg));
+    MP_CHECK(mp_register(ready_table, table_size, &ready_table_reg, 0));
     DBG("creating ready_table window\n");
     MP_CHECK(mp_window_create(ready_table, table_size, &ready_table_win));
     DBG("registering remote_ready_table\n");
-    MP_CHECK(mp_register(remote_ready_values, table_size, &remote_ready_values_reg));
+    MP_CHECK(mp_register(remote_ready_values, table_size, &remote_ready_values_reg, 0));
 
     comm_initialized = 1;
 
@@ -706,7 +706,30 @@ int comm_register(void *buf, size_t size, comm_reg_t *creg)
 
     if (!*reg) {
         DBG("registering buffer %p\n", buf);
-        MP_CHECK(mp_register(buf, size, reg));
+        MP_CHECK(mp_register(buf, size, reg, 0));
+    }
+
+out:
+    return ret;
+}
+
+int comm_register_odp(void *buf, size_t size, comm_reg_t *creg)
+{
+    assert(comm_initialized);
+    int ret = 0;
+    int retcode;
+    mp_reg_t *reg = (mp_reg_t*)creg;
+    assert(reg);
+
+    if (!size) {
+        ret = -EINVAL;
+        comm_err("SIZE==0\n");
+        goto out;
+    }
+
+    if (!*reg) {
+        DBG("registering buffer %p\n", buf);
+        MP_CHECK(mp_register(buf, size, reg, IBV_EXP_ACCESS_ON_DEMAND));
     }
 
 out:

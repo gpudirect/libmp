@@ -232,8 +232,8 @@ double sr_exchange (MPI_Comm comm, int size, int iter_count, int validate, doubl
     CUDA_CHECK(cudaMalloc((void **)&rbuf_d, size*iter_count));
     CUDA_CHECK(cudaMemset(rbuf_d, 0, size*iter_count)); 
  
-    MP_CHECK(mp_register(sbuf_d, size*iter_count, &sreg));
-    MP_CHECK(mp_register(rbuf_d, size*iter_count, &rreg));
+    MP_CHECK(mp_register(sbuf_d, size*iter_count, &sreg, 0));
+    MP_CHECK(mp_register(rbuf_d, size*iter_count, &rreg, 0));
 
     if (validate) {
         mp_dbg_msg("initializing the buffer \n");

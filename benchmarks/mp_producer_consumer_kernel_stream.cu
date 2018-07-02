@@ -373,8 +373,8 @@ int main (int c, char *v[])
         CUDA_CHECK(cudaMalloc((void **)&rbuf_d, buf_size));
         CUDA_CHECK(cudaMemset(rbuf_d, 0, buf_size)); 
  
-        MP_CHECK(mp_register(sbuf_d, buf_size, &sreg));
-        MP_CHECK(mp_register(rbuf_d, buf_size, &rreg));
+        MP_CHECK(mp_register(sbuf_d, buf_size, &sreg, 0));
+        MP_CHECK(mp_register(rbuf_d, buf_size, &rreg, 0));
 
 	if (!my_rank) { 
             if (prof_init(&prof_normal, 1000,  1000, "1us", 100, 1, tags)) {

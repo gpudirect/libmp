@@ -842,8 +842,8 @@ int main (int argc, char *argv[])
 			CUDA_CHECK(cudaMemset(rbuf_d, 0, buf_size)); 
 		}
 
-		MP_CHECK(mp_register(sbuf_d, buf_size, &sreg));
-		MP_CHECK(mp_register(rbuf_d, buf_size, &rreg));
+		MP_CHECK(mp_register(sbuf_d, buf_size, &sreg, 0));
+		MP_CHECK(mp_register(rbuf_d, buf_size, &rreg, 0));
 
 		if (!my_rank) fprintf(stdout, "%10d", size);
 
