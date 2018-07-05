@@ -47,11 +47,11 @@ libmpincludedir = $(includedir)/mp
 libmpinclude_HEADERS = include/mp/device.cuh comm_library/comm.h
 
 src_libmp_la_CFLAGS = $(AM_CFLAGS)
-src_libmp_la_SOURCES = src/mp.c src/mp_peersync.c src/mp_device.cpp src/desc_queue.cpp
+src_libmp_la_SOURCES = src/mp.c src/mp_peersync.c src/mp_device.cpp src/desc_queue.cpp src/mp_exp_send.c
 src_libmp_la_LDFLAGS = -version-info 2:0:0
 
 src_libmpcomm_la_CFLAGS = $(AM_CFLAGS)
-src_libmpcomm_la_SOURCES = src/mp.c src/mp_peersync.c src/mp_device.cpp src/desc_queue.cpp comm_library/comm.cpp
+src_libmpcomm_la_SOURCES = src/mp.c src/mp_peersync.c src/mp_device.cpp src/desc_queue.cpp comm_library/comm.cpp src/mp_exp_send.c
 src_libmpcomm_la_LDFLAGS = -version-info 2:0:0
 
 noinst_HEADERS = src/mp_internal.h src/archutils.h

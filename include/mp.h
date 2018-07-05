@@ -206,6 +206,25 @@ int mp_desc_queue_add_wait_value32(mp_desc_queue_t *dq, uint32_t *ptr, uint32_t 
 int mp_desc_queue_add_write_value32(mp_desc_queue_t *dq, uint32_t *ptr, uint32_t value);
 int mp_desc_queue_post_on_stream(cudaStream_t stream, mp_desc_queue_t *dq, int flags);
 
+//Exp send
+int mp_isend_on_stream_exp(
+                            void *buf, int size, int peer, 
+                            mp_reg_t *reg_t, mp_request_t *req_t, 
+                            cudaStream_t stream,
+                            void * ptr_to_size_new,
+                            void * ptr_to_lkey_new,
+                            void * ptr_to_addr_new);
+
+int mp_post_send_on_stream_exp(int peer, 
+                                struct mp_request *req, 
+                                cudaStream_t stream);
+
+int mp_prepare_send_exp(int peer,
+                        struct mp_request *req, 
+                        void * ptr_to_size_new,
+                        void * ptr_to_lkey_new,
+                        void * ptr_to_addr_new);
+
 #ifdef __cplusplus
 }
 #endif
