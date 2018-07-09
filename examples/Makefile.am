@@ -33,7 +33,7 @@ AM_CPPFLAGS += -I$(top_srcdir)/include
 
 AM_LDFLAGS   = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lmpi -lcuda -lcudart
 
-bin_PROGRAMS = mp_putget mp_sendrecv mp_sendrecv_kernel mp_sendrecv_stream
+bin_PROGRAMS = mp_putget mp_sendrecv mp_sendrecv_kernel mp_sendrecv_stream mp_sendrecv_stream_exp
 
 noinst_PROGRAMS = 
 
@@ -48,6 +48,7 @@ mp_sendrecv_stream_SOURCES = mp_sendrecv_stream.c
 
 mp_sendrecv_kernel_SOURCES = mp_sendrecv_kernel.cu
 
+mp_sendrecv_stream_exp_SOURCES = mp_sendrecv_stream_exp.cu
 
 SUFFIXES= .cu
 
