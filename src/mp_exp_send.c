@@ -57,7 +57,14 @@
 
 #define CUDACHECK(stmt) __CUDACHECK(stmt, #stmt)
 
-int mp_alloc_send_info(struct mp_send_info *mp_sinfo, int mp_mem_type)
+uint32_t mp_get_lkey_from_mr(mp_reg_t *reg_t)
+{
+	assert(reg_t);
+	struct mp_reg *reg = (struct mp_reg *)*reg_t;
+	return reg->key;
+}
+
+int mp_alloc_send_info(mp_send_info_t *mp_sinfo, int mp_mem_type)
 {
 	int ret=0;
 	if(!mp_sinfo)
@@ -69,22 +76,42 @@ int mp_alloc_send_info(struct mp_send_info *mp_sinfo, int mp_mem_type)
 
 	if(mp_mem_type == MP_HOSTMEM)
 	{
-		CUDACHECK(cudaMallocHost(mp_sinfo->ptr_to_size, 1*sizeof(uint32_t)));
+		int page_size = sysconf(_SC_PAGESIZE);
+		mp_dbg_msg("page_size=%d\n", page_size);
+		mp_sinfo->ptr_to_size = (uint32_t*)memalign(page_size, 1*sizeof(uint32_t));
+		//mp_sinfo->ptr_to_size = calloc(1, sizeof(uint32_t));
 		memset(mp_sinfo->ptr_to_size, 0, 1*sizeof(uint32_t));
-		CUDACHECK(cudaMallocHost(mp_sinfo->ptr_to_lkey, 1*sizeof(uint32_t)));
+		
+		mp_sinfo->ptr_to_lkey = (uint32_t*)memalign(page_size, 1*sizeof(uint32_t));
+		//mp_sinfo->ptr_to_lkey = calloc(1, sizeof(uint32_t));
 		memset(mp_sinfo->ptr_to_lkey, 0, 1*sizeof(uint32_t));
-		CUDACHECK(cudaMallocHost(mp_sinfo->ptr_to_addr, 1*sizeof(uintptr_t)));
+		
+		mp_sinfo->ptr_to_addr = (uintptr_t*)memalign(page_size, 1*sizeof(uintptr_t));
+		//mp_sinfo->ptr_to_addr = calloc(1, sizeof(uintptr_t));
 		memset(mp_sinfo->ptr_to_addr, 0, 1*sizeof(uintptr_t));
+		
 		mp_sinfo->mem_type=MP_HOSTMEM;
+	}
+	else if(mp_mem_type == MP_HOSTMEM_PINNED)
+	{
+		CUDACHECK(cudaMallocHost((void**)&(mp_sinfo->ptr_to_size), 1*sizeof(uint32_t)));
+		memset(mp_sinfo->ptr_to_size, 0, 1*sizeof(uint32_t));
+		CUDACHECK(cudaMallocHost((void**)&(mp_sinfo->ptr_to_lkey), 1*sizeof(uint32_t)));
+		memset(mp_sinfo->ptr_to_lkey, 0, 1*sizeof(uint32_t));
+		CUDACHECK(cudaMallocHost((void**)&(mp_sinfo->ptr_to_addr), 1*sizeof(uintptr_t)));
+		memset(mp_sinfo->ptr_to_addr, 0, 1*sizeof(uintptr_t));
+		
+		mp_sinfo->mem_type=MP_HOSTMEM_PINNED;
 	}
 	else if(mp_mem_type == MP_GPUMEM)
 	{
-		CUDACHECK(cudaMalloc(mp_sinfo->ptr_to_size, 1*sizeof(uint32_t)));
+		CUDACHECK(cudaMalloc((void**)&(mp_sinfo->ptr_to_size), 1*sizeof(uint32_t)));
 		CUDACHECK(cudaMemset(mp_sinfo->ptr_to_size, 0, 1*sizeof(uint32_t))); 
-		CUDACHECK(cudaMalloc(mp_sinfo->ptr_to_lkey, 1*sizeof(uint32_t)));
+		CUDACHECK(cudaMalloc((void**)&(mp_sinfo->ptr_to_lkey), 1*sizeof(uint32_t)));
 		CUDACHECK(cudaMemset(mp_sinfo->ptr_to_lkey, 0, 1*sizeof(uint32_t))); 
-		CUDACHECK(cudaMalloc(mp_sinfo->ptr_to_addr, 1*sizeof(uintptr_t)));
+		CUDACHECK(cudaMalloc((void**)&(mp_sinfo->ptr_to_addr), 1*sizeof(uintptr_t)));
 		CUDACHECK(cudaMemset(mp_sinfo->ptr_to_addr, 0, 1*sizeof(uintptr_t))); 
+		
 		mp_sinfo->mem_type=MP_GPUMEM;
 	}
 	else
@@ -94,15 +121,58 @@ int mp_alloc_send_info(struct mp_send_info *mp_sinfo, int mp_mem_type)
         goto out;
 	}
 
+	mp_dbg_msg("mp_sinfo->ptr_to_size=%p, mp_sinfo->ptr_to_lkey=%p, mp_sinfo->ptr_to_addr=%p, mem_type=%d\n", 
+				mp_sinfo->ptr_to_size, mp_sinfo->ptr_to_lkey, mp_sinfo->ptr_to_addr, mp_sinfo->mem_type);
+out:
+	return ret;
+}
+
+
+int mp_dealloc_send_info(mp_send_info_t *mp_sinfo)
+{
+	int ret=0;
+	if(!mp_sinfo)
+	{
+		mp_err_msg("!mp_sinfo\n");
+		ret=EINVAL;
+        goto out;
+	}
+
+	if(mp_sinfo->mem_type == MP_HOSTMEM)
+	{
+		free(mp_sinfo->ptr_to_size);
+		free(mp_sinfo->ptr_to_lkey);
+		free(mp_sinfo->ptr_to_addr);
+	}
+	else if(mp_sinfo->mem_type == MP_HOSTMEM_PINNED)
+	{
+		CUDACHECK(cudaFreeHost(mp_sinfo->ptr_to_size));
+		CUDACHECK(cudaFreeHost(mp_sinfo->ptr_to_lkey));
+		CUDACHECK(cudaFreeHost(mp_sinfo->ptr_to_addr));
+	}
+	else if(mp_sinfo->mem_type == MP_GPUMEM)
+	{
+		CUDACHECK(cudaFree(mp_sinfo->ptr_to_size));
+		CUDACHECK(cudaFree(mp_sinfo->ptr_to_lkey));
+		CUDACHECK(cudaFree(mp_sinfo->ptr_to_addr));
+	}
+	else
+	{
+		mp_err_msg("unknown memory type %x\n", mp_sinfo->mem_type);
+		ret=MP_FAILURE;
+        goto out;
+	}
+
 out:
 	return ret;
 }
 
 int mp_post_send_on_stream_exp(int peer, 
-                                struct mp_request *req, 
+								mp_request_t *req_t, 
                                 cudaStream_t stream)
 {
     int ret=MP_SUCCESS;
+    struct mp_request *req = *req_t;
 	client_t *client = &clients[client_index[peer]];
 
     if(!req)
@@ -134,7 +204,7 @@ out:
 
 int mp_prepare_send_exp(void *buf, int size, int peer, 
 						mp_reg_t *reg_t, mp_request_t *req_t, 
-						struct mp_send_info *mp_sinfo)
+						mp_send_info_t *mp_sinfo)
 {
     int progress_retry=0;
     int ret = MP_SUCCESS;
@@ -178,7 +248,29 @@ int mp_prepare_send_exp(void *buf, int size, int peer,
         // BUG: leaking req ??
         goto out;
     }
+    
+	if(mp_sinfo->mem_type == MP_HOSTMEM)
+	{
+		ptr_to_size_flags=GDS_MEMORY_HOST;
+		ptr_to_lkey_flags=GDS_MEMORY_HOST;
+		ptr_to_addr_flags=GDS_MEMORY_HOST;
+	}
+	else if(mp_sinfo->mem_type == MP_HOSTMEM_PINNED)
+	{
+		ptr_to_size_flags=GDS_MEMORY_GPU;
+		ptr_to_lkey_flags=GDS_MEMORY_GPU;
+		ptr_to_addr_flags=GDS_MEMORY_GPU;
+	}
+	else if(mp_sinfo->mem_type == MP_GPUMEM)
+	{
+		ptr_to_size_flags=GDS_MEMORY_GPU;
+		ptr_to_lkey_flags=GDS_MEMORY_GPU;
+		ptr_to_addr_flags=GDS_MEMORY_GPU;
+	}
 
+
+	//We can avoid it with mp_sinfo
+#if 0
     if(mp_sinfo != NULL && mp_sinfo->ptr_to_size != NULL)
     {
         curesult = cuPointerGetAttribute((void *)&mem_type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)mp_sinfo->ptr_to_size);
@@ -241,7 +333,7 @@ int mp_prepare_send_exp(void *buf, int size, int peer,
             goto out;
         }        
     }
-
+#endif
     ret = gds_prepare_send_info(&req->gds_send_info,
                             mp_sinfo->ptr_to_size, ptr_to_size_flags,
                             mp_sinfo->ptr_to_lkey, ptr_to_lkey_flags,
@@ -257,8 +349,8 @@ out:
 }
 
 int mp_isend_on_stream_exp(void *buf, int size, int peer, 
-							mp_reg_t *reg, mp_request_t *req, 
-							struct mp_send_info *mp_sinfo,
+                            mp_reg_t *reg, mp_request_t *req, 
+                            mp_send_info_t * mp_sinfo,
 							cudaStream_t stream)
 {
 	int ret = MP_SUCCESS;

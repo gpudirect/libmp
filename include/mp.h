@@ -74,6 +74,7 @@ typedef struct mp_send_info {
 
 enum mp_mem_type {
     MP_HOSTMEM = 0,
+    MP_HOSTMEM_PINNED,
     MP_GPUMEM
 };
 
@@ -222,11 +223,11 @@ int mp_desc_queue_post_on_stream(cudaStream_t stream, mp_desc_queue_t *dq, int f
 //Exp send
 int mp_isend_on_stream_exp(void *buf, int size, int peer, 
                             mp_reg_t *reg, mp_request_t *req, 
-                            struct mp_send_info *mp_sinfo,
+                            mp_send_info_t * mp_sinfo,
                             cudaStream_t stream);
 
 int mp_post_send_on_stream_exp(int peer, 
-                                struct mp_request *req, 
+                                mp_request_t *req_t, 
                                 cudaStream_t stream);
 
 int mp_prepare_send_exp(void *buf, int size, int peer, 
@@ -234,6 +235,8 @@ int mp_prepare_send_exp(void *buf, int size, int peer,
                         struct mp_send_info *mp_sinfo);
 
 int mp_alloc_send_info(struct mp_send_info *mp_sinfo, int mp_mem_type);
+int mp_dealloc_send_info(struct mp_send_info *mp_sinfo);
+uint32_t mp_get_lkey_from_mr(mp_reg_t *reg_t);
 
 #ifdef __cplusplus
 }
