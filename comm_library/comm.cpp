@@ -718,11 +718,10 @@ int comm_deregister(comm_reg_t *creg)
     assert(comm_initialized);
     int ret = 0;
     mp_reg_t *reg = (mp_reg_t*)creg;
-    assert(reg);
 
     if (*reg) {
-       MP_CHECK(mp_deregister(reg));
-       *creg=NULL;
+	MP_CHECK(mp_deregister(reg));
+	*creg=NULL;
     }
 
 out:
