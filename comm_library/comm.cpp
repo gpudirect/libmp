@@ -465,7 +465,7 @@ int comm_irecv(void *recv_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
     size_t nbytes = size*comm_size_of_mpi_type(type);
     int peer = comm_mpi_rank_to_peer(src_rank);
 
-    DBG("src_rank=%d peer=%d nbytes=%zd buf=%p *reg=%p\n", src_rank, peer, nbytes, recv_buf, *reg);
+    DBG("src_rank=%d peer=%d nbytes=%zd buf=%p\n", src_rank, peer, nbytes, recv_buf);
 
     COMM_CHECK(comm_register(recv_buf, nbytes, creg));
     reg = (mp_reg_t*)creg;
