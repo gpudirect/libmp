@@ -31,7 +31,7 @@ AM_CPPFLAGS  = -I$(CUDA_PATH)/include -I$(MPI_PATH)/include
 AM_CPPFLAGS += -D__STDC_FORMAT_MACROS
 AM_CPPFLAGS += -I$(top_srcdir)/include
 
-AM_LDFLAGS   = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lmpi -lcuda -lcudart
+AM_LDFLAGS   = -L$(CUDA_PATH)/lib64 -L$(CUDA_PATH)/lib $(top_builddir)/src/libmp.la -lgdsync -lgdrapi -lcuda -lcudart
 
 bin_PROGRAMS = mp_putget mp_sendrecv mp_sendrecv_kernel mp_sendrecv_stream
 
