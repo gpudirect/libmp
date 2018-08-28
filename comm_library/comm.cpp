@@ -495,9 +495,8 @@ int comm_post_isend_stream_exp(int dest_rank, comm_request_t *creq, cudaStream_t
 
     retcode = mp_post_send_on_stream_exp(peer, req, stream);
     if (retcode) {
-        comm_err("error in mp_send_prepare ret=%d\n", retcode);
+        comm_err("error in mp_post_send_on_stream_exp ret=%d\n", retcode);
         ret = -1;
-        comm_deregister(creg);
         goto out;
     }
 
@@ -694,7 +693,7 @@ int comm_prepare_isend_exp(void *send_buf, size_t size, MPI_Datatype type,
     reg = (mp_reg_t*)creg;
     assert(reg);
 
-    retcode = mp_prepare_send_exp(send_buf, nbytes, peer, reg, req);
+    retcode = mp_prepare_send_exp(send_buf, nbytes, peer, reg, req, mp_sinfo);
     if (retcode) {
         comm_err("error in mp_send_prepare ret=%d\n", retcode);
         ret = -1;

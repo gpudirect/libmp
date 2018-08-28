@@ -46,7 +46,7 @@ if [ ! -e Makefile ]; then
     echo "configuring..."
     ../configure \
         --prefix=$PREFIX \
-        --with-libibverbs=$PREFIX \
+        --with-libibverbs=$OFED \
         --with-libgdsync=$PREFIX \
         --with-cuda=$CUDA \
         --with-mpi=$MPI_HOME \
