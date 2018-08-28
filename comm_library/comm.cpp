@@ -484,6 +484,27 @@ out:
     return ret;
 }
 
+//Trigger the send
+int comm_post_isend_stream_exp(int dest_rank, comm_request_t *creq, cudaStream_t stream)
+{
+    int ret = 0, retcode = 0;
+    assert(comm_initialized);
+    assert(creq);
+    mp_request_t *req = (mp_request_t*)creq;
+    int peer = comm_mpi_rank_to_peer(dest_rank);
+
+    retcode = mp_post_send_on_stream_exp(peer, req, stream);
+    if (retcode) {
+        comm_err("error in mp_send_prepare ret=%d\n", retcode);
+        ret = -1;
+        comm_deregister(creg);
+        goto out;
+    }
+
+    out:
+        return ret;
+}
+
 int comm_isend_on_stream(void *send_buf, size_t size, MPI_Datatype type, comm_reg_t *creg,
                          int dest_rank, comm_request_t *creq, cudaStream_t stream)
 {
@@ -650,6 +671,44 @@ unreg:
 
 err:
     return ret;
+}
+
+int comm_prepare_isend_exp(void *send_buf, size_t size, MPI_Datatype type, 
+                            int dest_rank,
+                            comm_reg_t *creg, comm_request_t *creq,
+                            mp_send_info_t * mp_sinfo)
+{
+    int ret = 0, retcode = 0;
+    assert(mp_sinfo);
+    assert(comm_initialized);
+    mp_reg_t *reg;
+    mp_request_t *req = (mp_request_t*)creq;
+    size_t nbytes = size*comm_size_of_mpi_type(type);
+    int peer = comm_mpi_rank_to_peer(dest_rank);
+
+    DBG("dest_rank=%d peer=%d nbytes=%zd\n", dest_rank, peer, nbytes);
+
+    MP_CHECK(mp_alloc_send_info(mp_sinfo, MP_GPUMEM));
+
+    COMM_CHECK(comm_register(send_buf, nbytes, creg));
+    reg = (mp_reg_t*)creg;
+    assert(reg);
+
+    retcode = mp_prepare_send_exp(send_buf, nbytes, peer, reg, req);
+    if (retcode) {
+        comm_err("error in mp_send_prepare ret=%d\n", retcode);
+        ret = -1;
+        comm_deregister(creg);
+        goto out;
+    }
+
+    comm_track_request(req);
+
+    out:
+        return ret;
+
+    //Second method: prepare descriptors
+    //MP_CHECK(mp_prepare_send_exp((void *)((uintptr_t)sbuf_d + size*j), size, peer, &sreg, &sreq[j], &mp_sinfo));
 }
 
 int comm_prepare_wait_all(int count, comm_request_t *creqs)

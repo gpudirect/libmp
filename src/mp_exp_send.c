@@ -66,7 +66,8 @@ uint32_t mp_get_lkey_from_mr(mp_reg_t *reg_t)
 
 int mp_alloc_send_info(mp_send_info_t *mp_sinfo, int mp_mem_type)
 {
-	int ret=0;
+	int ret=MP_SUCCESS;
+	
 	if(!mp_sinfo)
 	{
 		mp_err_msg("!mp_sinfo\n");
@@ -274,70 +275,71 @@ int mp_prepare_send_exp(void *buf, int size, int peer,
 
 
 	//We can avoid it with mp_sinfo
-#if 0
-    if(mp_sinfo != NULL && mp_sinfo->ptr_to_size != NULL)
-    {
-        curesult = cuPointerGetAttribute((void *)&mem_type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)mp_sinfo->ptr_to_size);
-        if (curesult == CUDA_SUCCESS) {
-            if (mem_type == CU_MEMORYTYPE_DEVICE) ptr_to_size_flags=GDS_MEMORY_GPU;
-            else if (mem_type == CU_MEMORYTYPE_HOST) ptr_to_size_flags=GDS_MEMORY_HOST;
-            else
-            {
-                mp_err_msg("error ptr size mem_type=%d\n", __FUNCTION__, mem_type);
-                ret=MP_FAILURE;
-                goto out;
-            }
-        }
-        else {
-            cuGetErrorString(ret, &err_str);        
-            mp_err_msg("%s error ret=%d(%s)\n", __FUNCTION__, ret, err_str);
-            ret=MP_FAILURE;
-            goto out;
-        }        
-    }
+	#if 0
+	if(mp_sinfo != NULL && mp_sinfo->ptr_to_size != NULL)
+	{
+	curesult = cuPointerGetAttribute((void *)&mem_type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)mp_sinfo->ptr_to_size);
+	if (curesult == CUDA_SUCCESS) {
+	    if (mem_type == CU_MEMORYTYPE_DEVICE) ptr_to_size_flags=GDS_MEMORY_GPU;
+	    else if (mem_type == CU_MEMORYTYPE_HOST) ptr_to_size_flags=GDS_MEMORY_HOST;
+	    else
+	    {
+	        mp_err_msg("error ptr size mem_type=%d\n", __FUNCTION__, mem_type);
+	        ret=MP_FAILURE;
+	        goto out;
+	    }
+	}
+	else {
+	    cuGetErrorString(ret, &err_str);        
+	    mp_err_msg("%s error ret=%d(%s)\n", __FUNCTION__, ret, err_str);
+	    ret=MP_FAILURE;
+	    goto out;
+	}        
+	}
 
-    if(mp_sinfo != NULL && mp_sinfo->ptr_to_lkey != NULL)
-    {
-        curesult = cuPointerGetAttribute((void *)&mem_type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)mp_sinfo->ptr_to_lkey);
-        if (curesult == CUDA_SUCCESS) {
-            if (mem_type == CU_MEMORYTYPE_DEVICE) ptr_to_lkey_flags=GDS_MEMORY_GPU;
-            else if (mem_type == CU_MEMORYTYPE_HOST) ptr_to_lkey_flags=GDS_MEMORY_HOST;
-            else
-            {
-                mp_err_msg("error ptr lkey mem_type=%d\n", __FUNCTION__, mem_type);
-                ret=MP_FAILURE;
-                goto out;
-            }
-        }
-        else {
-            cuGetErrorString(ret, &err_str);        
-            mp_err_msg("%s error ret=%d(%s)\n", __FUNCTION__, ret, err_str);
-            ret=MP_FAILURE;
-            goto out;
-        }        
-    }
+	if(mp_sinfo != NULL && mp_sinfo->ptr_to_lkey != NULL)
+	{
+	curesult = cuPointerGetAttribute((void *)&mem_type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)mp_sinfo->ptr_to_lkey);
+	if (curesult == CUDA_SUCCESS) {
+	    if (mem_type == CU_MEMORYTYPE_DEVICE) ptr_to_lkey_flags=GDS_MEMORY_GPU;
+	    else if (mem_type == CU_MEMORYTYPE_HOST) ptr_to_lkey_flags=GDS_MEMORY_HOST;
+	    else
+	    {
+	        mp_err_msg("error ptr lkey mem_type=%d\n", __FUNCTION__, mem_type);
+	        ret=MP_FAILURE;
+	        goto out;
+	    }
+	}
+	else {
+	    cuGetErrorString(ret, &err_str);        
+	    mp_err_msg("%s error ret=%d(%s)\n", __FUNCTION__, ret, err_str);
+	    ret=MP_FAILURE;
+	    goto out;
+	}        
+	}
 
-    if(mp_sinfo != NULL && mp_sinfo->ptr_to_addr != NULL)
-    {
-        curesult = cuPointerGetAttribute((void *)&mem_type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)mp_sinfo->ptr_to_addr);
-        if (curesult == CUDA_SUCCESS) {
-            if (mem_type == CU_MEMORYTYPE_DEVICE) ptr_to_addr_flags=GDS_MEMORY_GPU;
-            else if (mem_type == CU_MEMORYTYPE_HOST) ptr_to_addr_flags=GDS_MEMORY_HOST;
-            else
-            {
-                mp_err_msg("error ptr addr mem_type=%d\n", __FUNCTION__, mem_type);
-                ret=MP_FAILURE;
-                goto out;
-            }
-        }
-        else {
-            cuGetErrorString(ret, &err_str);        
-            mp_err_msg("%s error ret=%d(%s)\n", __FUNCTION__, ret, err_str);
-            ret=MP_FAILURE;
-            goto out;
-        }        
-    }
-#endif
+	if(mp_sinfo != NULL && mp_sinfo->ptr_to_addr != NULL)
+	{
+	curesult = cuPointerGetAttribute((void *)&mem_type, CU_POINTER_ATTRIBUTE_MEMORY_TYPE, (CUdeviceptr)mp_sinfo->ptr_to_addr);
+	if (curesult == CUDA_SUCCESS) {
+	    if (mem_type == CU_MEMORYTYPE_DEVICE) ptr_to_addr_flags=GDS_MEMORY_GPU;
+	    else if (mem_type == CU_MEMORYTYPE_HOST) ptr_to_addr_flags=GDS_MEMORY_HOST;
+	    else
+	    {
+	        mp_err_msg("error ptr addr mem_type=%d\n", __FUNCTION__, mem_type);
+	        ret=MP_FAILURE;
+	        goto out;
+	    }
+	}
+	else {
+	    cuGetErrorString(ret, &err_str);        
+	    mp_err_msg("%s error ret=%d(%s)\n", __FUNCTION__, ret, err_str);
+	    ret=MP_FAILURE;
+	    goto out;
+	}        
+	}
+	#endif
+
     ret = gds_prepare_send_info(&req->gds_send_info,
                             mp_sinfo->ptr_to_size, ptr_to_size_flags,
                             mp_sinfo->ptr_to_lkey, ptr_to_lkey_flags,
