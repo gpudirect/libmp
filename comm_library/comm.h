@@ -128,6 +128,13 @@ extern "C" {
     int comm_deregister(comm_reg_t *creg);
     int comm_select_device(int mpiRank);
 
+    //Expose send params
+    int comm_prepare_isend_exp(void *send_buf, size_t size, MPI_Datatype type, 
+                            int dest_rank,
+                            comm_reg_t *creg, comm_request_t *creq,
+                            mp_send_info_t * mp_sinfo);
+    int comm_post_isend_stream_exp(int dest_rank, comm_request_t *creq, cudaStream_t stream);
+
 
 #ifdef __cplusplus
 }

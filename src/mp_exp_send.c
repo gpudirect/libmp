@@ -238,6 +238,10 @@ int mp_prepare_send_exp(void *buf, int size, int peer,
     	req->in.sr.wr.ud.remote_qkey = 0;
     }
 
+    //With size == 0, in libmlx5/qp.c, if (likely(sg_list[i].length)) fails and
+    //we don't retrieve pointers to send parameters
+    if(size == 0) size=1;
+    
     req->sg_entry.length = size;
     req->sg_entry.lkey = reg->key;
     req->sg_entry.addr = (uintptr_t)(buf);
