@@ -81,7 +81,7 @@ int put_exchange (MPI_Comm comm, int size, int iter_count, int window_size, int 
 		memset(buf_d, 0, buf_size);
 	}
 
-	MP_CHECK(mp_register(buf_d, buf_size, &reg));
+	MP_CHECK(mp_register(buf_d, buf_size, &reg, 0));
 
 	MP_CHECK(mp_window_create(buf_d, buf_size, &win));
 
@@ -189,8 +189,8 @@ int put_exchange_on_stream (MPI_Comm comm, int size, int iter_count, int window_
 		memset(buf_d, 0, buf_size);
 	}
 
-	MP_CHECK(mp_register(buf_d, buf_size, &reg));
-	MP_CHECK(mp_register(signal, 4096, &signal_reg));
+	MP_CHECK(mp_register(buf_d, buf_size, &reg, 0));
+	MP_CHECK(mp_register(signal, 4096, &signal_reg, 0));
 
 	MP_CHECK(mp_window_create(buf_d, buf_size, &win));
 
@@ -329,8 +329,8 @@ int put_desc_exchange_on_stream (MPI_Comm comm, int size, int iter_count, int wi
 	mp_desc_queue_t dq = NULL;
 	MP_CHECK(mp_desc_queue_alloc(&dq));
 
-	MP_CHECK(mp_register(buf_d, buf_size, &reg));
-	MP_CHECK(mp_register(signal, 4096, &signal_reg));
+	MP_CHECK(mp_register(buf_d, buf_size, &reg, 0));
+	MP_CHECK(mp_register(signal, 4096, &signal_reg, 0));
 
 	MP_CHECK(mp_window_create(buf_d, buf_size, &win));
 
@@ -478,8 +478,8 @@ int put_desc_nowait_exchange_on_stream (MPI_Comm comm, int size, int iter_count,
 	mp_desc_queue_t dq = NULL;
 	MP_CHECK(mp_desc_queue_alloc(&dq));
 
-	MP_CHECK(mp_register(buf_d, buf_size, &reg));
-	MP_CHECK(mp_register(signal, 4096, &signal_reg));
+	MP_CHECK(mp_register(buf_d, buf_size, &reg, 0));
+	MP_CHECK(mp_register(signal, 4096, &signal_reg, 0));
 
 	MP_CHECK(mp_window_create(buf_d, buf_size, &win));
 
@@ -616,7 +616,7 @@ int get_exchange (MPI_Comm comm, int size, int iter_count, int window_size, int 
 		memset(buf_d, 0, buf_size);
 	}
 
-	MP_CHECK(mp_register(buf_d, buf_size, &reg));
+	MP_CHECK(mp_register(buf_d, buf_size, &reg, 0));
 
 	MP_CHECK(mp_window_create(buf_d, buf_size, &win));
 

@@ -127,8 +127,8 @@ int sr_exchange (MPI_Comm comm, int size, int iter_count, int validate)
  
     CUDA_CHECK(cudaStreamCreate(&stream));	
 
-    MP_CHECK(mp_register(sbuf_d, buf_size, &sreg));
-    MP_CHECK(mp_register(rbuf_d, buf_size, &rreg));
+    MP_CHECK(mp_register(sbuf_d, buf_size, &sreg, 0));
+    MP_CHECK(mp_register(rbuf_d, buf_size, &rreg, 0));
 
     if (validate) {
         CUDA_CHECK(cudaMemset(sbuf_d, (my_rank + 1), buf_size));

@@ -54,14 +54,24 @@ do {                                                    \
 } while (0)
 
 
-comm_reg_t * sreg, * rreg;
+comm_reg_t * sreg, * rreg, * odpreg;
 int comm_size, my_rank, device_id;
 unsigned char * send_buf[MAX_PEERS];
 unsigned char * recv_buf[MAX_PEERS];
-int use_gpu_buffers=0;
 int tot_iters=MAX_ITERS;
-int max_size=BUF_SIZE;
+int buf_size=BUF_SIZE;
+int use_gpu_buffers=0;
 int validate=0;
+int use_odp=0;
+
+static void usage()
+{
+    printf("Options:\n");
+    printf("  -g            allocate GPU intead of CPU memory buffers\n");
+    printf("  -o            use implici ODP\n");
+    printf("  -n=<iter>     number of exchanges (default %d)\n", MAX_ITERS);
+    printf("  -s=<bytes>    S/R buffer size (default %d)\n", BUF_SIZE);
+}
 
 int async_exchange(int iter) {
     int peer, n_sreqs=0, n_rreqs=0;
@@ -73,8 +83,10 @@ int async_exchange(int iter) {
     {
         if(peer != my_rank)
         {
-            comm_irecv(recv_buf[peer], max_size, MPI_CHAR, &rreg[peer], peer, &recv_requests[n_rreqs]);
-            comm_send_ready_on_stream(peer, &ready_requests[n_rreqs], NULL);
+            COMM_CHECK(comm_irecv(recv_buf[peer], buf_size, MPI_CHAR, 
+                                    (use_odp ? &odpreg[0] : &rreg[peer]),
+                                    peer, &recv_requests[n_rreqs]));
+            COMM_CHECK(comm_send_ready_on_stream(peer, &ready_requests[n_rreqs], NULL));
             n_rreqs++;
         }
     }
@@ -83,18 +95,20 @@ int async_exchange(int iter) {
     {
         if(peer != my_rank)
         {
-            comm_wait_ready_on_stream(peer,NULL);
-            comm_isend_on_stream(send_buf[peer], max_size, MPI_CHAR, 
-                            &sreg[peer], peer, &send_requests[n_sreqs], NULL);
+            COMM_CHECK(comm_wait_ready_on_stream(peer,NULL));
+            COMM_CHECK(comm_isend_on_stream(send_buf[peer], buf_size, MPI_CHAR,
+                            (use_odp ? &odpreg[0] : &sreg[peer]),
+                            peer, &send_requests[n_sreqs], NULL));
 
             n_sreqs++;
         }
     }
 
-    comm_wait_all_on_stream(n_rreqs, recv_requests, NULL);
-    comm_wait_all_on_stream(n_sreqs, send_requests, NULL);
-    //comm_wait_all_on_stream(n_rreqs, ready_requests, NULL);
+    COMM_CHECK(comm_wait_all_on_stream(n_rreqs, recv_requests, NULL));
+    COMM_CHECK(comm_wait_all_on_stream(n_rreqs, ready_requests, NULL));
+    COMM_CHECK(comm_wait_all_on_stream(n_sreqs, send_requests, NULL));
 
+    //printf("Before progress, %d iter, %d n_rreqs, %d n_sreqs, %d comm_size\n", iter, n_rreqs, n_sreqs, comm_size);
     comm_progress();
 }
 
@@ -108,8 +122,10 @@ int sync_exchange(int iter) {
     {
         if(peer != my_rank)
         {
-            comm_irecv(recv_buf[peer], max_size, MPI_CHAR, &rreg[peer], peer, &recv_requests[n_rreqs]);
-            comm_send_ready(peer, &ready_requests[n_rreqs]);
+            COMM_CHECK(comm_irecv(recv_buf[peer], buf_size, MPI_CHAR, 
+                                    (use_odp ? &odpreg[0] : &rreg[peer]),
+                                    peer, &recv_requests[n_rreqs]));
+            COMM_CHECK(comm_send_ready(peer, &ready_requests[n_rreqs]));
             n_rreqs++;
         }
     }
@@ -118,13 +134,15 @@ int sync_exchange(int iter) {
     {
         if(peer != my_rank)
         {
-            comm_wait_ready(peer);
-            comm_isend(send_buf[peer], max_size, MPI_CHAR, 
-                            &sreg[peer], peer, &send_requests[n_sreqs]);
+            COMM_CHECK(comm_wait_ready(peer));
+            COMM_CHECK(comm_isend(send_buf[peer], buf_size, MPI_CHAR, 
+                            (use_odp ? &odpreg[0] : &sreg[peer]),
+                            peer, &send_requests[n_sreqs]));
 
             n_sreqs++;
         }
     }
+
     comm_flush();
 }
 
@@ -132,82 +150,120 @@ int main(int argc, char **argv) {
     int i,j,k,iter;
     char *value;
     double tot_time, start_time, stop_time;
+    int c;
 
-    value = getenv("USE_GPU_BUFFERS");
-    if (value != NULL) {
-        use_gpu_buffers = atoi(value);
-    }
+        while (1) {
 
-    value = getenv("MAX_SIZE");
-    if (value != NULL) {
-        max_size = atoi(value);
-    }
+        c = getopt(argc, argv, "gon:s:");
+        if (c == -1)
+            break;
 
-    value = getenv("TOT_ITERS");
-    if (value != NULL) {
-        tot_iters = atoi(value);
-        if(tot_iters > MAX_ITERS)
-        {
-            printf("ERROR: max iters number allowed=%d\n", MAX_ITERS);
-            tot_iters = MAX_ITERS;
+        switch (c) {
+        case 'g':
+            use_gpu_buffers=1;
+            printf("Using GPU memory for communication buffers\n");
+            break;
+
+        case 'n':
+            tot_iters = strtol(optarg, NULL, 0);
+            if(tot_iters > MAX_ITERS)
+                tot_iters = MAX_ITERS;
+            printf("Tot iters=%d\n", tot_iters);
+            break;
+
+        case 'o':
+            use_odp=1;
+            printf("Using implicit ODP\n");
+            break;
+
+
+        case 's':
+            buf_size=strtol(optarg, NULL, 0);
+            printf("Using buf_size=%d\n", buf_size);
+            
+            break;
+
+        default:
+            usage();
+            return 1;
         }
-
     }
-    
+   
     value = getenv("ENABLE_VALIDATION");
     if (value != NULL) {
         validate = atoi(value);
     }
 
-    if(!comm_use_comm())
-        fprintf(stderr, "ERROR: pingpong + one sided for comm library only\n");
-
     MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &comm_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
 
-    assert(comm_size <= MAX_PEERS);
+    if (comm_size < 2 || comm_size > MAX_PEERS) { 
+        fprintf(stderr, "this test requires 2<ranks<%d\n", MAX_PEERS);
+        exit(EXIT_FAILURE);
+    }
+
+    if(!comm_use_comm())
+    {
+        fprintf(stderr, "ERROR: you need to enable COMM\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if(use_odp && use_gpu_buffers)
+    {
+        fprintf(stderr, "ERROR: Can't use device memory with on-demand paging\n");
+        exit(EXIT_FAILURE);        
+    }
 
     device_id = comm_select_device(my_rank);
-    cudaSetDevice(device_id);
+    CUDA_CHECK(cudaSetDevice(device_id));
     if (my_rank < 10) {
         struct cudaDeviceProp devProp;
-        cudaGetDeviceProperties(&devProp, device_id);
+        CUDA_CHECK(cudaGetDeviceProperties(&devProp, device_id));
         printf("rank %d:  Selecting device %d (%s)\n",my_rank,device_id,devProp.name);
     }
     
     comm_init(MPI_COMM_WORLD, device_id);
-
     
     for(i=0; i<comm_size; i++)
     {
         if(!use_gpu_buffers)
         {
-            CUDA_CHECK(cudaMallocHost((void **)&send_buf[i], max_size*sizeof(char)));
+            CUDA_CHECK(cudaMallocHost((void **)&send_buf[i], buf_size*sizeof(char)));
             assert(send_buf[i]);
-            memset(send_buf[i], 9, max_size*sizeof(char));
+            memset(send_buf[i], 9, buf_size*sizeof(char));
 
-            CUDA_CHECK(cudaMallocHost((void **)&recv_buf[i], max_size*sizeof(char)));
+            CUDA_CHECK(cudaMallocHost((void **)&recv_buf[i], buf_size*sizeof(char)));
             assert(recv_buf[i]);
-            memset(recv_buf[i], 0, max_size*sizeof(char));            
+            memset(recv_buf[i], 0, buf_size*sizeof(char));            
         }
         else
         {
-            CUDA_CHECK(cudaMalloc((void **)&send_buf[i], max_size*sizeof(char)));
-            CUDA_CHECK(cudaMemset(send_buf[i], 9, max_size*sizeof(char)));
+            CUDA_CHECK(cudaMalloc((void **)&send_buf[i], buf_size*sizeof(char)));
+            CUDA_CHECK(cudaMemset(send_buf[i], 9, buf_size*sizeof(char)));
 
-            CUDA_CHECK(cudaMalloc((void **)&recv_buf[i], max_size*sizeof(char)));
-            CUDA_CHECK(cudaMemset(recv_buf[i], 0, max_size*sizeof(char)));
+            CUDA_CHECK(cudaMalloc((void **)&recv_buf[i], buf_size*sizeof(char)));
+            CUDA_CHECK(cudaMemset(recv_buf[i], 0, buf_size*sizeof(char)));
         }
     }
 
-    //1 region for each buffer
-    sreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
-    rreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
-    
+    if(use_odp)
+    {
+        odpreg = (comm_reg_t*)calloc(1, sizeof(comm_reg_t));
+        assert(odpreg);
+        COMM_CHECK(comm_register_odp(&odpreg[0]));
+    }
+    else
+    {
+        sreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
+        assert(sreg);
+        rreg = (comm_reg_t*)calloc(comm_size, sizeof(comm_reg_t));
+        assert(sreg);        
+    }
+
     if(!my_rank) 
-        printf("----> async sa=%d, use_gpu_buffers=%d, max_size=%d, tot_iters=%d num peers=%d validate=%d\n", 
-                    comm_use_model_sa()?1:0, use_gpu_buffers, max_size, tot_iters, comm_size, validate);
+        printf("# SA Model=%d\n# use_gpu_buffers=%d\n# buf_size=%d\n# tot_iters=%d\n# num peers=%d\n# validate=%d\n# use_odp=%d\n",
+                    comm_use_model_sa()?1:0, use_gpu_buffers, buf_size, tot_iters, comm_size, validate, use_odp);
 
     start_time = MPI_Wtime();
     for(iter=0; iter<tot_iters; iter++)
@@ -220,8 +276,8 @@ int main(int argc, char **argv) {
 
     if(comm_use_model_sa())
     {
-        cudaDeviceSynchronize();
-        comm_flush();
+        CUDA_CHECK(cudaDeviceSynchronize());
+        COMM_CHECK(comm_flush());
     }   
     stop_time = MPI_Wtime();
 
@@ -247,8 +303,13 @@ int main(int argc, char **argv) {
         } 
     }
 
-    free(sreg);
-    free(rreg);
+    if(use_odp)
+        free(odpreg);
+    else
+    {
+        free(sreg);
+        free(rreg);
+    }
 
     comm_finalize();
     MPI_Finalize();

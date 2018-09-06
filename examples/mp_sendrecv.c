@@ -65,7 +65,7 @@ int sr_exchange (MPI_Comm comm, int size, int iter_count, int window_size, int v
     CUDA_CHECK(cudaMalloc((void **)&buf_d, buf_size));
     CUDA_CHECK(cudaMemset(buf_d, 0, buf_size)); 
 
-    MP_CHECK(mp_register(buf_d, buf_size, &reg));
+    MP_CHECK(mp_register(buf_d, buf_size, &reg, 0));
 
     dbg_msg("registered ptr: %p size: %zu\n", buf_d, buf_size);
 
